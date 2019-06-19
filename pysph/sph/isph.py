@@ -374,11 +374,13 @@ class SetPressureSolid(Equation):
 
 
 class GTVFAcceleration(Equation):
-    def __init__(self, dest, sources, pref, hij_fac=0.5, internal_flow=False):
-        self.hij_fac = hij_fac
+    def __init__(self, dest, sources, pref, internal_flow=False,
+                 gtvf_delta=0.02):
         self.pref = pref
         assert self.pref is not None, "pref should not be None"
         self.internal = internal_flow
+        self.hij_fac = 1 if self.internal else 0.5
+        self.gtvf_delta = gtvf_delta
         super(GTVFAcceleration, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_auhat, d_avhat, d_awhat, d_p0, d_p):
@@ -405,7 +407,7 @@ class GTVFAcceleration(Equation):
         d_awhat[d_idx] += tmp * dwijhat[2]
 
     def post_loop(self, d_auhat, d_avhat, d_awhat, d_idx, d_h, dt):
-        max_dist = 0.02*d_h[d_idx]
+        max_dist = self.gtvf_delta*d_h[d_idx]
         dt2b2 = dt*dt*0.5
         dist = sqrt(d_auhat[d_idx]**2 + d_avhat[d_idx]**2 +
                     d_awhat[d_idx]**2)*dt2b2
@@ -496,8 +498,8 @@ class ISPHScheme(Scheme):
                  gx=0.0, gy=0.0, gz=0.0, variant="CR", tolerance=0.05,
                  omega=0.5, hg_correction=False, has_ghosts=False,
                  inviscid_solids=None, inlet_outlet_manager=None, pref=None,
-                 gtvf=False, symmetric=False, rho_cutoff=0.8, hij_fac=0.5,
-                 max_iterations=1000, internal_flow=False):
+                 gtvf=False, symmetric=False, rho_cutoff=0.8,
+                 max_iterations=1000, internal_flow=False, gtvf_delta=0.02):
         self.fluids = fluids
         self.solids = solids
         self.solver = None
@@ -524,9 +526,9 @@ class ISPHScheme(Scheme):
         self.pref = pref
         self.gtvf = gtvf
         self.symmetric = symmetric
-        self.hij_fac = hij_fac
         self.max_iterations = max_iterations
         self.internal_flow = internal_flow
+        self.gtvf_delta = gtvf_delta
 
     def add_user_options(self, group):
         group.add_argument(
@@ -549,6 +551,11 @@ class ISPHScheme(Scheme):
             default=None,
             help='Artificial viscosity.'
         )
+        group.add_argument(
+            '--gtvf-delta', action='store', type=float, dest='gtvf_delta',
+            default=0.02,
+            help='Factor limiting GTVF acceleration.'
+        )
         add_bool_argument(
             group, 'gtvf', dest='gtvf', default=None,
             help='Use GTVF.'
@@ -557,9 +564,14 @@ class ISPHScheme(Scheme):
             group, 'symmetric', dest='symmetric', default=None,
             help='Use symmetric form of pressure gradient.'
         )
+        add_bool_argument(
+            group, 'internal', dest='internal_flow', default=None,
+            help='If the simulation is internal or external.'
+        )
 
     def consume_user_options(self, options):
-        _vars = ['variant', 'tolerance', 'omega', 'alpha', 'gtvf', 'symmetric']
+        _vars = ['variant', 'tolerance', 'omega', 'alpha', 'gtvf', 'symmetric',
+                 'gtvf_delta', 'internal_flow']
         data = dict((var, self._smart_getattr(options, var))
                     for var in _vars)
         self.configure(**data)
@@ -765,14 +777,14 @@ class ISPHScheme(Scheme):
                 real=False
             )
             solver_eqns = [ghost_eqns]
-        
+
         if all_solids:
             g3 = self._get_pressure_bc()
             solver_eqns.append(g3)
 
         eq3 = []
         for fluid in self.fluid_with_io:
-            if not fluid == 'outlet': 
+            if not fluid == 'outlet':
                 eq3.append(PressureCoeffMatrixIterative(dest=fluid, sources=all))
                 eq3.append(
                     PPESolve(
@@ -852,8 +864,8 @@ class ISPHScheme(Scheme):
             if self.gtvf:
                 eq4.append(
                     GTVFAcceleration(dest=fluid, sources=all, pref=self.pref,
-                                     hij_fac=self.hij_fac,
-                                     internal_flow=self.internal_flow)
+                                     internal_flow=self.internal_flow,
+                                     gtvf_delta=self.gtvf_delta)
                 )
         stg2.append(Group(equations=eq4))
         return MultiStageEquations([stg1, stg2])
