@@ -13,6 +13,9 @@ from pysph.sph.rigid_body_setup import (
     setup_rotation_matrix_rigid_body, setup_quaternion_rigid_body,
     setup_rotation_matrix_rigid_body_optimized,
     setup_quaternion_rigid_body_optimized)
+from compyle.api import (elementwise, annotate, wrap)
+from cython import (address)
+from pysph.sph.wc.linalg import (mat_mult, mat_vec_mult, dot)
 from numpy import sin, cos
 
 
@@ -2209,6 +2212,416 @@ class RigidBodyQuaternionsOptimizedScheme(Scheme):
         for body in self.bodies:
             if body not in steppers:
                 steppers[body] = RK2StepRigidBodyQuaternionsOptimized()
+
+        cls = integrator_cls if integrator_cls is not None else EPECIntegrator
+        integrator = cls(**steppers)
+
+        self.solver = Solver(dim=self.dim, integrator=integrator,
+                             kernel=kernel, **kw)
+
+    def get_equations(self):
+        from pysph.sph.equation import Group
+        equations = []
+        g1 = []
+        if self.solids is not None:
+            all = self.bodies + self.solids
+        else:
+            all = self.bodies
+
+        for name in self.bodies:
+            g1.append(
+                BodyForce(dest=name, sources=None, gx=self.gx, gy=self.gy,
+                          gz=self.gz))
+        equations.append(Group(equations=g1, real=False))
+
+        g2 = []
+        for name in self.bodies:
+            g2.append(
+                RigidBodyCollision(dest=name, sources=all, kn=self.kn,
+                                   mu=self.mu, en=self.en))
+        equations.append(Group(equations=g2, real=False))
+
+        g3 = []
+        for name in self.bodies:
+            g3.append(SumUpExternalForces(dest=name, sources=None))
+        equations.append(Group(equations=g3, real=False))
+
+        return equations
+
+
+########################################################################
+# Rigid body simulation using rotation matrices made fast with compyle #
+########################################################################
+@annotate(orien='gdoublep')
+def normalize_R_orientation_compyle(orien):
+    # column 1
+    a1 = declare('matrix(3)')
+    # column 2
+    a2 = declare('matrix(3)')
+    # column 3
+    a3 = declare('matrix(3)')
+    # unit column 1
+    b1 = declare('matrix(3)')
+    # unit column 2
+    b2 = declare('matrix(3)')
+    # unit column 3
+    b3 = declare('matrix(3)')
+
+    # initialize column 1 from matrix
+    a1[0] = orien[0]
+    a1[1] = orien[3]
+    a1[2] = orien[6]
+    # initialize column 2 from matrix
+    a2[0] = orien[1]
+    a2[1] = orien[4]
+    a2[2] = orien[7]
+    # initialize column 3 from matrix
+    a3[0] = orien[2]
+    a3[1] = orien[5]
+    a3[2] = orien[8]
+
+    # norm of column 1
+    na1 = sqrt(a1[0]**2 + a1[1]**2 + a1[2]**2)
+
+    # normalized unit column 1
+    b1[0] = a1[0] / na1
+    b1[1] = a1[1] / na1
+    b1[2] = a1[2] / na1
+
+    # dot product between b1 and a2
+    # tmp = b1[0]*a2[0] + b1[1]*a2[1] + b1[2]*a2[2]
+    tmp = dot(b1, a2, 3)
+    b2[0] = a2[0] - tmp * b1[0]
+    b2[1] = a2[1] - tmp * b1[1]
+    b2[2] = a2[2] - tmp * b1[2]
+    nb2 = sqrt(b2[0]**2 + b2[1]**2 + b2[2]**2)
+
+    # normalized unit column 2
+    b2[0] = b2[0] / nb2
+    b2[1] = b2[1] / nb2
+    b2[2] = b2[2] / nb2
+
+    tmp1 = dot(b1, a3, 3)
+    tmp2 = dot(b2, a3, 3)
+    b3[0] = a3[0] - tmp1 * b1[0] - tmp2 * b2[0]
+    b3[1] = a3[1] - tmp1 * b1[1] - tmp2 * b2[1]
+    b3[2] = a3[2] - tmp1 * b1[2] - tmp2 * b2[2]
+    nb3 = sqrt(b3[0]**2 + b3[1]**2 + b3[2]**2)
+
+    # normalized unit column 2
+    b3[0] = b3[0] / nb3
+    b3[1] = b3[1] / nb3
+    b3[2] = b3[2] / nb3
+
+    # set it back to the rotation matrix
+    orien[0] = b1[0]
+    orien[3] = b1[1]
+    orien[6] = b1[2]
+    orien[1] = b2[0]
+    orien[4] = b2[1]
+    orien[7] = b2[2]
+    orien[2] = b3[0]
+    orien[5] = b3[1]
+    orien[8] = b3[2]
+
+
+@annotate(vec='gdoublep', mat='gdoublep')
+def vec_to_skew_matrix(vec, mat):
+    mat[0] = 0.
+    mat[1] = -vec[2]
+    mat[2] = vec[1]
+    mat[3] = vec[2]
+    mat[4] = 0.
+    mat[5] = -vec[0]
+    mat[6] = -vec[1]
+    mat[7] = vec[0]
+    mat[8] = 0.
+
+
+@annotate(mat='gdoublep', res='gdoublep')
+def transpose(mat, res):
+    res[0] = mat[0]
+    res[1] = mat[3]
+    res[2] = mat[6]
+    res[3] = mat[1]
+    res[4] = mat[4]
+    res[5] = mat[7]
+    res[6] = mat[2]
+    res[7] = mat[5]
+    res[8] = mat[8]
+
+
+@annotate(a='gdoublep', b='gdoublep', res='gdoublep')
+def cross_product(a, b, res):
+    res[0] = a[1] * b[2] - a[2] * b[1]
+    res[1] = a[2] * b[0] - a[0] * b[2]
+    res[2] = a[0] * b[1] - a[1] * b[0]
+
+
+@elementwise
+@annotate
+def compyle_py_initialize(i, total_mass, cm, vc, omega, cm0, vc0, omega0, R0,
+                          R):
+    i3, i9, j = declare('int', 3)
+    i3 = 3 * i
+    i9 = 9 * i
+    for j in range(3):
+        # save the center of mass and center of mass velocity
+        cm0[i3+j] = cm[i3+j]
+        vc0[i3+j] = vc[i3+j]
+        omega0[i3+j] = omega[i3+j]
+
+    # save the current orientation
+    for j in range(9):
+        R0[i9+j] = R[i9+j]
+
+
+@elementwise
+@annotate
+def compyle_py_stage1(i, total_mass, cm, vc, omega, cm0, vc0, omega0, R0, R,
+                      force, torque, mib, mig, dt):
+    i3, i9, j = declare('int', 3)
+    dtb2 = declare('float', 1)
+    # tmp arrays for intermediate computation
+    tmp_mat = declare('matrix(9)')
+    tmp_vec1 = declare('matrix(3)')
+    tmp_vec2 = declare('matrix(3)')
+    tmp_vec3 = declare('matrix(3)')
+    omega_dot = declare('matrix(3)')
+    R_t = declare('matrix(9)')
+    dtb2 = dt / 2.
+    i3 = 3 * i
+    i9 = 9 * i
+    for j in range(3):
+        # using velocity at t, move position
+        # to t + dt/2.
+        cm[i3+j] = cm0[i3+j] + dtb2 * vc[i3+j]
+        vc[i3+j] = vc0[i3+j] + dtb2 * force[i3+j] / total_mass[i]
+
+    # angular velocity in terms of matrix
+    omega_mat = declare('matrix(9)')
+    vec_to_skew_matrix(address(omega[i3]), omega_mat)
+
+    # Rate of change of orientation is
+    r_dot = declare('matrix(9)')
+    mat_mult(omega_mat, address(R[i9]), 3, r_dot)
+
+    # update the orientation to next time step
+    for j in range(9):
+        R[i9+j] = R0[i9+j] + r_dot[i9+j] * dtb2
+
+    # normalize the orientation using Gram Schmidt process
+    normalize_R_orientation_compyle(address(R[i9]))
+
+    # update the moment of inertia
+    transpose(address(R[i9]), R_t)
+    mat_mult(address(R[i9]), address(mib[i9]), 3, tmp_mat)
+    mat_mult(tmp_mat, R_t, 3, address(mig[i9]))
+
+    # move angular velocity to t + dt/2.
+    # Overall expression is omega cross (I omega)
+    # this is subdivided into (I omega), then a cross product is executed
+    mat_vec_mult(address(mig[i9]), address(omega[i3]), 3, tmp_vec1)
+    cross_product(address(omega[i3]), tmp_vec1, tmp_vec2)
+    # tmp_vec3 = T - omega cross (I * omega) [where * is matrix mult]
+    tmp_vec3[0] = torque[i3+0] - tmp_vec2[0]
+    tmp_vec3[1] = torque[i3+1] - tmp_vec2[1]
+    tmp_vec3[2] = torque[i3+2] - tmp_vec2[2]
+
+    # omega_dot = I_inverse * tmp_vec3 (* is mat mult)
+    mat_vec_mult(address(mig[i9]), tmp_vec3, 3, omega_dot)
+    omega[i3+0] = omega0[i3+0] + omega_dot[i3+0] * dtb2
+    omega[i3+1] = omega0[i3+1] + omega_dot[i3+1] * dtb2
+    omega[i3+2] = omega0[i3+2] + omega_dot[i3+2] * dtb2
+
+
+@elementwise
+@annotate
+def compyle_py_stage2(i, total_mass, cm, vc, omega, cm0, vc0, omega0, R0, R,
+                      force, torque, mib, mig, dt):
+    i3, i9, j = declare('int', 3)
+    # tmp arrays for intermediate computation
+    tmp_mat = declare('matrix(9)')
+    tmp_vec1 = declare('matrix(3)')
+    tmp_vec2 = declare('matrix(3)')
+    tmp_vec3 = declare('matrix(3)')
+    omega_dot = declare('matrix(3)')
+    R_t = declare('matrix(9)')
+    i3 = 3 * i
+    i9 = 9 * i
+    for j in range(3):
+        # using velocity at t, move position
+        # to t + dt
+        cm[i3+j] = cm0[i3+j] + dt * vc[i3+j]
+        vc[i3+j] = vc0[i3+j] + dt * force[i3+j] / total_mass[i]
+
+    # angular velocity in terms of matrix
+    omega_mat = declare('matrix(9)')
+    vec_to_skew_matrix(address(omega[i3]), omega_mat)
+
+    # Rate of change of orientation is
+    r_dot = declare('matrix(9)')
+    mat_mult(omega_mat, address(R[i9]), 3, r_dot)
+
+    # update the orientation to next time step
+    for j in range(9):
+        R[i9+j] = R0[i9+j] + r_dot[i9+j] * dt
+
+    # normalize the orientation using Gram Schmidt process
+    normalize_R_orientation_compyle(address(R[i9]))
+
+    # update the moment of inertia
+    transpose(address(R[i9]), R_t)
+    mat_mult(address(R[i9]), address(mib[i9]), 3, tmp_mat)
+    mat_mult(tmp_mat, R_t, 3, address(mig[i9]))
+
+    # move angular velocity to t + dt/2.
+    # Overall expression is omega cross (I omega)
+    # this is subdivided into (I omega), then a cross product is executed
+    mat_vec_mult(address(mig[i9]), address(omega[i3]), 3, tmp_vec1)
+    cross_product(address(omega[i3]), tmp_vec1, tmp_vec2)
+    # tmp_vec3 = T - omega cross (I * omega) [where * is matrix mult]
+    tmp_vec3[0] = torque[i3+0] - tmp_vec2[0]
+    tmp_vec3[1] = torque[i3+1] - tmp_vec2[1]
+    tmp_vec3[2] = torque[i3+2] - tmp_vec2[2]
+
+    # omega_dot = I_inverse * tmp_vec3 (* is mat mult)
+    mat_vec_mult(address(mig[i9]), tmp_vec3, 3, omega_dot)
+    omega[i3+0] = omega0[i3+0] + omega_dot[i3+0] * dt
+    omega[i3+1] = omega0[i3+1] + omega_dot[i3+1] * dt
+    omega[i3+2] = omega0[i3+2] + omega_dot[i3+2] * dt
+
+
+class RK2StepRigidBodyRotationMatricesCompyle(IntegratorStep):
+    def py_initialize(self, dst, t, dt):
+        total_mass, cm, vc, omega, cm0, vc0, omega0, R0, R = wrap(
+            dst.total_mass, dst.cm, dst.vc, dst.omega, dst.cm0, dst.vc0,
+            dst.omega0, dst.R0, dst.R)
+        # total_mass, cm, vc, omega, cm0, vc0, omega0, R0, R = dst.total_mass,
+        # dst.cm, dst.vc, dst.omega, dst.cm0, dst.vc0, dst.omega0, dst.R0,
+        # dst.R
+        compyle_py_initialize(total_mass, cm, vc, omega, cm0, vc0, omega0, R0,
+                              R)
+
+    def initialize(self):
+        pass
+
+    def py_stage1(self, dst, t, dt):
+        args = wrap(dst.total_mass, dst.cm, dst.vc, dst.omega, dst.cm0,
+                    dst.vc0, dst.omega0, dst.R0, dst.R, dst.force, dst.torque,
+                    dst.mib, dst.mig)
+        compyle_py_stage1(*(args + [dt]))
+
+    def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_dx0, d_dy0, d_dz0,
+               d_cm, d_vc, d_R, d_omega, d_body_id):
+        # some variables to update the positions seamlessly
+        bid, i9, i3 = declare('int', 3)
+        bid = d_body_id[d_idx]
+        i9 = 9 * bid
+        i3 = 3 * bid
+
+        ###########################
+        # Update position vectors #
+        ###########################
+        # rotate the position of the vector in the body frame to global frame
+        dx = (d_R[i9+0] * d_dx0[d_idx] + d_R[i9+1] * d_dy0[d_idx] +
+              d_R[i9+2] * d_dz0[d_idx])
+        dy = (d_R[i9+3] * d_dx0[d_idx] + d_R[i9+4] * d_dy0[d_idx] +
+              d_R[i9+5] * d_dz0[d_idx])
+        dz = (d_R[i9+6] * d_dx0[d_idx] + d_R[i9+7] * d_dy0[d_idx] +
+              d_R[i9+8] * d_dz0[d_idx])
+
+        d_x[d_idx] = d_cm[i3+0] + dx
+        d_y[d_idx] = d_cm[i3+1] + dy
+        d_z[d_idx] = d_cm[i3+2] + dz
+
+        ###########################
+        # Update velocity vectors #
+        ###########################
+        # here du, dv, dw are velocities due to angular velocity
+        # dV = omega \cross dr
+        # where dr = x - cm
+        du = d_omega[i3+1] * dz - d_omega[i3+2] * dy
+        dv = d_omega[i3+2] * dx - d_omega[i3+0] * dz
+        dw = d_omega[i3+0] * dy - d_omega[i3+1] * dx
+
+        d_u[d_idx] = d_vc[i3+0] + du
+        d_v[d_idx] = d_vc[i3+1] + dv
+        d_w[d_idx] = d_vc[i3+2] + dw
+
+    def py_stage2(self, dst, t, dt):
+        args = wrap(dst.total_mass, dst.cm, dst.vc, dst.omega, dst.cm0,
+                    dst.vc0, dst.omega0, dst.R0, dst.R, dst.force, dst.torque,
+                    dst.mib, dst.mig)
+        compyle_py_stage2(*(args + [dt]))
+
+    def stage2(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_dx0, d_dy0, d_dz0,
+               d_cm, d_vc, d_R, d_omega, d_body_id):
+        # some variables to update the positions seamlessly
+        bid, i9, i3 = declare('int', 3)
+        bid = d_body_id[d_idx]
+        i9 = 9 * bid
+        i3 = 3 * bid
+
+        ###########################
+        # Update position vectors #
+        ###########################
+        # rotate the position of the vector in the body frame to global frame
+        dx = (d_R[i9+0] * d_dx0[d_idx] + d_R[i9+1] * d_dy0[d_idx] +
+              d_R[i9+2] * d_dz0[d_idx])
+        dy = (d_R[i9+3] * d_dx0[d_idx] + d_R[i9+4] * d_dy0[d_idx] +
+              d_R[i9+5] * d_dz0[d_idx])
+        dz = (d_R[i9+6] * d_dx0[d_idx] + d_R[i9+7] * d_dy0[d_idx] +
+              d_R[i9+8] * d_dz0[d_idx])
+
+        d_x[d_idx] = d_cm[i3+0] + dx
+        d_y[d_idx] = d_cm[i3+1] + dy
+        d_z[d_idx] = d_cm[i3+2] + dz
+
+        ###########################
+        # Update velocity vectors #
+        ###########################
+        # here du, dv, dw are velocities due to angular velocity
+        # dV = omega \cross dr
+        # where dr = x - cm
+        du = d_omega[i3+1] * dz - d_omega[i3+2] * dy
+        dv = d_omega[i3+2] * dx - d_omega[i3+0] * dz
+        dw = d_omega[i3+0] * dy - d_omega[i3+1] * dx
+
+        d_u[d_idx] = d_vc[i3+0] + du
+        d_v[d_idx] = d_vc[i3+1] + dv
+        d_w[d_idx] = d_vc[i3+2] + dw
+
+
+class RigidBodyRotationMatricesCompyleScheme(Scheme):
+    def __init__(self, bodies, solids, dim, kn, mu=0.5, en=1.0, gx=0.0,
+                 gy=0.0, gz=0.0, debug=False):
+        self.bodies = bodies
+        self.solids = solids
+        self.dim = dim
+        self.kn = kn
+        self.mu = mu
+        self.en = en
+        self.gx = gx
+        self.gy = gy
+        self.gz = gz
+        self.debug = debug
+
+    def configure_solver(self, kernel=None, integrator_cls=None,
+                         extra_steppers=None, **kw):
+        from pysph.base.kernels import CubicSpline
+        from pysph.sph.integrator import EPECIntegrator
+        from pysph.solver.solver import Solver
+        if kernel is None:
+            kernel = CubicSpline(dim=self.dim)
+
+        steppers = {}
+        if extra_steppers is not None:
+            steppers.update(extra_steppers)
+
+        for body in self.bodies:
+            if body not in steppers:
+                steppers[body] = RK2StepRigidBodyRotationMatricesCompyle()
 
         cls = integrator_cls if integrator_cls is not None else EPECIntegrator
         integrator = cls(**steppers)
