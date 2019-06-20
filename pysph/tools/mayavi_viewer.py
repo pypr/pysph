@@ -93,6 +93,14 @@ def sort_file_list(files):
     return files
 
 
+def is_running(timer):
+    '''Backward compatible timer check.'''
+    if hasattr(timer, 'active'):
+        return timer.active
+    else:
+        return timer.IsRunning()
+
+
 ##############################################################################
 # `InterpolatorView` class.
 ##############################################################################
@@ -677,7 +685,10 @@ class MayaviViewer(HasTraits):
     file_count = Range(low='_low', high='_n_files', value=0,
                        desc='the file counter')
     play = Bool(False, desc='if all files are played automatically')
-    play_delay = Float(0.2, desc='the delay between loading files')
+    play_delay = Float(0.2, enter_set=True, auto_set=False,
+                       desc='the delay between loading files')
+    play_step = Int(1, enter_set=True, auto_set=False,
+                    desc='steps between files played')
     loop = Bool(False, desc='if the animation is looped')
     # This is len(files) - 1.
     _n_files = Int(0)
@@ -727,6 +738,8 @@ class MayaviViewer(HasTraits):
                             ),
                             HGroup(
                                 Item(name='play'),
+                                Item(name='play_step',
+                                     label='Step'),
                                 Item(name='play_delay',
                                      label='Delay'),
                                 Item(name='loop'),
@@ -820,7 +833,7 @@ class MayaviViewer(HasTraits):
 
         # Just accessing the timer will start it.
         t = self.timer
-        if not t.IsRunning():
+        if not is_running(t):
             t.Start(int(self._poll_interval*1000))
 
     @on_trait_change('scene:activated')
@@ -1001,7 +1014,7 @@ class MayaviViewer(HasTraits):
         t = self.timer
         if t is None:
             return
-        if t.IsRunning():
+        if is_running(t):
             t.Stop()
             interval = max(value, self._poll_interval)
             t.Start(int(interval*1000))
@@ -1042,10 +1055,10 @@ class MayaviViewer(HasTraits):
             self._file_count_changed(fc)
         t = self.timer
         if not self.live_mode:
-            if t.IsRunning():
+            if is_running(t):
                 t.Stop()
         else:
-            if not t.IsRunning():
+            if not is_running(t):
                 t.Stop()
                 t.Start(self._poll_interval*1000)
 
@@ -1103,7 +1116,11 @@ class MayaviViewer(HasTraits):
         t = self.timer
         if value:
             t.Stop()
-            t.callable = self._play_event
+            if hasattr(t, 'callback'):
+                t.callback = self._play_event
+            else:
+                t.callable = self._play_event
+
             t.Start(1000*self.play_delay)
         else:
             t.Stop()
@@ -1116,13 +1133,19 @@ class MayaviViewer(HasTraits):
     def _play_event(self):
         nf = self._n_files
         pc = self.file_count
-        pc += 1
+        pc += self.play_step
         if pc > nf:
             if self.loop:
                 pc = 0
             else:
                 self.timer.Stop()
                 pc = nf
+        elif pc < 0:
+            if self.loop:
+                pc = nf
+            else:
+                self.timer.Stop()
+                pc = 0
         self.file_count = pc
         self._handle_particle_array_updates()
 
