@@ -16,6 +16,7 @@ from pysph.sph.rigid_body import (
     RigidBodySimpleScheme, RigidBodyRotationMatricesScheme,
     RigidBodyQuaternionScheme, RigidBodyRotationMatricesOptimizedScheme,
     RigidBodyQuaternionsOptimizedScheme,
+    RigidBodyRotationMatricesCompyleScheme,
     get_particle_array_rigid_body_rotation_matrix,
     get_particle_array_rigid_body_quaternion,
     get_particle_array_rigid_body_rotation_matrix_optimized,
@@ -103,6 +104,20 @@ class Case4(Application):
             add_properties(body, 'tang_velocity_z', 'tang_disp_y',
                            'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
                            'tang_disp_z')
+        elif self.options.scheme == 'rbrmcs':
+            body = get_particle_array_rigid_body_rotation_matrix(
+                name='body', x=body.x, y=body.y, h=body.h, m=body.m,
+                rad_s=body.rad_s, body_id=body.body_id)
+            add_properties(body, 'tang_velocity_z', 'tang_disp_y',
+                           'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
+                           'tang_disp_z')
+
+            if body.backend == 'cython':
+                from pysph.base.device_helper import DeviceHelper
+                from compyle.api import get_config
+                get_config().use_double = True
+                body.set_device_helper(DeviceHelper(body))
+                tank.set_device_helper(DeviceHelper(tank))
 
         # setup initial conditions
         body.vc[0] = -3.0
@@ -123,7 +138,6 @@ class Case4(Application):
         return [body, tank]
 
     def create_scheme(self):
-        # rbss = RigidBodySimpleScheme
         rbss = RigidBodySimpleScheme(bodies=['body'], solids=['tank'],
                                      dim=self.dim, kn=self.kn, mu=self.mu,
                                      en=self.en, gy=-9.81)
@@ -139,8 +153,11 @@ class Case4(Application):
         rbqos = RigidBodyQuaternionsOptimizedScheme(bodies=['body'], solids=[
             'tank'
         ], dim=self.dim, kn=self.kn, mu=self.mu, en=self.en, gy=-9.81)
+        rbrmcs = RigidBodyRotationMatricesCompyleScheme(
+            bodies=['body'], solids=['tank'], dim=self.dim, kn=self.kn,
+            mu=self.mu, en=self.en, gy=-9.81)
         s = SchemeChooser(default='rbss', rbss=rbss, rbrms=rbrms, rbqs=rbqs,
-                          rbrmos=rbrmos, rbqos=rbqos)
+                          rbrmos=rbrmos, rbqos=rbqos, rbrmcs=rbrmcs)
 
         return s
 
@@ -154,7 +171,6 @@ class Case4(Application):
                                 dt=dt, tf=tf)
 
     def customize_output(self):
-        #
         self._mayavi_config('''
         viewer.scalar = 'u'
         b = particle_arrays['tank']

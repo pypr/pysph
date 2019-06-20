@@ -14,7 +14,7 @@ from pysph.sph.rigid_body_setup import (
     setup_rotation_matrix_rigid_body_optimized,
     setup_quaternion_rigid_body_optimized)
 from compyle.api import (elementwise, annotate, wrap)
-from cython import (address)
+from compyle.low_level import (address)
 from pysph.sph.wc.linalg import (mat_mult, mat_vec_mult, dot)
 from numpy import sin, cos
 
@@ -2408,7 +2408,7 @@ def compyle_py_stage1(i, total_mass, cm, vc, omega, cm0, vc0, omega0, R0, R,
 
     # update the orientation to next time step
     for j in range(9):
-        R[i9+j] = R0[i9+j] + r_dot[i9+j] * dtb2
+        R[i9+j] = R0[i9+j] + r_dot[j] * dtb2
 
     # normalize the orientation using Gram Schmidt process
     normalize_R_orientation_compyle(address(R[i9]))
@@ -2430,9 +2430,9 @@ def compyle_py_stage1(i, total_mass, cm, vc, omega, cm0, vc0, omega0, R0, R,
 
     # omega_dot = I_inverse * tmp_vec3 (* is mat mult)
     mat_vec_mult(address(mig[i9]), tmp_vec3, 3, omega_dot)
-    omega[i3+0] = omega0[i3+0] + omega_dot[i3+0] * dtb2
-    omega[i3+1] = omega0[i3+1] + omega_dot[i3+1] * dtb2
-    omega[i3+2] = omega0[i3+2] + omega_dot[i3+2] * dtb2
+    omega[i3+0] = omega0[i3+0] + omega_dot[0] * dtb2
+    omega[i3+1] = omega0[i3+1] + omega_dot[1] * dtb2
+    omega[i3+2] = omega0[i3+2] + omega_dot[2] * dtb2
 
 
 @elementwise
@@ -2465,7 +2465,7 @@ def compyle_py_stage2(i, total_mass, cm, vc, omega, cm0, vc0, omega0, R0, R,
 
     # update the orientation to next time step
     for j in range(9):
-        R[i9+j] = R0[i9+j] + r_dot[i9+j] * dt
+        R[i9+j] = R0[i9+j] + r_dot[j] * dt
 
     # normalize the orientation using Gram Schmidt process
     normalize_R_orientation_compyle(address(R[i9]))
@@ -2487,29 +2487,32 @@ def compyle_py_stage2(i, total_mass, cm, vc, omega, cm0, vc0, omega0, R0, R,
 
     # omega_dot = I_inverse * tmp_vec3 (* is mat mult)
     mat_vec_mult(address(mig[i9]), tmp_vec3, 3, omega_dot)
-    omega[i3+0] = omega0[i3+0] + omega_dot[i3+0] * dt
-    omega[i3+1] = omega0[i3+1] + omega_dot[i3+1] * dt
-    omega[i3+2] = omega0[i3+2] + omega_dot[i3+2] * dt
+    omega[i3+0] = omega0[i3+0] + omega_dot[0] * dt
+    omega[i3+1] = omega0[i3+1] + omega_dot[1] * dt
+    omega[i3+2] = omega0[i3+2] + omega_dot[2] * dt
 
 
 class RK2StepRigidBodyRotationMatricesCompyle(IntegratorStep):
     def py_initialize(self, dst, t, dt):
-        total_mass, cm, vc, omega, cm0, vc0, omega0, R0, R = wrap(
-            dst.total_mass, dst.cm, dst.vc, dst.omega, dst.cm0, dst.vc0,
-            dst.omega0, dst.R0, dst.R)
-        # total_mass, cm, vc, omega, cm0, vc0, omega0, R0, R = dst.total_mass,
-        # dst.cm, dst.vc, dst.omega, dst.cm0, dst.vc0, dst.omega0, dst.R0,
-        # dst.R
-        compyle_py_initialize(total_mass, cm, vc, omega, cm0, vc0, omega0, R0,
-                              R)
+        # total_mass, cm, vc, omega, cm0, vc0, omega0, R0, R = wrap(
+        #     dst.total_mass, dst.cm, dst.vc, dst.omega, dst.cm0, dst.vc0,
+        #     dst.omega0, dst.R0, dst.R)
+        g = dst.gpu
+        compyle_py_initialize(g.total_mass, g.cm, g.vc, g.omega, g.cm0, g.vc0,
+                              g.omega0, g.R0,
+                              g.R)
 
     def initialize(self):
         pass
 
     def py_stage1(self, dst, t, dt):
-        args = wrap(dst.total_mass, dst.cm, dst.vc, dst.omega, dst.cm0,
-                    dst.vc0, dst.omega0, dst.R0, dst.R, dst.force, dst.torque,
-                    dst.mib, dst.mig)
+        # args = wrap(dst.total_mass, dst.cm, dst.vc, dst.omega, dst.cm0,
+        #             dst.vc0, dst.omega0, dst.R0, dst.R, dst.force, dst.torque,
+        #             dst.mib, dst.mig)
+        g = dst.gpu
+        args = [g.total_mass, g.cm, g.vc, g.omega, g.cm0,
+                g.vc0, g.omega0, g.R0, g.R, g.force, g.torque,
+                g.mib, g.mig]
         compyle_py_stage1(*(args + [dt]))
 
     def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_dx0, d_dy0, d_dz0,
@@ -2550,9 +2553,13 @@ class RK2StepRigidBodyRotationMatricesCompyle(IntegratorStep):
         d_w[d_idx] = d_vc[i3+2] + dw
 
     def py_stage2(self, dst, t, dt):
-        args = wrap(dst.total_mass, dst.cm, dst.vc, dst.omega, dst.cm0,
-                    dst.vc0, dst.omega0, dst.R0, dst.R, dst.force, dst.torque,
-                    dst.mib, dst.mig)
+        # args = wrap(dst.total_mass, dst.cm, dst.vc, dst.omega, dst.cm0,
+        #             dst.vc0, dst.omega0, dst.R0, dst.R, dst.force, dst.torque,
+        #             dst.mib, dst.mig)
+        g = dst.gpu
+        args = [g.total_mass, g.cm, g.vc, g.omega, g.cm0,
+                g.vc0, g.omega0, g.R0, g.R, g.force, g.torque,
+                g.mib, g.mig]
         compyle_py_stage2(*(args + [dt]))
 
     def stage2(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_dx0, d_dy0, d_dz0,

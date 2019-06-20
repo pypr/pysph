@@ -112,6 +112,11 @@ class Case0(Application):
             add_properties(body, 'tang_velocity_z', 'tang_disp_y',
                            'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
                            'tang_disp_z')
+            if body.backend == 'cython':
+                from pysph.base.device_helper import DeviceHelper
+                from compyle.api import get_config
+                get_config().use_double = True
+                body.set_device_helper(DeviceHelper(body))
 
         body.vc[0] = 0.5
         body.vc[1] = 0.5
