@@ -1,4 +1,4 @@
-"""A cube translating and rotating freely without the influence of gravity.
+"""A cube, translating and rotating freely without the influence of gravity.
 
 This is used to test the rigid body dynamics equations.
 """

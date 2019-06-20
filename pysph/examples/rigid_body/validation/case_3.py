@@ -1,4 +1,4 @@
-"""A 2d cube bouncing inside a box. (5 seconds)
+"""A 2d cube bouncing inside a box. (8 seconds)
 
 This is used to test the rigid body equations.
 """

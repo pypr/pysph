@@ -1,4 +1,4 @@
-"""Four two dimensional cubes falling under gravity into a tank. (5 seconds)
+"""Four two dimensional cubes falling under gravity into a tank. (12 seconds)
 
 This is used to test the rigid body equations.
 """

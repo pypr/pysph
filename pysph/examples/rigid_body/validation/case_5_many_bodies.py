@@ -1,4 +1,5 @@
-"""Thousand two dimensional cubes falling under gravity into a tank.
+"""Many two dimensional cubes falling under gravity into a tank,
+with hopper as an obstacle.
 
 This is used to test the performance of rigid body dynamics schemes.
 """

@@ -1,4 +1,4 @@
-"""Freely rotating rigid plate hits another steady rigid plate. (10 seconds)
+"""Freely rotating rigid plate hits another steady rigid plate. (7 seconds)
 
 This is used to test the rigid body dynamics equations.
 """
