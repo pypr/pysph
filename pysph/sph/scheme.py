@@ -881,7 +881,7 @@ class GasDScheme(Scheme):
                  alpha2=0.1, beta=2.0, adaptive_h_scheme='mpm',
                  update_alpha1=False, update_alpha2=False,
                  max_density_iterations=250,
-                 density_iteration_tolerance=1e-5):
+                 density_iteration_tolerance=1e-3):
         """
         Parameters
         ----------
@@ -1019,7 +1019,8 @@ class GasDScheme(Scheme):
         from pysph.sph.equation import Group
         from pysph.sph.gas_dynamics.basic import (
             ScaleSmoothingLength, UpdateSmoothingLengthFromVolume,
-            SummationDensity, IdealGasEOS, MPMAccelerations
+            SummationDensity, IdealGasEOS, MPMAccelerations,
+            MPMUpdateGhostProps
         )
         from pysph.sph.gas_dynamics.boundary_equations import WallBoundary
 
@@ -1087,7 +1088,14 @@ class GasDScheme(Scheme):
         g3 = []
         for solid in self.solids:
             g3.append(WallBoundary(solid, sources=self.fluids))
-            equations.append(Group(equations=g3))
+        equations.append(Group(equations=g3))
+
+        gh = []
+        for fluid in self.fluids:
+            gh.append(
+                MPMUpdateGhostProps(dest=fluid, sources=None)
+            )
+        equations.append(Group(equations=gh, real=False))
 
         g4 = []
         for fluid in self.fluids:
@@ -1104,6 +1112,7 @@ class GasDScheme(Scheme):
 
     def setup_properties(self, particles, clean=True):
         from pysph.base.utils import get_particle_array_gasd
+        import numpy
         particle_arrays = dict([(p.name, p) for p in particles])
         dummy = get_particle_array_gasd(name='junk')
         props = list(dummy.properties.keys())
@@ -1111,6 +1120,9 @@ class GasDScheme(Scheme):
         for fluid in self.fluids:
             pa = particle_arrays[fluid]
             self._ensure_properties(pa, props, clean)
+            pa.add_property('orig_idx', type='int')
+            nfp = pa.get_number_of_particles()
+            pa.orig_idx[:] = numpy.arange(nfp)
             pa.set_output_arrays(output_props)
 
         solid_props = set(props) | set('div cs wij htmp'.split(' '))
@@ -1416,7 +1428,8 @@ class ADKEScheme(Scheme):
         from pysph.sph.equation import Group
         from pysph.sph.basic_equations import SummationDensity
         from pysph.sph.gas_dynamics.basic import (
-            IdealGasEOS, ADKEAccelerations, SummationDensityADKE
+            IdealGasEOS, ADKEAccelerations, SummationDensityADKE,
+            ADKEUpdateGhostProps
         )
         from pysph.sph.gas_dynamics.boundary_equations import WallBoundary
 
@@ -1455,6 +1468,13 @@ class ADKEScheme(Scheme):
         for elem in self.fluids+self.solids:
             g6.append(IdealGasEOS(elem, sources=None, gamma=self.gamma))
         equations.append(Group(equations=g6))
+
+        gh = []
+        for fluid in self.fluids:
+            gh.append(
+                ADKEUpdateGhostProps(dest=fluid, sources=None)
+            )
+        equations.append(Group(equations=gh, real=False))
 
         g7 = []
         for fluid in self.fluids:
@@ -1512,6 +1532,7 @@ class ADKEScheme(Scheme):
 
     def setup_properties(self, particles, clean=True):
         from pysph.base.utils import get_particle_array
+        import numpy
         particle_arrays = dict([(p.name, p) for p in particles])
         required_props = [
                 'x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm', 'cs', 'p',
@@ -1536,4 +1557,7 @@ class ADKEScheme(Scheme):
         for fluid in self.fluids:
             pa = particle_arrays[fluid]
             self._ensure_properties(pa, props, clean)
+            pa.add_property('orig_idx', type='int')
+            nfp = pa.get_number_of_particles()
+            pa.orig_idx[:] = numpy.arange(nfp)
             pa.set_output_arrays(output_props)
