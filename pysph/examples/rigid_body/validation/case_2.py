@@ -16,6 +16,7 @@ from pysph.sph.rigid_body import (
     RigidBodySimpleScheme, RigidBodyRotationMatricesScheme,
     RigidBodyQuaternionScheme, RigidBodyRotationMatricesOptimizedScheme,
     RigidBodyQuaternionsOptimizedScheme,
+    RigidBodyRotationMatricesCompyleScheme,
     get_particle_array_rigid_body_rotation_matrix,
     get_particle_array_rigid_body_quaternion,
     get_particle_array_rigid_body_rotation_matrix_optimized,
@@ -127,6 +128,27 @@ class Case2(Application):
             add_properties(body2, 'tang_velocity_z', 'tang_disp_y',
                            'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
                            'tang_disp_z')
+        elif self.options.scheme == 'rbrmcs':
+            body1 = get_particle_array_rigid_body_rotation_matrix(
+                name='body1', x=body1.x, y=body1.y, h=body1.h, m=body1.m,
+                rad_s=body1.rad_s)
+            body1.omega[2] = -3.
+            add_properties(body1, 'tang_velocity_z', 'tang_disp_y',
+                           'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
+                           'tang_disp_z')
+            body2 = get_particle_array_rigid_body_rotation_matrix(
+                name='body2', x=body2.x, y=body2.y, h=body2.h, m=body2.m,
+                rad_s=body2.rad_s)
+            add_properties(body2, 'tang_velocity_z', 'tang_disp_y',
+                           'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
+                           'tang_disp_z')
+            if body1.backend == 'cython':
+                from pysph.base.device_helper import DeviceHelper
+                from compyle.api import get_config
+                get_config().use_double = True
+                body1.set_device_helper(DeviceHelper(body1))
+                body2.set_device_helper(DeviceHelper(body2))
+
         return [body1, body2]
 
     def create_scheme(self):
@@ -145,8 +167,11 @@ class Case2(Application):
         rbqos = RigidBodyQuaternionsOptimizedScheme(
             bodies=['body1', 'body2'], solids=None, dim=self.dim, kn=self.kn,
             mu=self.mu, en=self.en)
+        rbrmcs = RigidBodyRotationMatricesCompyleScheme(
+            bodies=['body'], solids=['tank'], dim=self.dim, kn=self.kn,
+            mu=self.mu, en=self.en, gy=-9.81)
         s = SchemeChooser(default='rbss', rbss=rbss, rbrms=rbrms, rbqs=rbqs,
-                          rbrmos=rbrmos, rbqos=rbqos)
+                          rbrmos=rbrmos, rbqos=rbqos, rbrmcs=rbrmcs)
         return s
 
     def configure_scheme(self):
