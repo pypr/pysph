@@ -212,11 +212,11 @@ class PressureCoeffMatrixIterative(Equation):
     def loop(self, d_idx, s_idx, s_m, d_rho, s_rho, d_diag, d_odiag, s_pk, XIJ,
              DWIJ, R2IJ, EPS):
         rhoij = (s_rho[s_idx] + d_rho[d_idx])
-        rhoij2_1 = 1.0/(rhoij*rhoij)
+        rhoij2_1 = 1.0/(d_rho[d_idx]*rhoij)
 
         xdotdwij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
 
-        fac = 8.0 * s_m[s_idx] * rhoij2_1 * xdotdwij / (R2IJ + EPS)
+        fac = 4.0 * s_m[s_idx] * rhoij2_1 * xdotdwij / (R2IJ + EPS)
 
         d_diag[d_idx] += fac
         d_odiag[d_idx] += -fac * s_pk[s_idx]
