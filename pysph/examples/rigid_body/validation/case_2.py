@@ -53,7 +53,7 @@ class Case2(Application):
         y = y - 0.8
         m = np.ones_like(x) * dx * dx * self.rho0
         h = np.ones_like(x) * self.hdx * dx
-        rad_s = np.ones_like(x) * dx
+        rad_s = np.ones_like(x) * dx / 2.
         body1 = get_particle_array_rigid_body(name='body1', x=x, y=y, h=h, m=m,
                                               rad_s=rad_s)
         body1.omega[2] = -3.
@@ -142,6 +142,8 @@ class Case2(Application):
             add_properties(body2, 'tang_velocity_z', 'tang_disp_y',
                            'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
                            'tang_disp_z')
+
+        if self.options.scheme == 'rbrmcs':
             if body1.backend == 'cython':
                 from pysph.base.device_helper import DeviceHelper
                 from compyle.api import get_config
@@ -168,8 +170,8 @@ class Case2(Application):
             bodies=['body1', 'body2'], solids=None, dim=self.dim, kn=self.kn,
             mu=self.mu, en=self.en)
         rbrmcs = RigidBodyRotationMatricesCompyleScheme(
-            bodies=['body'], solids=['tank'], dim=self.dim, kn=self.kn,
-            mu=self.mu, en=self.en, gy=-9.81)
+            bodies=['body1', 'body2'], solids=None, dim=self.dim, kn=self.kn,
+            mu=self.mu, en=self.en)
         s = SchemeChooser(default='rbss', rbss=rbss, rbrms=rbrms, rbqs=rbqs,
                           rbrmos=rbrmos, rbqos=rbqos, rbrmcs=rbrmcs)
         return s

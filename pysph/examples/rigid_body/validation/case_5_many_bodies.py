@@ -165,6 +165,7 @@ class Case4(Application):
                            'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
                            'tang_disp_z')
 
+        if self.options.scheme == 'rbrmcs':
             if body.backend == 'cython':
                 from pysph.base.device_helper import DeviceHelper
                 from compyle.api import get_config

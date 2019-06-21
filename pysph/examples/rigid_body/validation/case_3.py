@@ -45,7 +45,7 @@ class Case3(Application):
         m = np.ones_like(x) * dx * dx * self.rho0
         h = np.ones_like(x) * self.hdx * dx
         # radius of each sphere constituting in cube
-        rad_s = np.ones_like(x) * dx
+        rad_s = np.ones_like(x) * dx / 2.
         body = get_particle_array_rigid_body(name='body', x=x, y=y, h=h, m=m,
                                              rad_s=rad_s)
 
@@ -94,23 +94,25 @@ class Case3(Application):
             add_properties(body, 'tang_velocity_z', 'tang_disp_y',
                            'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
                            'tang_disp_z')
-        if self.options.scheme == 'rbrmcs':
+        elif self.options.scheme == 'rbrmcs':
             body = get_particle_array_rigid_body_rotation_matrix(
                 name='body', x=body.x, y=body.y, h=body.h, m=body.m,
                 rad_s=body.rad_s)
             add_properties(body, 'tang_velocity_z', 'tang_disp_y',
                            'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
                            'tang_disp_z')
+
+        body.vc[0] = -3.0
+        body.vc[1] = -3.0
+        body.omega[2] = 1.0
+
+        if self.options.scheme == 'rbrmcs':
             if body.backend == 'cython':
                 from pysph.base.device_helper import DeviceHelper
                 from compyle.api import get_config
                 get_config().use_double = True
                 body.set_device_helper(DeviceHelper(body))
                 tank.set_device_helper(DeviceHelper(tank))
-
-        body.vc[0] = -3.0
-        body.vc[1] = -3.0
-        body.omega[2] = 1.0
         return [body, tank]
 
     def create_scheme(self):

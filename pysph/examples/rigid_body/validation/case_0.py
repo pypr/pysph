@@ -6,7 +6,8 @@ This is used to test the rigid body dynamics equations.
 import numpy as np
 
 from pysph.base.kernels import CubicSpline
-from pysph.base.utils import get_particle_array_rigid_body
+from pysph.base.utils import (get_particle_array_rigid_body,
+                              get_particle_array)
 from pysph.sph.integrator import EPECIntegrator
 from pysph.solver.application import Application
 from pysph.sph.scheme import SchemeChooser
@@ -14,7 +15,8 @@ from pysph.sph.rigid_body import (
     RigidBodySimpleScheme, RigidBodyRotationMatricesScheme,
     RigidBodyQuaternionScheme, RigidBodyRotationMatricesOptimizedScheme,
     RigidBodyQuaternionsOptimizedScheme,
-    RigidBodyRotationMatricesCompyleScheme,
+    RigidBodyRotationMatricesCompyleScheme, RigidBodyRotationMatricesNewScheme,
+    RK2StepRigidBodyRotationMatricesChildBody,
     get_particle_array_rigid_body_rotation_matrix,
     get_particle_array_rigid_body_quaternion,
     get_particle_array_rigid_body_rotation_matrix_optimized,
@@ -51,8 +53,12 @@ class Case0(Application):
         rbrmcs = RigidBodyRotationMatricesCompyleScheme(
             bodies=['body'], solids=None, dim=3, kn=self.kn, mu=self.mu,
             en=self.en)
+        rbrmns = RigidBodyRotationMatricesNewScheme(
+            bodies=['body'], bodies_child=['body_c'], solids=None, dim=3,
+            kn=self.kn, mu=self.mu, en=self.en)
         s = SchemeChooser(default='rbss', rbss=rbss, rbrms=rbrms, rbqs=rbqs,
-                          rbrmos=rbrmos, rbqos=rbqos, rbrmcs=rbrmcs)
+                          rbrmos=rbrmos, rbqos=rbqos, rbrmcs=rbrmcs,
+                          rbrmns=rbrmns)
         return s
 
     def configure_scheme(self):
@@ -106,21 +112,41 @@ class Case0(Application):
                            'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
                            'tang_disp_z')
 
-        if self.options.scheme == 'rbrmcs':
+        elif self.options.scheme == 'rbrmcs':
             body = get_particle_array_rigid_body_rotation_matrix(
                 name='body', x=x, y=y, z=z, h=h, m=m, rad_s=rad_s)
             add_properties(body, 'tang_velocity_z', 'tang_disp_y',
                            'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
                            'tang_disp_z')
+        elif self.options.scheme == 'rbrmns':
+            body = get_particle_array_rigid_body_rotation_matrix(
+                name='body', x=x, y=y, z=z, h=h, m=m, rad_s=rad_s)
+            add_properties(body, 'tang_velocity_z', 'tang_disp_y',
+                           'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
+                           'tang_disp_z')
+            body_c = get_particle_array(name='body_c', x=np.zeros(body.nb[0]))
+            bc = body_c.constants
+            for constant in body.constants:
+                bc[constant] = body.get_carray(constant)
+
+            body.vc[0] = 0.5
+            body.vc[1] = 0.5
+            body.omega[2] = 1.
+            integrator = RK2StepRigidBodyRotationMatricesChildBody()
+            integrator.py_initialize(body, 0., 1e-3)
+            return [body, body_c]
+
+        body.vc[0] = 0.5
+        body.vc[1] = 0.5
+        body.omega[2] = 1.
+
+        if self.options.scheme == 'rbrmcs':
             if body.backend == 'cython':
                 from pysph.base.device_helper import DeviceHelper
                 from compyle.api import get_config
                 get_config().use_double = True
                 body.set_device_helper(DeviceHelper(body))
 
-        body.vc[0] = 0.5
-        body.vc[1] = 0.5
-        body.omega[2] = 1.
         return [body]
 
 

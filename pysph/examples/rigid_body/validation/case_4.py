@@ -112,13 +112,6 @@ class Case4(Application):
                            'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
                            'tang_disp_z')
 
-            if body.backend == 'cython':
-                from pysph.base.device_helper import DeviceHelper
-                from compyle.api import get_config
-                get_config().use_double = True
-                body.set_device_helper(DeviceHelper(body))
-                tank.set_device_helper(DeviceHelper(tank))
-
         # setup initial conditions
         body.vc[0] = -3.0
         body.vc[1] = -3.0
@@ -135,6 +128,14 @@ class Case4(Application):
         body.vc[9] = -3.0
         body.vc[10] = -3.0
         body.omega[11] = 1.0
+
+        if self.options.scheme == 'rbrmcs':
+            if body.backend == 'cython':
+                from pysph.base.device_helper import DeviceHelper
+                from compyle.api import get_config
+                get_config().use_double = True
+                body.set_device_helper(DeviceHelper(body))
+                tank.set_device_helper(DeviceHelper(tank))
         return [body, tank]
 
     def create_scheme(self):
