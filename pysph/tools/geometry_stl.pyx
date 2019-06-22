@@ -4,22 +4,23 @@ import numpy as np
 from stl import mesh
 from numpy.linalg import norm
 from cyarray.api import UIntArray
-from mayavi import mlab
 cimport cython
 cimport numpy as np
 
 DTYPE = np.float
-DTYPE1 = np.int
 ctypedef np.float_t DTYPE_t
+
 
 class ZeroAreaTriangleException(Exception):
     pass
+
 
 class PolygonMeshError(ValueError):
     pass
 
 
-def _point_sign(x1, y1, x2, y2, x3, y3):
+cpdef _point_sign(double x1, double y1, double x2,
+                double y2, double x3, double y3):
     return (x1 - x3) * (y2 - y3) - (x2 - x3) * (y1 - y3)
 
 
@@ -102,194 +103,250 @@ def _get_stl_mesh(stl_fname, dx_triangle):
     m = mesh.Mesh.from_file(stl_fname)
     x_list, y_list, z_list = [], [], []
     for i in range(len(m.vectors)):
-        try:
-            x1, y1, z1 = _fill_triangle(m.vectors[i], dx_triangle)
-            x2, y2, z2 = _get_triangle_sides(m.vectors[i], dx_triangle)
-            x_list.append(np.r_[x1, x2])
-            y_list.append(np.r_[y1, y2])
-            z_list.append(np.r_[z1, z2])
-        except ZeroAreaTriangleException as e:
-            print(e)
-            print("Skipping triangle {}".format(i))
-            continue
+        x1, y1, z1 = _fill_triangle(m.vectors[i], dx_triangle)
+        x2, y2, z2 = _get_triangle_sides(m.vectors[i], dx_triangle)
+        x_list.append(np.r_[x1, x2])
+        y_list.append(np.r_[y1, y2])
+        z_list.append(np.r_[z1, z2])
+
     x = np.concatenate(x_list)
     y = np.concatenate(y_list)
     z = np.concatenate(z_list)
-    points = []
+    return x, y, z
+
+
+def remove_repeated_points(x, y, z, dx_triangle):
+    EPS = np.finfo(float).eps
+    pa_mesh = ParticleArray(name="mesh", x=x, y=y, z=z, h=EPS)
+    pa_grid = ParticleArray(name="grid", x=x, y=y, z=z, h=EPS)
+    pa_list = [pa_mesh, pa_grid]
+    nps = nnps.LinkedListNNPS(dim=3, particles=pa_list, radius_scale=1)
+    cdef float src_index = 1, dst_index = 0
+    nps.set_context(src_index=1, dst_index=0)
+    nbrs = UIntArray()
+    cdef list idx = []
     for i in range(len(x)):
-        point = [x[i], y[i], z[i]]
-        if point in points:
-            pass
-        else:
-            points.append([x[i], y[i], z[i]])
-    x, y, z = [], [], []
-    for i in range(np.shape(points)[0]):
-        x.append(points[i][0])
-        y.append(points[i][1])
-        z.append(points[i][2])
-    points = []
-    for i in range(len(x)):
-        point = [x[i], y[i], z[i]]
-        if point in points:
-            pass
-        else:
-            points.append([x[i], y[i], z[i]])
-    x, y, z = [], [], []
-    for i in range(np.shape(points)[0]):
-        x.append(points[i][0])
-        y.append(points[i][1])
-        z.append(points[i][2])
-    return np.array(x), np.array(y), np.array(z)
+        nps.get_nearest_particles(src_index, dst_index, i, nbrs)
+        neighbours = nbrs.get_npy_array()
+        idx.append(neighbours.min())
+    idx_set = set(idx)
+    idx = list(idx_set)
+    return pa_mesh.x[idx], pa_mesh.y[idx], pa_mesh.z[idx]
 
 
 def _get_stl_mesh_uniform(stl_fname, dx_triangle):
-    """Interpolates points within triangles in the stl file"""
+    """Interpolates points within triangles in the stl file.
+
+        Return
+        ------
+        x, y, z : Coordinates of all points on surface of object
+        x_list, y_list, z_list: Coordinates of surface points grouped
+                                as lists corresponding to their triangle
+    """
     m = mesh.Mesh.from_file(stl_fname)
     x_list, y_list, z_list = [], [], []
     for i in range(len(m.vectors)):
-        try:
-            x1, y1, z1 = _fill_triangle(m.vectors[i], dx_triangle)
-            x2, y2, z2 = _get_triangle_sides(m.vectors[i], dx_triangle)
-            x_list.append(np.r_[x1, x2])
-            y_list.append(np.r_[y1, y2])
-            z_list.append(np.r_[z1, z2])
-        except ZeroAreaTriangleException as e:
-            print(e)
-            print("Skipping triangle {}".format(i))
-            continue
-    sizes = []  # contains number of points corresponding to each triangle
-    for i in range(np.shape(x_list)[0]):
-        sizes.append(np.shape(x_list[i])[0])
-    sizes = np.array(sizes)
-    sizes[0] = sizes[0]-1
-    for k in range(len(sizes)-1):
-        sizes[k+1] = sizes[k]+sizes[k+1]
+        x1, y1, z1 = _fill_triangle(m.vectors[i], dx_triangle)
+        x2, y2, z2 = _get_triangle_sides(m.vectors[i], dx_triangle)
+        x_list.append(np.r_[x1, x2])
+        y_list.append(np.r_[y1, y2])
+        z_list.append(np.r_[z1, z2])
     x = np.concatenate(x_list)
     y = np.concatenate(y_list)
     z = np.concatenate(z_list)
-    return x, y, z, sizes
+    return x, y, z, x_list, y_list, z_list, m
 
 
-def updater(my_mesh, normal_5, points, radius_scale, dx_sph, tracker):
-    cdef int m,n
-    cdef float mag = norm(my_mesh.normals[tracker])
-    normal_5[0] = my_mesh.normals[tracker] / norm(my_mesh.normals[tracker])
-    normal_5[4] = -1*normal_5[0]
-    cdef float h = 1.5 * radius_scale * dx_sph
-    for m in range(3):
-        for n in range(3):
-            points[n][m] = my_mesh.vectors[tracker][n][m]
-    for m in range(3):
-        for n in range(3):
-            points[m+3][n] = my_mesh.vectors[tracker][m][n] - normal_5[0][n]*h
-    normal_5[1] = np.cross(points[1]-points[0], points[1]-points[4])
-    normal_5[2] = np.cross(points[2]-points[0], points[5]-points[2] )
-    normal_5[3] = np.cross(points[1]-points[2], points[5]-points[2])
-    for i in range(1,4):
-        normal_5[i] = normal_5[i] / norm(normal_5[i])
-    return normal_5, points
-
-def _get_neighbouring_particles(pa_src, pa_dst, float radius_scale,
-                                np.ndarray sizes, float dx_sph, stl_fname):
+def prism(tri_normal, tri_points, dx_sph):
     """
     Parameters
     ----------
-    pa_src : Source particle array
-    pa_dst : Destination particle array
+    tri_normal : outward normal of triangle
+    tri_points : points forming the triangle
+    dx_sph :  grid spacing
+    Returns
+    -------
+    prism_normals : 5X3 array containing the 5 outward normals of the prism
+    prism _points : 6X3 array containing the 6 points used to define the prism
+    prism_face_centres : 5X3 array containing the centres of the 5 faces
+                         of the prism
     """
-    pa_list = [pa_dst, pa_src]
+    cdef np.ndarray prism_normals = np.zeros((5, 3), dtype=DTYPE)
+    cdef np.ndarray prism_points = np.zeros((6, 3), dtype=DTYPE)
+    cdef np.ndarray prism_face_centres = np.zeros((5, 3), dtype=DTYPE)
+    cdef int sign = 1
+    cdef int m, n
+
+    # unit normals of the triangular faces of the prism.
+    prism_normals[0] = tri_normal / norm(tri_normal)
+    prism_normals[4] = -1 * prism_normals[0]
+
+    # distance between triangular faces of prism
+    cdef float h = 1.5 * dx_sph
+
+    for m in range(3):
+        prism_points[m] = tri_points[m]
+
+    # second triangular face at a distance h from STL triangle.
+    for m in range(3):
+        for n in range(3):
+            prism_points[m+3][n] = tri_points[m][n] - tri_normal[n]*h
+
+    #need to determine if point orientation is clockwise or anticlockwise
+    #to determine normals direction.
+    normal_tri_cross = np.cross(prism_points[2]-prism_points[0],
+                                prism_points[1]-prism_points[0])
+    if np.dot(tri_normal, normal_tri_cross) < 0:
+        sign = 1  # clockwise
+    else:
+        sign = -1  # anti-clockwise
+
+    # Normals of the reactangular faces of the prism.
+    prism_normals[1] = sign * np.cross(prism_points[1]-prism_points[0],
+                                       prism_points[1]-prism_points[4])
+
+    prism_normals[2] = sign * np.cross(prism_points[2]-prism_points[0],
+                                       prism_points[5]-prism_points[2])
+
+    prism_normals[3] = sign * np.cross(prism_points[1]-prism_points[2],
+                                       prism_points[5]-prism_points[2])
+
+    # centroids of the triangles
+    prism_face_centres[0] = (prism_points[0] +
+                             prism_points[1] +
+                             prism_points[2])/3
+
+    prism_face_centres[4] = (prism_points[3] +
+                             prism_points[4] +
+                             prism_points[5])/3
+
+    # centres of the rectangular faces
+    prism_face_centres[1] = (prism_points[0] + prism_points[3] +
+                             prism_points[1] + prism_points[4])/4
+
+    prism_face_centres[2] = (prism_points[0] + prism_points[3] +
+                             prism_points[2] + prism_points[5])/4
+
+    prism_face_centres[3] = (prism_points[1] + prism_points[2] +
+                             prism_points[4] + prism_points[5])/4
+
+    return prism_normals, prism_points, prism_face_centres
+
+
+def get_points_from_mgrid(pa_grid, pa_mesh, x_list, y_list, z_list,
+                          float radius_scale, float dx_sph, my_mesh):
+    """
+    The function finds nearest neighbours for a given mesh on a given grid
+    and only returns those points which lie within the volume of the stl
+    object
+    Parameters
+    ----------
+    pa_grid : Source particle array
+    pa_mesh : Destination particle array
+    x_list, y_list, z_list : Coordinates of surface points for each triangle
+    """
+    pa_list = [pa_mesh, pa_grid]
     nps = nnps.LinkedListNNPS(dim=3, particles=pa_list,
                               radius_scale=radius_scale)
-
+    cdef int src_index = 1, dst_index = 0
     nps.set_context(src_index=1, dst_index=0)
-    cdef int n = len(pa_dst.x)
     nbrs = UIntArray()
-    cdef list grid_set = []
-    cdef list remover = []
-    cdef int tracker = 0
-    my_mesh = mesh.Mesh.from_file(stl_fname)
-    cdef int n_trig = np.shape(my_mesh.vectors)[0]
-    cdef np.ndarray centroids = np.zeros((n_trig, 3), dtype=DTYPE)
-    cdef int i
-    cdef np.ndarray normal_5 = np.zeros((5,3), dtype=DTYPE)
-    cdef np.ndarray point_2 = np.zeros((6,3), dtype=DTYPE)
-    normal_5, point_2 = updater(my_mesh, normal_5, point_2, radius_scale, dx_sph, tracker)
-    for i in range(n):
-        nps.get_nearest_particles(1, 0, i, nbrs)
-        neighbours = nbrs.get_npy_array()
-        for neighbour in neighbours:
-            point = np.array([pa_src.x[neighbour],
-                pa_src.y[neighbour],
-                pa_src.z[neighbour]])
-            grid_set.append(neighbour)
-            if elemental_volume(point, normal_5, point_2,my_mesh, dx_sph, radius_scale,i):
-                remover.append(0)
-            else:
-                remover.append(1)
-        if i == sizes[tracker]:
-            if not(sizes[tracker] == sizes[-1]):
-                tracker = tracker+1
-                normal_5, point_2 = updater(my_mesh, normal_5, point_2, radius_scale, dx_sph, tracker)
-    x, y, z = [], [], []
-    for i in grid_set:
-        x.append(pa_src.x[i])
-        y.append(pa_src.y[i])
-        z.append(pa_src.z[i])
-    return x, y, z, remover
+    cdef np.ndarray prism_normals = np.zeros((5, 3), dtype=DTYPE)
+    cdef np.ndarray prism_face_centres = np.zeros((5, 3), dtype=DTYPE)
+    cdef np.ndarray prism_points = np.zeros((6, 3), dtype=DTYPE)
+    cdef list selected_points = []
+    cdef int counter = 0, l = 0
+    # Iterating over each triangle
+    for i in range(np.shape(x_list)[0]):
+        prism_normals, prism_points, prism_face_centres = prism(
+            my_mesh.normals[i], my_mesh.vectors[i], dx_sph
+        )
+        # Iterating over surface points in triangle to find nearest
+        # neighbour on grid.
+        for j in range(len(x_list[i])):
+            nps.get_nearest_particles(src_index, dst_index, counter, nbrs)
+            neighbours = nbrs.get_npy_array()
+            l = len(neighbours)
+            for t in range(l):
+                point = np.array([pa_grid.x[neighbours[t]],
+                                  pa_grid.y[neighbours[t]],
+                                  pa_grid.z[neighbours[t]]])
+                # determining whether point is within prism.
+                if inside_prism(point, prism_normals,
+                                prism_points, prism_face_centres):
+                    selected_points.append(neighbours[t])
+            counter = counter + 1
+    idx_set = set(selected_points)
+    idx = list(idx_set)
+    return pa_grid.x[idx], pa_grid.y[idx], pa_grid.z[idx]
 
-def elemental_volume(np.ndarray point, np.ndarray normal_5,np.ndarray points,
-                     my_mesh, float dx_sph, float radius_scale, i):
-    """ Identifies whether a point is within h thickness of it's
-    corresponding side"""
-    if np.dot(normal_5[0], point - (points[0]+points[1]+points[2])/3) > 0:
-        return False
-    elif np.dot(normal_5[4], point - (points[5]+points[4]+points[3])/3) > 0:
-        return False
-    elif np.dot(normal_5[1], point - (points[0]+points[3]+points[1]+points[4])/4) > 0:
-        return False
-    elif np.dot(normal_5[2], point - (points[0]+points[3]+points[2]+points[5])/4) > 0:
-        return False
-    elif np.dot(normal_5[3], point - (points[1]+points[2]+points[4]+points[5])/4) > 0:
-        return False
 
+cdef bint inside_prism(double[:] point, double[:,:] prism_normals,
+                        double[:,:] prism_points, double[:,:] prism_face_centres):
+    """ Identifies whether a point is within the corresponding prism by checking
+        if all dot products of the normals of the prism with the vector joining
+        the point and a point on the corresponding side is negative
+    """
+    if dot(prism_normals[0], point, prism_face_centres[0]) > 0:
+        return False
+    if dot(prism_normals[4], point, prism_face_centres[4]) > 0:
+        return False
+    if dot(prism_normals[1], point, prism_face_centres[1]) > 0:
+        return False
+    if dot(prism_normals[2], point, prism_face_centres[2]) > 0:
+        return False
+    if dot(prism_normals[3], point, prism_face_centres[3]) > 0:
+        return False
     return True
 
-def remove_exterior(x, y, z, remover):
-    """ removes points which lie outside the given volume"""
-    remove_point = []
-    for i in range(len(x)):
-        if remover[i] == 1:
-            remove_point.append(i)
 
-    x = np.delete(x, remove_point)
-    y = np.delete(y, remove_point)
-    z = np.delete(z, remove_point)
-    return x, y, z
+cdef double dot(double[:] normal, double[:] point, double[:] face_centre):
+    return normal[0]*(point[0]-face_centre[0]) + \
+           normal[1]*(point[1]-face_centre[1]) + \
+           normal[2]*(point[2]-face_centre[2])
 
-def remove_repeated(x, y, z):
-    cdef int n = len(x)
-    cdef list points = []
-    for i in range(n):
-        point = [x[i], y[i], z[i]]
-        points.append(point)
-    points_uni = set(tuple(i) for i in points)
-    points = list(points_uni)
-    cdef list xf =[], yf =[], zf = []
-    for i in range(len(points)):
-        xf.append(points[i][0])
-        yf.append(points[i][1])
-        zf.append(points[i][2])
-    return xf, yf, zf
-
-
-def get_stl_surface_uniform(stl_fname="stl_files/bit_yes_up.stl", dx_sph=1, h_sph=1,
+def get_stl_surface_uniform(stl_fname, dx_sph=1, h_sph=1,
                             radius_scale=1.0, dx_triangle=None):
-    """ Returns coordinates of uniform distribution of
-     particles for given stl"""
+    """Generate points to cover surface described by stl file
+    The function generates a grid with a spacing of dx_sph and keeps points
+    on the grid which lie within the STL object.
+
+    The algorithm for this is straightforward and consists of the following
+    steps:
+    1. Interpolate a set of points over the STL triangles
+    2. Create a grid that covers the entire STL object
+    3. Remove grid points generated outside the given STL object by checking
+       if the points lie within prisms formed by the triangles.
+    Parameters
+    ----------
+    stl_fname : str
+        File name of STL file
+    dx_sph : float
+        Spacing in generated grid points
+    h_sph : float
+        Smoothing length
+    radius_scale : float
+        Kernel radius scale
+    dx_triangle : float, optional
+        By default, dx_triangle = 0.5 * dx_sph
+    Returns
+    -------
+    x : ndarray
+        1d numpy array with x coordinates of surface grid
+    y : ndarray
+        1d numpy array with y coordinates of surface grid
+    z : ndarray
+        1d numpy array with z coordinates of surface grid
+    Raises
+    ------
+    PolygonMeshError
+        If polygons in STL file are not all triangles
+    """
     if dx_triangle is None:
         dx_triangle = 0.5 * dx_sph
 
-    x, y, z ,sizes = _get_stl_mesh_uniform(stl_fname, dx_triangle)
+    x, y, z, x_list, y_list, z_list, my_mesh = \
+        _get_stl_mesh_uniform(stl_fname, dx_triangle)
     pa_mesh = ParticleArray(name='mesh', x=x, y=y, z=z, h=h_sph)
     offset = radius_scale * h_sph
     x_grid, y_grid, z_grid = np.meshgrid(
@@ -299,17 +356,24 @@ def get_stl_surface_uniform(stl_fname="stl_files/bit_yes_up.stl", dx_sph=1, h_sp
     )
 
     pa_grid = ParticleArray(name='grid', x=x_grid, y=y_grid, z=z_grid, h=h_sph)
-    x_grid, y_grid, z_grid, remover = \
-        _get_neighbouring_particles(pa_grid, pa_mesh, radius_scale,
-                                    sizes, dx_sph, stl_fname)
-    xf, yf, zf = remove_exterior(x_grid, y_grid, z_grid, remover)
-    xf, yf, zf = remove_repeated(xf, yf, zf)
+    xf, yf, zf = get_points_from_mgrid(pa_grid, pa_mesh, x_list,
+                                       y_list, z_list, radius_scale,
+                                       dx_sph, my_mesh)
     return xf, yf, zf
 
 
 def get_stl_surface(stl_fname, dx_triangle, radius_scale=1.0):
-    """ Returns coordinates of particle distribution along surface
-    of stl file"""
+    """ Generate points to cover surface described by stl file
+    Returns
+    -------
+    x : ndarray
+        1d numpy array with x coordinates of surface grid
+    y : ndarray
+        1d numpy array with y coordinates of surface grid
+    z : ndarray
+        1d numpy array with z coordinates of surface grid
+    """
 
     x, y, z = _get_stl_mesh(stl_fname, dx_triangle)
-    return x, y, z
+    xf, yf, zf = remove_repeated_points(x, y, z, dx_triangle)
+    return xf, yf, zf
