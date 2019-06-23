@@ -491,7 +491,7 @@ class Application(object):
             action="store_true",
             dest="use_double",
             default=False,
-            help="Use double precision for OpenCL code.")
+            help="Use double precision for OpenCL/CUDA code.")
 
         # --kernel
         all_kernels = list_all_kernels()
@@ -502,6 +502,12 @@ class Application(object):
             default=None,
             choices=all_kernels,
             help="Use specified kernel from %s" % all_kernels)
+
+        parser.add_argument(
+            '--post-process', action="store",
+            dest="post_process", default=None,
+            help="Only perform post-processing and exit."
+        )
 
         # Restart options
         restart = parser.add_argument_group("Restart options",
@@ -805,6 +811,13 @@ class Application(object):
 
         """
         options = self.options
+        if options.post_process:
+            self._message('-'*70)
+            self._message('Performing post processing alone.')
+            self.post_process(options.post_process)
+            # Exit right after this so even if the user
+            # has an app.post_process call, it doesn't call it.
+            sys.exit(0)
         # save the path where we want to dump output
         self.output_dir = abspath(options.output_dir)
         mkdir(self.output_dir)
