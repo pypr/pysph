@@ -14,7 +14,7 @@ from pysph.base.kernels import CubicSpline
 from pysph.base.nnps import LinkedListNNPS
 from pysph.sph.sph_compiler import SPHCompiler
 from pysph.sph.integrator import (LeapFrogIntegrator, PECIntegrator,
-                                  PEFRLIntegrator)
+                                  PEFRLIntegrator, EulerIntegrator)
 from pysph.sph.integrator_step import (
     IntegratorStep, LeapFrogStep, PEFRLStep, TwoStageRigidBodyStep
 )
@@ -156,6 +156,19 @@ class OnlyPyStep(IntegratorStep):
         dest.x += 0.5
 
 
+def my_helper(dt=0.0):
+    return dt*2.0
+
+
+class StepWithHelper(IntegratorStep):
+
+    def _get_helpers_(self):
+        return [my_helper]
+
+    def stage1(self, d_idx, d_u, d_au, dt):
+        d_u[d_idx] += d_au[d_idx] * my_helper(dt)
+
+
 class TestLeapFrogIntegrator(TestIntegratorBase):
     def test_leapfrog(self):
         # Given.
@@ -289,6 +302,27 @@ class TestLeapFrogIntegrator(TestIntegratorBase):
         # Then
         self.assertTrue(err2 < err1)
         self.assertAlmostEqual(err1/err2, 4.0, places=2)
+
+    def test_helper_can_be_used_with_stepper(self):
+        # Given.
+        integrator = EulerIntegrator(fluid=StepWithHelper())
+        equations = [SHM(dest="fluid", sources=None)]
+        self._setup_integrator(equations=equations, integrator=integrator)
+
+        # When
+        tf = 1.0
+        dt = tf/2
+
+        def callback(t):
+            pass
+
+        self._integrate(integrator, dt, tf, callback)
+
+        # Then
+        if self.pa.gpu is not None:
+            self.pa.gpu.pull('u')
+        u = self.pa.u
+        self.assertEqual(u, -2.0*self.pa.x)
 
 
 class TestPEFRLIntegrator(TestIntegratorBase):
@@ -427,6 +461,27 @@ class TestLeapFrogIntegratorGPU(TestIntegratorBase):
         get_config().use_double = True
         self.addCleanup(_cleanup)
         self.test_leapfrog()
+
+    def test_helper_can_be_used_with_stepper_on_gpu(self):
+        # Given.
+        integrator = EulerIntegrator(fluid=StepWithHelper())
+        equations = [SHM(dest="fluid", sources=None)]
+        self._setup_integrator(equations=equations, integrator=integrator)
+
+        # When
+        tf = 1.0
+        dt = tf/2
+
+        def callback(t):
+            pass
+
+        self._integrate(integrator, dt, tf, callback)
+
+        # Then
+        if self.pa.gpu is not None:
+            self.pa.gpu.pull('u')
+        u = self.pa.u
+        self.assertEqual(u, -2.0*self.pa.x)
 
 
 class TestLeapFrogIntegratorCUDA(TestLeapFrogIntegratorGPU):

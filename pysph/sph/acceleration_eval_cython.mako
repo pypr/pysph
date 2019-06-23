@@ -141,6 +141,7 @@ from libc.math cimport *
 from libc.math cimport fabs as abs
 cimport numpy
 import numpy
+from cython import address
 % if not helper.config.use_openmp:
 from cython.parallel import threadid
 prange = range

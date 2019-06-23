@@ -11,7 +11,8 @@ from compyle.config import get_config
 from .equation import get_array_names
 from .integrator_cython_helper import IntegratorCythonHelper
 from .acceleration_eval_gpu_helper import (
-    get_kernel_definition, get_converter, profile_kernel, wrap_code
+    get_kernel_definition, get_converter, profile_kernel, wrap_code,
+    get_helper_code
 )
 
 
@@ -141,7 +142,8 @@ class CUDAIntegrator(GPUIntegrator):
 
             # Compute the remaining arguments.
             args = [x() for x in args[3:]]
-            call(*(args + extra_args), block=(num_tpb, 1, 1), grid=(num_blocks, 1))
+            call(*(args + extra_args),
+                 block=(num_tpb, 1, 1), grid=(num_blocks, 1))
 
 
 class IntegratorGPUHelper(IntegratorCythonHelper):
@@ -239,16 +241,21 @@ class IntegratorGPUHelper(IntegratorCythonHelper):
 
     def get_stepper_code(self):
         classes = {}
-        for dest, stepper in self.object.steppers.items():
+        helpers = []
+        for stepper in self.object.steppers.values():
             cls = stepper.__class__.__name__
             classes[cls] = stepper
+            if hasattr(stepper, '_get_helpers_'):
+                for helper in stepper._get_helpers_():
+                    if helper not in helpers:
+                        helpers.append(helper)
 
         known_types = dict(self.acceleration_eval_helper.known_types)
 
         Converter = get_converter(self.acceleration_eval_helper.backend)
         code_gen = Converter(known_types=known_types)
 
-        wrappers = []
+        wrappers = get_helper_code(helpers, code_gen, self.backend)
         for cls in sorted(classes.keys()):
             wrappers.append(code_gen.parse_instance(classes[cls]))
         return '\n'.join(wrappers)

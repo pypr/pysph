@@ -13,6 +13,7 @@ from mako.template import Template
 
 # Local imports.
 from pysph.sph.equation import get_array_names
+from .acceleration_eval_cython_helper import get_helper_code
 from compyle.api import CythonGenerator, get_func_definition
 
 
@@ -53,6 +54,17 @@ class IntegratorCythonHelper(object):
     ##########################################################################
     def get_particle_array_names(self):
         return ', '.join(sorted(self.object.steppers.keys()))
+
+    def get_helper_code(self):
+        helpers = []
+        for stepper in self.object.steppers.values():
+            if hasattr(stepper, '_get_helpers_'):
+                for helper in stepper._get_helpers_():
+                    if helper not in helpers:
+                        helpers.append(helper)
+
+        code = get_helper_code(helpers)
+        return '\n'.join(code)
 
     def get_stepper_code(self):
         classes = {}
