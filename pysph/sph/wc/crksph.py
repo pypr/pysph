@@ -1,6 +1,5 @@
 '''
 CRKSPH corrections
-###################
 
 These are equations for the basic kernel corrections in [CRKSPH2017].
 
@@ -24,8 +23,6 @@ from pysph.sph.scheme import Scheme
 from pysph.base.utils import get_particle_array
 from pysph.sph.integrator import Integrator, IntegratorStep
 from pysph.base.particle_array import get_ghost_tag
-
-from pysph.sph.basic_equations import SummationDensity
 
 # Constants
 GHOST_TAG = get_ghost_tag()
@@ -80,7 +77,6 @@ class CRKSPHPreStep(Equation):
                 for k in range(3):
                     grad_m2[9*i + 3*j + k] = 0.0
         for i in range(N_NBRS):
-            # print("nnbrs: ", N_NBRS)  delete
             s_idx = NBRS[i]
             xij[0] = x - s_x[s_idx]
             xij[1] = y - s_y[s_idx]
@@ -631,9 +627,9 @@ class MomentumEquation(Equation):
         Qj = rhoj * (-Cl*cj*muj + Cq*muj*muj)
 
         fac = -(1.0/mi) * Vi * Vj * (pi + pj + Qi + Qj)
-        d_au[d_idx] += fac * (DWIJ[0])  # - DWJ[0])
-        d_av[d_idx] += fac * (DWIJ[1])  # - DWJ[1])
-        d_aw[d_idx] += fac * (DWIJ[2])  # - DWJ[2])
+        d_au[d_idx] += fac * DWIJ[0]
+        d_av[d_idx] += fac * DWIJ[1]
+        d_aw[d_idx] += fac * DWIJ[2]
 
 
 class EnergyEquation(Equation):
@@ -760,13 +756,8 @@ class EnergyEquation(Equation):
         fac = -(1.0 / mi) * Vi * Vj * (pi + pj + Qi + Qj)
 
         gamma = self.gamma
-        # d = declare('int')
         d = self.dim
-        # print('u - u0', d_u[d_idx] - d_u0[d_idx])
         auij, delu = declare('matrix(3)', 2)
-        # auij[0] = d_au[d_idx] - s_au[s_idx]
-        # auij[1] = d_av[d_idx] - s_av[s_idx]
-        # auij[2] = d_aw[d_idx] - s_aw[s_idx]
         auij[0] = fac * DWIJ[0]
         auij[1] = fac * DWIJ[1]
         auij[2] = fac * DWIJ[2]
@@ -880,12 +871,11 @@ class CRKSPHIntegrator(Integrator):
         self.compute_accelerations(0)
 
         self.stage2()
-        # We update domain here alone as positions only change here.
-        # self.update_domain()
         self.do_post_stage(dt, 2)
 
         self.compute_accelerations(1)
 
+        # We update domain here alone as positions only change here.
         self.stage3()
         self.do_post_stage(dt, 3)
         self.update_domain()
@@ -950,8 +940,6 @@ class CRKSPHScheme(Scheme):
             Any additional keyword args are passed to the solver instance.
         """
         from pysph.base.kernels import QuinticSpline
-        # from pysph.sph.integrator import PECIntegrator
-        # from pysph.sph.integrator_step import WCSPHStep
         if kernel is None:
             kernel = QuinticSpline(dim=self.dim)
         steppers = {}

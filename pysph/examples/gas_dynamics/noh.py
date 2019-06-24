@@ -1,4 +1,4 @@
-"""Example for the Noh's cylindrical implosion test. (2 hours)
+"""Example for the Noh's cylindrical implosion test. (10 minutes)
 """
 
 # NumPy and standard library imports
@@ -7,7 +7,7 @@ import numpy
 # PySPH base and carray imports
 from pysph.base.utils import get_particle_array as gpa
 from pysph.solver.application import Application
-from pysph.sph.scheme import GasDScheme, SchemeChooser
+from pysph.sph.scheme import GasDScheme, SchemeChooser, ADKEScheme, GSPHScheme
 from pysph.sph.wc.crksph import CRKSPHScheme
 from pysph.base.nnps import DomainManager
 
@@ -30,7 +30,7 @@ tf = 0.6
 xmin = ymin = -1.0
 xmax = ymax = 1.0
 
-nx = ny = 200
+nx = ny = 100
 dx = (xmax-xmin)/nx
 dxb2 = 0.5 * dx
 
@@ -64,7 +64,8 @@ class NohImplosion(Application):
             v[i] = vr*sin(theta)
 
         fluid = gpa(
-            name='fluid', x=x, y=y, m=m, rho=rho, h=h, u=u, v=v, p=0, e=0
+            name='fluid', x=x, y=y, m=m, rho=rho, h=h, u=u, v=v, p=1e-12,
+            e=2.5e-11, h0=h.copy()
             )
         self.scheme.setup_properties([fluid])
 
@@ -83,7 +84,7 @@ class NohImplosion(Application):
         mpm = GasDScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             kernel_factor=kernel_factor, alpha1=alpha1, alpha2=alpha2,
-            beta=beta, adaptive_h_scheme="gsph",
+            beta=beta, adaptive_h_scheme="mpm",
             update_alpha1=True, update_alpha2=True
         )
 
@@ -91,8 +92,21 @@ class NohImplosion(Application):
             fluids=['fluid'], dim=2, rho0=0, c0=0, nu=0, h0=0, p0=0,
             gamma=gamma, cl=2
         )
+
+        gsph = GSPHScheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            kernel_factor=1.5,
+            g1=0.25, g2=0.5, rsolver=7, interpolation=1, monotonicity=2,
+            interface_zero=True, hybrid=False, blend_alpha=2.0,
+            niter=40, tol=1e-6
+        )
+
+        adke = ADKEScheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            alpha=1, beta=1, k=1.0, eps=0.8, g1=0.5, g2=0.5)
+
         s = SchemeChooser(
-            default='crksph', crksph=crksph, mpm=mpm
+            default='crksph', crksph=crksph, mpm=mpm, adke=adke, gsph=gsph
         )
         s.configure_solver(dt=dt, tf=tf, adaptive_timestep=False)
         return s
@@ -108,6 +122,14 @@ class NohImplosion(Application):
             s.configure_solver(
                 dt=dt, tf=tf, adaptive_timestep=False, pfreq=50
             )
+        elif self.options.scheme == 'gsph':
+            s.configure_solver(
+                dt=dt, tf=tf, adaptive_timestep=False, pfreq=50
+            )
+        elif self.options.scheme == 'adke':
+            s.configure_solver(
+                dt=dt, tf=tf, adaptive_timestep=False, pfreq=50
+            )       
 
     def post_process(self):
         try:
@@ -154,7 +176,7 @@ class NohImplosion(Application):
         pyplot.ylabel('P')
         pyplot.plot(re, p_e, color='r', lw=1)
         pyplot.legend(
-            [self.options.scheme, 'exact']
+            ['exact', self.options.scheme]
         )
         fname = os.path.join(self.output_dir, 'pressure.png')
         pyplot.savefig(fname, dpi=300)
@@ -165,7 +187,7 @@ class NohImplosion(Application):
         pyplot.ylabel(r'$\rho$')
         pyplot.plot(re, rho_e, color='r', lw=1)
         pyplot.legend(
-            [self.options.scheme, 'exact']
+            ['exact', self.options.scheme]
         )
         fname = os.path.join(self.output_dir, 'density.png')
         pyplot.savefig(fname, dpi=300)
