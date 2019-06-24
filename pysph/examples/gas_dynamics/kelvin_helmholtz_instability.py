@@ -17,8 +17,8 @@ from pysph.tools import uniform_distribution as ud
 dim = 2
 gamma = 5.0/3.0
 
-xmin = ymin = 0
-xmax = ymax = 1
+xmin = ymin = 0.0
+xmax = ymax = 1.0
 
 rhoi_1 = 1
 rhoi_2 = 2
@@ -158,7 +158,7 @@ class KHInstability(Application):
         s = self.scheme
         if self.options.scheme == 'crksph':
             s.configure_solver(
-                dt=dt, tf=tf, adaptive_timestep=False, pfreq=20
+                dt=dt, tf=tf, adaptive_timestep=False, pfreq=50
             )
         elif self.options.scheme == 'mpm':
             s.configure(kernel_factor=1.2)

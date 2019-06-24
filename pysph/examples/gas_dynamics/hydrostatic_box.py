@@ -1,5 +1,5 @@
 """Simulate the hydrostatic box problem (30 minutes)
- 
+
 high density square region inside a low density square medium, in pressure
 equilibrium, the solution should not evolve in time
 """
@@ -17,10 +17,10 @@ import numpy
 
 class HydrostaticBox(Application):
     def initialize(self):
-        self.xmin = 0
-        self.xmax = 1
-        self.ymin = 0
-        self.ymax = 1
+        self.xmin = 0.0
+        self.xmax = 1.0
+        self.ymin = 0.0
+        self.ymax = 1.0
         self.gamma = 1.5
         self.p = 1
         self.rho0 = 1

@@ -129,7 +129,7 @@ class NohImplosion(Application):
         elif self.options.scheme == 'adke':
             s.configure_solver(
                 dt=dt, tf=tf, adaptive_timestep=False, pfreq=50
-            )       
+            )
 
     def post_process(self):
         try:
