@@ -67,22 +67,24 @@ class HydrostaticBox(Application):
             gamma=self.gamma, kernel_factor=1.0,
             g1=0., g2=0., rsolver=7, interpolation=1, monotonicity=1,
             interface_zero=True, hybrid=False, blend_alpha=5.0,
-            niter=40, tol=1e-6
+            niter=40, tol=1e-6, has_ghosts=True
         )
 
         mpm = GasDScheme(
             fluids=['fluid'], solids=[], dim=2, gamma=self.gamma,
             kernel_factor=1.2, alpha1=0, alpha2=0,
-            beta=2.0, update_alpha1=False, update_alpha2=False
+            beta=2.0, update_alpha1=False, update_alpha2=False,
+            has_ghosts=True
         )
 
         crk = CRKSPHScheme(
             fluids=['fluid'], dim=2, rho0=0, c0=0, nu=0, h0=0, p0=0,
-            gamma=self.gamma, cl=2
+            gamma=self.gamma, cl=2, has_ghosts=True
         )
         adke = ADKEScheme(
             fluids=['fluid'], solids=[], dim=2, gamma=self.gamma,
-            alpha=0.1, beta=0.1, k=1.5, eps=0., g1=0.1, g2=0.1)
+            alpha=0.1, beta=0.1, k=1.5, eps=0., g1=0.1, g2=0.1,
+            has_ghosts=True)
         s = SchemeChooser(
             default='crksph', crksph=crk, adke=adke, mpm=mpm, gsph=gsph
         )

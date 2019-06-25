@@ -85,12 +85,12 @@ class NohImplosion(Application):
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             kernel_factor=kernel_factor, alpha1=alpha1, alpha2=alpha2,
             beta=beta, adaptive_h_scheme="mpm",
-            update_alpha1=True, update_alpha2=True
+            update_alpha1=True, update_alpha2=True, has_ghosts=True
         )
 
         crksph = CRKSPHScheme(
             fluids=['fluid'], dim=2, rho0=0, c0=0, nu=0, h0=0, p0=0,
-            gamma=gamma, cl=2
+            gamma=gamma, cl=2, has_ghosts=True
         )
 
         gsph = GSPHScheme(
@@ -98,12 +98,13 @@ class NohImplosion(Application):
             kernel_factor=1.5,
             g1=0.25, g2=0.5, rsolver=7, interpolation=1, monotonicity=2,
             interface_zero=True, hybrid=False, blend_alpha=2.0,
-            niter=40, tol=1e-6
+            niter=40, tol=1e-6, has_ghosts=True
         )
 
         adke = ADKEScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            alpha=1, beta=1, k=1.0, eps=0.8, g1=0.5, g2=0.5)
+            alpha=1, beta=1, k=1.0, eps=0.8, g1=0.5, g2=0.5,
+            has_ghosts=True)
 
         s = SchemeChooser(
             default='crksph', crksph=crksph, mpm=mpm, adke=adke, gsph=gsph

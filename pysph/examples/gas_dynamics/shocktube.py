@@ -15,6 +15,7 @@ from pysph.base.utils import get_particle_array as gpa
 from pysph.solver.application import Application
 
 from pysph.sph.scheme import GasDScheme, ADKEScheme, GSPHScheme, SchemeChooser
+from pysph.sph.wc.crksph import CRKSPHScheme
 
 # PySPH tools
 from pysph.tools import uniform_distribution as ud
@@ -40,7 +41,7 @@ x0 = 0.5  # initial discontuinity
 
 # scheme constants
 alpha1 = 1.0
-alpha2 = 0.1
+alpha2 = 1.0
 beta = 2.0
 kernel_factor = 1.5
 h0 = kernel_factor * dx
@@ -53,7 +54,7 @@ class ShockTube2D(Application):
         self.ymin = ymin
         self.ymax = ymax
         self.dx = dx
-        self.hdx = 1.5
+        self.hdx = 1.7
         self.x0 = x0
         self.ny = ny
         self.pl = 1000
@@ -123,12 +124,14 @@ class ShockTube2D(Application):
 
         adke = ADKEScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            alpha=1, beta=1, k=1.0, eps=0.8, g1=0.5, g2=0.5)
+            alpha=1, beta=1, k=1.0, eps=0.8, g1=0.5, g2=0.5,
+            has_ghosts=True)
 
         mpm = GasDScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             kernel_factor=kernel_factor, alpha1=alpha1, alpha2=alpha2,
-            beta=beta
+            beta=beta, max_density_iterations=1000,
+            density_iteration_tolerance=1e-4, has_ghosts=True
         )
 
         gsph = GSPHScheme(
@@ -136,11 +139,16 @@ class ShockTube2D(Application):
             kernel_factor=1.5,
             g1=0.25, g2=0.5, rsolver=2, interpolation=1, monotonicity=2,
             interface_zero=True, hybrid=False, blend_alpha=2.0,
-            niter=40, tol=1e-6
+            niter=40, tol=1e-6, has_ghosts=True
+        )
+
+        crksph = CRKSPHScheme(
+            fluids=['fluid'], dim=dim, rho0=0, c0=0, nu=0, h0=0, p0=0,
+            gamma=gamma, cl=2, has_ghosts=True
         )
 
         s = SchemeChooser(
-            default='adke', adke=adke, mpm=mpm, gsph=gsph
+            default='adke', adke=adke, mpm=mpm, gsph=gsph, crksph=crksph
         )
         return s
 
@@ -154,6 +162,9 @@ class ShockTube2D(Application):
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=50)
         elif self.options.scheme == 'gsph':
+            s.configure_solver(dt=self.dt, tf=self.tf,
+                               adaptive_timestep=False, pfreq=50)
+        elif self.options.scheme == 'crksph':
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=50)
 
@@ -200,6 +211,7 @@ class ShockTube2D(Application):
             s=1, color='k'
             )
         pyplot.plot(x_e, rho_e, label='exact')
+        pyplot.xlim((0.2, 0.8))
         pyplot.xlabel('x')
         pyplot.ylabel('rho')
         pyplot.legend()
@@ -212,6 +224,7 @@ class ShockTube2D(Application):
             s=1, color='k'
             )
         pyplot.plot(x_e, e_e, label='exact')
+        pyplot.xlim((0.2, 0.8))
         pyplot.xlabel('x')
         pyplot.ylabel('e')
         pyplot.legend()
@@ -224,6 +237,7 @@ class ShockTube2D(Application):
             s=1, color='k'
             )
         pyplot.plot(x_e, rho_e * u_e, label='exact')
+        pyplot.xlim((0.2, 0.8))
         pyplot.xlabel('x')
         pyplot.ylabel('M')
         pyplot.legend()
@@ -236,6 +250,7 @@ class ShockTube2D(Application):
             s=1, color='k'
             )
         pyplot.plot(x_e, p_e, label='exact')
+        pyplot.xlim((0.2, 0.8))
         pyplot.xlabel('x')
         pyplot.ylabel('p')
         pyplot.legend()

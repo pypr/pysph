@@ -127,17 +127,19 @@ class KHInstability(Application):
     def create_scheme(self):
         crk = CRKSPHScheme(
             fluids=['fluid'], dim=2, rho0=0, c0=0, nu=0, h0=0, p0=0,
-            gamma=gamma, cl=2
+            gamma=gamma, cl=2, has_ghosts=True
         )
 
         adke = ADKEScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            alpha=0.1, beta=0.1, k=1.2, eps=0.1, g1=0.1, g2=0.2)
+            alpha=0.1, beta=0.1, k=1.2, eps=0.1, g1=0.1, g2=0.2,
+            has_ghosts=True)
 
         mpm = GasDScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             kernel_factor=1.2, alpha1=1.0, alpha2=0.1,
-            beta=2.0, update_alpha1=True, update_alpha2=True
+            beta=2.0, update_alpha1=True, update_alpha2=True,
+            has_ghosts=True
         )
 
         gsph = GSPHScheme(
@@ -145,7 +147,7 @@ class KHInstability(Application):
             kernel_factor=1.5,
             g1=0.2, g2=0.4, rsolver=2, interpolation=1, monotonicity=2,
             interface_zero=True, hybrid=False, blend_alpha=2.0,
-            niter=40, tol=1e-6
+            niter=40, tol=1e-6, has_ghosts=True
         )
 
         s = SchemeChooser(

@@ -10,7 +10,8 @@ import numpy
 from pysph.base.utils import get_particle_array as gpa
 from pysph.base.nnps import DomainManager
 from pysph.solver.application import Application
-from pysph.sph.scheme import GSPHScheme, SchemeChooser
+from pysph.sph.scheme import GSPHScheme, SchemeChooser, ADKEScheme, GasDScheme
+from pysph.sph.wc.crksph import CRKSPHScheme
 from pysph.examples.gas_dynamics.riemann_2d_config import R2DConfig
 
 # current case from the al possible unique cases
@@ -117,7 +118,7 @@ class Riemann2D(Application):
 
         # create the particle array
         pa = gpa(name='fluid', x=x, y=y, m=m, rho=rho, h=h,
-                 u=u, v=v, p=p, e=e)
+                 u=u, v=v, p=p, e=e, h0=h.copy())
 
         return pa
 
@@ -211,7 +212,8 @@ class Riemann2D(Application):
 
         # create the particle array
         pa = gpa(
-            name='fluid', x=x, y=y, m=m, rho=rho, h=h, u=u, v=v, p=p, e=e
+            name='fluid', x=x, y=y, m=m, rho=rho, h=h, u=u, v=v, p=p, e=e,
+            h0=h.copy()
         )
 
         return pa
@@ -226,7 +228,7 @@ class Riemann2D(Application):
         return DomainManager(
             xmin=config.xmin, xmax=config.xmax,
             ymin=config.ymin, ymax=config.ymax,
-            periodic_in_x=True, periodic_in_y=True
+            mirror_in_x=True, mirror_in_y=True
         )
 
     def create_scheme(self):
@@ -235,17 +237,44 @@ class Riemann2D(Application):
             kernel_factor=1.5,
             g1=0.25, g2=0.5, rsolver=2, interpolation=1, monotonicity=1,
             interface_zero=True, hybrid=False, blend_alpha=2.0,
-            niter=40, tol=1e-6
+            niter=40, tol=1e-6, has_ghosts=True
+        )
+
+        adke = ADKEScheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            alpha=1, beta=1.0, k=1.0, eps=0.5, g1=0.2, g2=0.4,
+            has_ghosts=True)
+
+        crksph = CRKSPHScheme(
+            fluids=['fluid'], dim=dim, rho0=0, c0=0, nu=0, h0=0, p0=0,
+            gamma=gamma, cl=2, has_ghosts=True
+        )
+
+        mpm = GasDScheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            kernel_factor=1.2, alpha1=1.0, alpha2=0.1,
+            beta=2.0, update_alpha1=True, update_alpha2=True,
+            has_ghosts=True
         )
 
         s = SchemeChooser(
-            default='gsph', gsph=gsph
+            default='gsph', gsph=gsph, adke=adke, crksph=crksph, mpm=mpm
         )
         return s
 
     def configure_scheme(self):
         s = self.scheme
         if self.options.scheme == 'gsph':
+            s.configure_solver(dt=self.dt, tf=self.tf,
+                               adaptive_timestep=False, pfreq=50)
+        elif self.options.scheme == 'adke':
+            s.configure_solver(dt=self.dt, tf=self.tf,
+                               adaptive_timestep=False, pfreq=50)
+        elif self.options.scheme == 'crksph':
+            s.configure_solver(dt=self.dt, tf=self.tf,
+                               adaptive_timestep=False, pfreq=50)
+        elif self.options.scheme == 'mpm':
+            s.configure(kernel_factor=kernel_factor)
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=50)
 

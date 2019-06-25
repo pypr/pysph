@@ -903,7 +903,17 @@ class CRKSPHStep(IntegratorStep):
 class CRKSPHScheme(Scheme):
     def __init__(self, fluids, dim, rho0, c0, nu, h0, p0, gx=0.0,
                  gy=0.0, gz=0.0, cl=2, cq=1, gamma=7.0, eta_crit=0.3,
-                 eta_fold=0.2, tol=0.5):
+                 eta_fold=0.2, tol=0.5, has_ghosts=False):
+        """
+        Parameters
+        ----------
+
+        fluids: list
+            a list with names of fluid particle arrays
+        solids: list
+            a list with names of solid (or boundary) particle arrays
+        
+        """
         self.fluids = fluids
         self.solver = None
         self.dim = dim
@@ -921,6 +931,7 @@ class CRKSPHScheme(Scheme):
         self.eta_crit = eta_crit
         self.eta_fold = eta_fold
         self.tol = tol
+        self.has_ghosts = has_ghosts
 
     def configure_solver(self, kernel=None, integrator_cls=None,
                          extra_steppers=None, **kw):
@@ -993,24 +1004,30 @@ class CRKSPHScheme(Scheme):
             eq0.append(NumberDensity(dest=fluid, sources=all))
         equations_stage1.append(Group(equations=eq0, real=False))
 
-        gh = []
-        for fluid in self.fluids:
-            gh.append(
-                CRKSPHUpdateGhostProps(dest=fluid, sources=None, dim=self.dim)
-            )
-        equations_stage1.append(Group(equations=gh, real=False))
+        if self.has_ghosts:
+            gh = []
+            for fluid in self.fluids:
+                gh.append(
+                    CRKSPHUpdateGhostProps(
+                        dest=fluid, sources=None, dim=self.dim
+                        )
+                )
+            equations_stage1.append(Group(equations=gh, real=False))
 
         eq1 = []
         for fluid in self.fluids:
             eq1.append(CRKSPHPreStep(dest=fluid, sources=all, dim=self.dim))
         equations_stage1.append(Group(equations=eq1, real=False))
 
-        gh = []
-        for fluid in self.fluids:
-            gh.append(
-                CRKSPHUpdateGhostProps(dest=fluid, sources=None, dim=self.dim)
-            )
-        equations_stage1.append(Group(equations=gh, real=False))
+        if self.has_ghosts:
+            gh = []
+            for fluid in self.fluids:
+                gh.append(
+                    CRKSPHUpdateGhostProps(
+                        dest=fluid, sources=None, dim=self.dim
+                        )
+                )
+            equations_stage1.append(Group(equations=gh, real=False))
 
         eq2 = []
         for fluid in self.fluids:
@@ -1032,12 +1049,15 @@ class CRKSPHScheme(Scheme):
             )
         equations_stage1.append(Group(equations=eq3))
 
-        gh = []
-        for fluid in self.fluids:
-            gh.append(
-                CRKSPHUpdateGhostProps(dest=fluid, sources=None, dim=self.dim)
-            )
-        equations_stage1.append(Group(equations=gh, real=False))
+        if self.has_ghosts:
+            gh = []
+            for fluid in self.fluids:
+                gh.append(
+                    CRKSPHUpdateGhostProps(
+                        dest=fluid, sources=None, dim=self.dim
+                        )
+                )
+            equations_stage1.append(Group(equations=gh, real=False))
 
         eq4 = []
         for fluid in self.fluids:
@@ -1049,12 +1069,15 @@ class CRKSPHScheme(Scheme):
             ])
         equations_stage1.append(Group(equations=eq4))
 
-        gh = []
-        for fluid in self.fluids:
-            gh.append(
-                CRKSPHUpdateGhostProps(dest=fluid, sources=None, dim=self.dim)
-            )
-        equations_stage1.append(Group(equations=gh, real=False))
+        if self.has_ghosts:
+            gh = []
+            for fluid in self.fluids:
+                gh.append(
+                    CRKSPHUpdateGhostProps(
+                        dest=fluid, sources=None, dim=self.dim
+                        )
+                )
+            equations_stage1.append(Group(equations=gh, real=False))
 
         eq5 = []
         for fluid in self.fluids:
@@ -1076,12 +1099,15 @@ class CRKSPHScheme(Scheme):
                 ))
         equations_stage1.append(Group(equations=eq5))
 
-        gh = []
-        for fluid in self.fluids:
-            gh.append(
-                CRKSPHUpdateGhostProps(dest=fluid, sources=None, dim=self.dim)
-            )
-        equations_stage2.append(Group(equations=gh, real=False))
+        if self.has_ghosts:
+            gh = []
+            for fluid in self.fluids:
+                gh.append(
+                    CRKSPHUpdateGhostProps(
+                        dest=fluid, sources=None, dim=self.dim
+                        )
+                )
+            equations_stage2.append(Group(equations=gh, real=False))
 
         eq6 = []
         for fluid in self.fluids:
