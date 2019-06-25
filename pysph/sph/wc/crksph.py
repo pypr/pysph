@@ -912,7 +912,7 @@ class CRKSPHScheme(Scheme):
             a list with names of fluid particle arrays
         solids: list
             a list with names of solid (or boundary) particle arrays
-        
+
         """
         self.fluids = fluids
         self.solver = None

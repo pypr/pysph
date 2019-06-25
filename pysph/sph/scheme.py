@@ -1179,7 +1179,7 @@ class GSPHScheme(Scheme):
         tol: double
             Tolerance for iterative Riemann solvers.
         has_ghosts: bool
-            if ghost particles (either mirror or periodic) is used    
+            if ghost particles (either mirror or periodic) is used
         """
         self.fluids = fluids
         self.solids = solids
