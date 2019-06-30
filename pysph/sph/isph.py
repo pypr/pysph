@@ -25,6 +25,7 @@ def get_particle_array_isph(constants=None, **props):
     )
 
     pa.add_constant('iters', [0.0])
+    pa.add_constant('pmax', [0.0])
     pa.add_output_arrays(['p', 'V', 'vmag', 'p0'])
     return pa
 
@@ -235,7 +236,7 @@ class PPESolve(Equation):
         super(PPESolve, self).__init__(dest, sources)
 
     def post_loop(self, d_idx, d_p, d_pk, d_rhs, d_odiag, d_diag, d_pdiff,
-                  d_rho, d_m, d_pabs):
+                  d_rho, d_m, d_pabs, d_pmax):
         omega = self.omega
         rho = d_rho[d_idx] / self.rho0
         diag = d_diag[d_idx]
@@ -249,6 +250,7 @@ class PPESolve(Equation):
         d_pabs[d_idx] = abs(p)
         d_p[d_idx] = p
         d_pk[d_idx] = p
+        d_pmax[0] = max(abs(d_pmax[0]), d_p[d_idx])
 
     def reduce(self, dst, t, dt):
         self.count += 1
@@ -383,13 +385,14 @@ class GTVFAcceleration(Equation):
         self.gtvf_delta = gtvf_delta
         super(GTVFAcceleration, self).__init__(dest, sources)
 
-    def initialize(self, d_idx, d_auhat, d_avhat, d_awhat, d_p0, d_p):
+    def initialize(self, d_idx, d_auhat, d_avhat, d_awhat, d_p0, d_p, d_pmax):
         d_auhat[d_idx] = 0.0
         d_avhat[d_idx] = 0.0
         d_awhat[d_idx] = 0.0
 
         if self.internal:
-            d_p0[d_idx] = self.pref
+            pref = 2*d_pmax[0]
+            d_p0[d_idx] = pref
         else:
             d_p0[d_idx] = min(10*abs(d_p[d_idx]), self.pref)
 
@@ -405,17 +408,6 @@ class GTVFAcceleration(Equation):
         d_auhat[d_idx] += tmp * dwijhat[0]
         d_avhat[d_idx] += tmp * dwijhat[1]
         d_awhat[d_idx] += tmp * dwijhat[2]
-
-    def post_loop(self, d_auhat, d_avhat, d_awhat, d_idx, d_h, dt):
-        max_dist = self.gtvf_delta*d_h[d_idx]
-        dt2b2 = dt*dt*0.5
-        dist = sqrt(d_auhat[d_idx]**2 + d_avhat[d_idx]**2 +
-                    d_awhat[d_idx]**2)*dt2b2
-        if dist > max_dist:
-            fac = max_dist/dist
-            d_auhat[d_idx] *= fac
-            d_avhat[d_idx] *= fac
-            d_awhat[d_idx] *= fac
 
 
 #class GTVFAccelerationInternal(Equation):
@@ -759,10 +751,11 @@ class ISPHScheme(Scheme):
                 )
             else:
                 eq2.append(VolumeSummation(dest=fluid, sources=all))
-                eq2.append(VelocityDivergence(
-                    dest=fluid,
-                    sources=self.fluid_with_io+self.inviscid_solids)
-                          )
+                eq2.append(
+                    VelocityDivergence(
+                        dest=fluid,
+                        sources=self.fluid_with_io+self.inviscid_solids
+                    ))
                 if self.solids:
                     eq2.append(
                         VelocityDivergenceSolid(fluid, sources=self.solids)
