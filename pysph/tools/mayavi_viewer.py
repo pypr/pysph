@@ -1124,7 +1124,10 @@ class MayaviViewer(HasTraits):
             t.Start(1000*self.play_delay)
         else:
             t.Stop()
-            t.callable = self._timer_event
+            if hasattr(t, 'callback'):
+                t.callback = self._timer_event
+            else:
+                t.callable = self._timer_event
 
     def _clear(self):
         self.pa_names = []
