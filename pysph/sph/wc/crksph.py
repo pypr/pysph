@@ -1,6 +1,5 @@
 '''
 CRKSPH corrections
-###################
 
 These are equations for the basic kernel corrections in [CRKSPH2017].
 
@@ -16,12 +15,17 @@ References
 
 from math import sqrt, exp
 from compyle.api import declare
-from pysph.sph.equation import Equation, Group
+from pysph.sph.equation import Equation, Group, MultiStageEquations
 from pysph.sph.wc.linalg import (
     augmented_matrix, dot, gj_solve, identity, mat_vec_mult
 )
 from pysph.sph.scheme import Scheme
 from pysph.base.utils import get_particle_array
+from pysph.sph.integrator import Integrator, IntegratorStep
+from pysph.base.particle_array import get_ghost_tag
+
+# Constants
+GHOST_TAG = get_ghost_tag()
 
 
 class CRKSPHPreStep(Equation):
@@ -34,7 +38,7 @@ class CRKSPHPreStep(Equation):
         return [augmented_matrix, gj_solve, identity, dot, mat_vec_mult]
 
     def loop_all(self, d_idx, d_x, d_y, d_z, d_h, s_x, s_y, s_z, s_h, s_m,
-                 s_rho, SPH_KERNEL, NBRS, N_NBRS, d_ai, d_gradai, d_bi,
+                 s_rho, SPH_KERNEL, NBRS, N_NBRS, d_ai, d_gradai, d_bi, s_V,
                  d_gradbi):
         x = d_x[d_idx]
         y = d_y[d_idx]
@@ -72,7 +76,6 @@ class CRKSPHPreStep(Equation):
                 grad_bi[3*i + j] = 0.0
                 for k in range(3):
                     grad_m2[9*i + 3*j + k] = 0.0
-
         for i in range(N_NBRS):
             s_idx = NBRS[i]
             xij[0] = x - s_x[s_idx]
@@ -82,7 +85,7 @@ class CRKSPHPreStep(Equation):
             rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
             wij = SPH_KERNEL.kernel(xij, rij, hij)
             SPH_KERNEL.gradient(xij, rij, hij, dwij)
-            V = s_m[s_idx] / s_rho[s_idx]
+            V = 1.0/s_V[s_idx]
 
             m0 += V * wij
             for alp in range(d):
@@ -342,15 +345,19 @@ class CRKSPHSymmetric(Equation):
         super(CRKSPHSymmetric, self).__init__(dest, sources)
 
     def loop(self, d_idx, s_idx, d_ai, d_gradai, d_cwij, d_bi, d_gradbi, s_ai,
-             s_gradai, s_bi, s_gradbi, WIJ, DWIJ, XIJ, HIJ):
+             s_gradai, s_bi, s_gradbi, d_h, s_h, WIJ, DWIJ, XIJ, HIJ, RIJ,
+             DWI, DWJ, WI, WJ, SPH_KERNEL):
         alp, gam, d = declare('int', 3)
-        res = declare('matrix(3)')
         dbxij = declare('matrix(3)')
         dbxji = declare('matrix(3)')
+        dwij, dwji = declare('matrix(3)', 2)
+        SPH_KERNEL.gradient(XIJ, RIJ, d_h[d_idx], dwij)
+        SPH_KERNEL.gradient(XIJ, RIJ, s_h[s_idx], dwji)
+        wij = SPH_KERNEL.kernel(XIJ, RIJ, d_h[d_idx])
+        wji = SPH_KERNEL.kernel(XIJ, RIJ, s_h[s_idx])
         d = self.dim
         ai = d_ai[d_idx]
         aj = s_ai[s_idx]
-        eps = 1.0e-04 * HIJ
         bxij = 0.0
         bxji = 0.0
         for alp in range(d):
@@ -366,25 +373,19 @@ class CRKSPHSymmetric(Equation):
             dbxji[gam] = temp1
 
         d_cwij[d_idx] = (ai*(1 + bxij))
+        WI = (ai*(1 + bxij)) * WIJ
+        WJ = (aj*(1 + bxji)) * WIJ
 
         for gam in range(d):
-            temp = ((ai * DWIJ[gam] + d_gradai[d * d_idx + gam] * WIJ) *
+            temp = ((ai * dwij[gam] + d_gradai[d * d_idx + gam] * wij) *
                     (1 + bxij))
-            temp += ai * (dbxij[gam] + d_bi[d * d_idx + gam]) * WIJ
-            temp += ((aj * DWIJ[gam] - s_gradai[d * s_idx + gam] * WIJ) *
+            temp += ai * (dbxij[gam] + d_bi[d * d_idx + gam]) * wij
+            temp1 = ((-aj * dwji[gam] + s_gradai[d * s_idx + gam] * wji) *
                      (1 + bxji))
-            temp -= aj * (dbxji[gam] + s_bi[d * s_idx + gam]) * WIJ
-            res[gam] = 0.5*temp
-
-        res_mag = 0.0
-        dwij_mag = 0.0
-        for i in range(d):
-            res_mag += abs(res[i])
-            dwij_mag += abs(DWIJ[i])
-        change = abs(res_mag - dwij_mag)/(dwij_mag + eps)
-        if change < self.tol:
-            for i in range(d):
-                DWIJ[i] = res[i]
+            temp1 += aj * (dbxji[gam] + s_bi[d * s_idx + gam]) * wji
+            DWIJ[gam] = 0.5*(temp - temp1)
+            DWI[gam] = temp
+            DWJ[gam] = temp1
 
 
 class NumberDensity(Equation):
@@ -401,8 +402,8 @@ class NumberDensity(Equation):
     def initialize(self, d_idx, d_V):
         d_V[d_idx] = 0.0
 
-    def loop(self, d_idx, d_V, WIJ):
-        d_V[d_idx] += WIJ
+    def loop(self, d_idx, d_V, WI):
+        d_V[d_idx] += WI
 
 
 class SummationDensityCRKSPH(Equation):
@@ -465,7 +466,7 @@ class VelocityGradient(Equation):
         for i in range(9):
             d_gradv[9*d_idx + i] = 0.0
 
-    def loop(self, d_idx, s_idx, s_V, d_gradv, d_h, s_h, XIJ, DWIJ, VIJ):
+    def loop(self, d_idx, s_idx, s_V, d_gradv, d_h, s_h, XIJ, DWIJ, VIJ, DWI):
         alp, bet, d = declare('int', 3)
         d = self.dim
 
@@ -473,7 +474,7 @@ class VelocityGradient(Equation):
 
         for alp in range(d):
             for bet in range(d):
-                d_gradv[d_idx*d*d + d*bet + alp] += -Vj * VIJ[alp] * DWIJ[bet]
+                d_gradv[d_idx*d*d + d*alp + bet] += -Vj * VIJ[alp] * DWI[bet]
 
 
 class MomentumEquation(Equation):
@@ -534,7 +535,7 @@ class MomentumEquation(Equation):
     """
 
     def __init__(self, dest, sources, dim, gx=0.0, gy=0.0, gz=0.0, cl=2, cq=1,
-                 eta_crit=0.5, eta_fold=0.2, tol=0.5):
+                 eta_crit=0.3, eta_fold=0.2, tol=0.5):
         self.dim = dim
         self.gx = gx
         self.gy = gy
@@ -557,7 +558,7 @@ class MomentumEquation(Equation):
     def loop(self, d_idx, s_idx, d_m, s_m, d_rho, s_rho, d_p, s_p, d_cs, s_cs,
              d_u, d_v, d_w, s_u, s_v, s_w, d_gradv, s_gradv, d_h, s_h, s_ai,
              s_bi, s_gradai, s_gradbi, d_au, d_av, d_aw, d_V, s_V, XIJ, VIJ,
-             DWIJ, EPS, HIJ, WIJ):
+             DWIJ, EPS, HIJ, WIJ, DWI, DWJ):
         Cl = self.cl
         Cq = self.cq
         eta_fold = self.eta_fold
@@ -625,8 +626,7 @@ class MomentumEquation(Equation):
         Qi = rhoi * (-Cl*ci*mui + Cq*mui*mui)
         Qj = rhoj * (-Cl*cj*muj + Cq*muj*muj)
 
-        fac = -(0.5/mi) * Vi * Vj * (pi + pj + Qi + Qj)
-
+        fac = -(1.0/mi) * Vi * Vj * (pi + pj + Qi + Qj)
         d_au[d_idx] += fac * DWIJ[0]
         d_av[d_idx] += fac * DWIJ[1]
         d_aw[d_idx] += fac * DWIJ[2]
@@ -661,9 +661,19 @@ class EnergyEquation(Equation):
     see MomentumEquation for :math:`\frac{Dv_{ij}^{\alpha}}{Dt}`
     """
 
-    def __init__(self, dest, sources, dim, gamma):
+    def __init__(self, dest, sources, dim, gamma, gx=0.0, gy=0.0, gz=0.0,
+                 cl=2, cq=1, eta_crit=0.5, eta_fold=0.2, tol=0.5):
         self.dim = dim
         self.gamma = gamma
+        self.dim = dim
+        self.gx = gx
+        self.gy = gy
+        self.gz = gz
+        self.cl = cl
+        self.cq = cq
+        self.eta_crit = eta_crit
+        self.eta_fold = eta_fold
+        self.tol = tol
         super(EnergyEquation, self).__init__(dest, sources)
 
     def _get_helpers_(self):
@@ -674,14 +684,83 @@ class EnergyEquation(Equation):
 
     def loop(self, d_idx, s_idx, d_au, d_av, d_aw, d_ae, s_au, s_av, s_aw,
              d_u0, d_v0, d_w0, s_u0, s_v0, s_w0, d_u, d_v, d_w, s_u, s_v, s_w,
-             d_p, d_rho, s_p, s_rho):
+             d_p, d_rho, s_p, s_rho, d_m, d_V, s_V, d_cs, s_cs, d_h, s_h,
+             XIJ, d_gradv, s_gradv, EPS, DWIJ):
+        Cl = self.cl
+        Cq = self.cq
+        eta_fold = self.eta_fold
+        eta_crit = self.eta_crit
+
+        mi = d_m[d_idx]
+        Vi = 1.0/d_V[d_idx]
+        Vj = 1.0/s_V[s_idx]
+
+        pi = d_p[d_idx]
+        pj = s_p[s_idx]
+
+        rhoi = d_rho[d_idx]
+        rhoj = s_rho[s_idx]
+
+        ci = d_cs[d_idx]
+        cj = s_cs[s_idx]
+
+        hi = d_h[d_idx]
+        hj = s_h[s_idx]
+
+        alp, bet, i, d = declare('int', 4)
+        uijhat, tmpdvxij = declare('matrix(3)', 2)
+
+        d = self.dim
+
+        tmpri = 0.0
+        tmprj = 0.0
+        for alp in range(d):
+            for bet in range(d):
+                tmpri += d_gradv[d*d*d_idx + d*alp + bet] * XIJ[alp] * XIJ[bet]
+                tmprj += s_gradv[d*d*s_idx + d*alp + bet] * XIJ[alp] * XIJ[bet]
+        rij = tmpri/tmprj
+
+        tmprij = min(1, 4*rij/((1 + rij)*(1 + rij)))
+        phiij = max(0, tmprij)
+
+        tmpxij = dot(XIJ, XIJ, d)
+        tmpxij2 = sqrt(tmpxij)
+        etai_scalar = tmpxij2/hi
+        etaj_scalar = tmpxij2/hj
+        etaij = min(etai_scalar, etaj_scalar)
+
+        if etaij < eta_crit:
+            tmpphi = (etaij - eta_crit)/eta_fold
+            phiij = phiij * exp(-tmpphi*tmpphi)
+
+        for alp in range(d):
+            s = 0.0
+            for bet in range(d):
+                s += (d_gradv[d*d*d_idx + d*alp + bet] +
+                      s_gradv[d*d*s_idx + d*alp + bet]) * XIJ[bet]
+            tmpdvxij[alp] = s
+
+        uijhat[0] = d_u0[d_idx] - s_u0[s_idx] - 0.5*phiij * tmpdvxij[0]
+        uijhat[1] = d_v0[d_idx] - s_v0[s_idx] - 0.5*phiij * tmpdvxij[1]
+        uijhat[2] = d_w0[d_idx] - s_w0[s_idx] - 0.5*phiij * tmpdvxij[2]
+
+        tmpmui = dot(uijhat, XIJ, d) / (tmpxij/hi + EPS * hi)
+        mui = min(0, tmpmui)
+
+        tmpmuj = dot(uijhat, XIJ, d) / (tmpxij/hi + EPS * hj)
+        muj = min(0, tmpmuj)
+
+        Qi = rhoi * (-Cl*ci*mui + Cq*mui*mui)
+        Qj = rhoj * (-Cl*cj*muj + Cq*muj*muj)
+
+        fac = -(1.0 / mi) * Vi * Vj * (pi + pj + Qi + Qj)
+
         gamma = self.gamma
-        d = declare('int')
         d = self.dim
         auij, delu = declare('matrix(3)', 2)
-        auij[0] = d_au[d_idx] - s_au[s_idx]
-        auij[1] = d_av[d_idx] - s_av[s_idx]
-        auij[2] = d_aw[d_idx] - s_aw[s_idx]
+        auij[0] = fac * DWIJ[0]
+        auij[1] = fac * DWIJ[1]
+        auij[2] = fac * DWIJ[2]
 
         delu[0] = s_u0[s_idx] + s_u[s_idx] - d_u0[d_idx] - d_u[d_idx]
         delu[1] = s_v0[s_idx] + s_v[s_idx] - d_v0[d_idx] - d_v[d_idx]
@@ -722,6 +801,49 @@ class StateEquation(Equation):
         d_p[d_idx] = (self.gamma - 1) * d_rho[d_idx] * d_e[d_idx]
 
 
+class SpeedOfSound(Equation):
+    def __init__(self, dest, sources=None, gamma=7.0):
+        super(SpeedOfSound, self).__init__(dest, sources)
+        self.gamma = gamma
+
+    def initialize(self, d_cs, d_idx, d_p, d_rho):
+        d_cs[d_idx] = (self.gamma * d_p[d_idx] / d_rho[d_idx])**0.5
+
+
+class CRKSPHUpdateGhostProps(Equation):
+    def __init__(self, dest, sources=None, dim=2):
+        super(CRKSPHUpdateGhostProps, self).__init__(dest, sources)
+        self.dim = dim
+        assert GHOST_TAG == 2
+
+    def initialize(self, d_idx, d_orig_idx, d_p, d_cs, d_V, d_ai, d_bi, d_tag,
+                   d_gradbi, d_gradai, d_rho, d_u0, d_v0, d_w0, d_gradv, d_u,
+                   d_v, d_w):
+        idx, d, alp, bet = declare('int', 4)
+        d = self.dim
+        if d_tag[d_idx] == 2:
+            idx = d_orig_idx[d_idx]
+            d_p[d_idx] = d_p[idx]
+            d_cs[d_idx] = d_cs[idx]
+            d_V[d_idx] = d_V[idx]
+            d_rho[d_idx] = d_rho[idx]
+            d_u0[d_idx] = d_u0[idx]
+            d_v0[d_idx] = d_v0[idx]
+            d_w0[d_idx] = d_w0[idx]
+            d_u[d_idx] = d_u[idx]
+            d_v[d_idx] = d_v[idx]
+            d_w[d_idx] = d_w[idx]
+            d_ai[d_idx] = d_ai[idx]
+            for alp in range(d):
+                d_gradai[d*d_idx + alp] = d_gradai[d*idx + alp]
+                d_bi[d*d_idx + alp] = d_bi[d*idx + alp]
+                for bet in range(d):
+                    d_gradv[d*d*d_idx + d*alp + bet] = \
+                        d_gradv[d*d*idx + d*alp + bet]
+                    d_gradbi[d*d*d_idx + d*alp + bet] = \
+                        d_gradbi[d*d*idx + d*alp + bet]
+
+
 def get_particle_array_crksph(constants=None, **props):
     crksph_props = [
         'e', 'au', 'av', 'aw', 'ae', 'u0', 'v0', 'w0', 'cs', 'V', 'rhofac',
@@ -741,10 +863,57 @@ def get_particle_array_crksph(constants=None, **props):
     return pa
 
 
+class CRKSPHIntegrator(Integrator):
+    def one_timestep(self, t, dt):
+        self.stage1()
+        self.do_post_stage(dt, 1)
+
+        self.compute_accelerations(0)
+
+        self.stage2()
+        self.do_post_stage(dt, 2)
+
+        self.compute_accelerations(1)
+
+        # We update domain here alone as positions only change here.
+        self.stage3()
+        self.do_post_stage(dt, 3)
+        self.update_domain()
+
+
+class CRKSPHStep(IntegratorStep):
+    def stage1(self, d_idx, d_u, d_v, d_w, d_u0, d_v0, d_w0):
+        d_u0[d_idx] = d_u[d_idx]
+        d_v0[d_idx] = d_v[d_idx]
+        d_w0[d_idx] = d_w[d_idx]
+
+    def stage2(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, dt):
+        d_u[d_idx] += d_au[d_idx] * dt
+        d_v[d_idx] += d_av[d_idx] * dt
+        d_w[d_idx] += d_aw[d_idx] * dt
+
+    def stage3(self, d_idx, d_e, d_ae, d_u, d_v, d_w, d_u0, d_v0, d_w0,
+               d_x, d_y, d_z, dt):
+        d_e[d_idx] += d_ae[d_idx] * dt
+        d_x[d_idx] += 0.5*dt*(d_u[d_idx] + d_u0[d_idx])
+        d_y[d_idx] += 0.5*dt*(d_v[d_idx] + d_v0[d_idx])
+        d_z[d_idx] += 0.5*dt*(d_w[d_idx] + d_w0[d_idx])
+
+
 class CRKSPHScheme(Scheme):
     def __init__(self, fluids, dim, rho0, c0, nu, h0, p0, gx=0.0,
-                 gy=0.0, gz=0.0, cl=2, cq=1, gamma=7.0, eta_crit=0.5,
-                 eta_fold=0.2, tol=0.5):
+                 gy=0.0, gz=0.0, cl=2, cq=1, gamma=7.0, eta_crit=0.3,
+                 eta_fold=0.2, tol=0.5, has_ghosts=False):
+        """
+        Parameters
+        ----------
+
+        fluids: list
+            a list with names of fluid particle arrays
+        solids: list
+            a list with names of solid (or boundary) particle arrays
+
+        """
         self.fluids = fluids
         self.solver = None
         self.dim = dim
@@ -762,6 +931,7 @@ class CRKSPHScheme(Scheme):
         self.eta_crit = eta_crit
         self.eta_fold = eta_fold
         self.tol = tol
+        self.has_ghosts = has_ghosts
 
     def configure_solver(self, kernel=None, integrator_cls=None,
                          extra_steppers=None, **kw):
@@ -781,20 +951,22 @@ class CRKSPHScheme(Scheme):
             Any additional keyword args are passed to the solver instance.
         """
         from pysph.base.kernels import QuinticSpline
-        from pysph.sph.integrator import PECIntegrator
-        from pysph.sph.integrator_step import WCSPHStep
         if kernel is None:
             kernel = QuinticSpline(dim=self.dim)
         steppers = {}
         if extra_steppers is not None:
             steppers.update(extra_steppers)
 
-        step_cls = WCSPHStep
+        step_cls = CRKSPHStep
         for fluid in self.fluids:
             if fluid not in steppers:
                 steppers[fluid] = step_cls()
 
-        cls = integrator_cls if integrator_cls is not None else PECIntegrator
+        if integrator_cls is not None:
+            cls = integrator_cls
+            print("warning: CRKSPHIntegrator is not being used")
+        else:
+            cls = CRKSPHIntegrator
         integrator = cls(**steppers)
 
         from pysph.solver.solver import Solver
@@ -804,73 +976,178 @@ class CRKSPHScheme(Scheme):
         )
 
     def get_equations(self):
-        from pysph.sph.basic_equations import XSPHCorrection
-        from pysph.sph.wc.basic import TaitEOS
         from pysph.sph.wc.viscosity import LaminarViscosity
         all = self.fluids
 
-        equations = []
+        equations_stage1 = []
+        equations_stage2 = []
+
+        eq00 = []
+        for fluid in self.fluids:
+            eq00.append(
+                StateEquation(dest=fluid, sources=None, gamma=self.gamma)
+            )
+            eq00.append(
+                SpeedOfSound(dest=fluid, sources=None, gamma=self.gamma)
+            )
+        equations_stage1.append(Group(equations=eq00))
+
+        gh = []
+        for fluid in self.fluids:
+            gh.append(
+                CRKSPHUpdateGhostProps(dest=fluid, sources=None, dim=self.dim)
+            )
+        equations_stage1.append(Group(equations=gh, real=False))
 
         eq0 = []
         for fluid in self.fluids:
-            eq0.append(CRKSPHPreStep(dest=fluid, sources=all, dim=2))
-        equations.append(Group(equations=eq0, real=False))
+            eq0.append(NumberDensity(dest=fluid, sources=all))
+        equations_stage1.append(Group(equations=eq0, real=False))
+
+        if self.has_ghosts:
+            gh = []
+            for fluid in self.fluids:
+                gh.append(
+                    CRKSPHUpdateGhostProps(
+                        dest=fluid, sources=None, dim=self.dim
+                        )
+                )
+            equations_stage1.append(Group(equations=gh, real=False))
 
         eq1 = []
         for fluid in self.fluids:
-            eq1.append(NumberDensity(dest=fluid, sources=all))
-        equations.append(Group(equations=eq1, real=False))
+            eq1.append(CRKSPHPreStep(dest=fluid, sources=all, dim=self.dim))
+        equations_stage1.append(Group(equations=eq1, real=False))
+
+        if self.has_ghosts:
+            gh = []
+            for fluid in self.fluids:
+                gh.append(
+                    CRKSPHUpdateGhostProps(
+                        dest=fluid, sources=None, dim=self.dim
+                        )
+                )
+            equations_stage1.append(Group(equations=gh, real=False))
 
         eq2 = []
         for fluid in self.fluids:
             eq2.extend([
-                CRKSPH(dest=fluid, sources=all, dim=self.dim, tol=self.tol),
+                CRKSPHSymmetric(
+                    dest=fluid, sources=all, dim=self.dim, tol=self.tol
+                    ),
                 SummationDensityCRKSPH(dest=fluid, sources=all)
             ])
-        equations.append(Group(equations=eq2, real=False))
+        equations_stage1.append(Group(equations=eq2, real=False))
 
         eq3 = []
         for fluid in self.fluids:
             eq3.append(
-                TaitEOS(dest=fluid, sources=None, rho0=self.rho0, c0=self.c0,
-                        p0=self.p0, gamma=self.gamma))
-        equations.append(Group(equations=eq3, real=False))
+                StateEquation(dest=fluid, sources=None, gamma=self.gamma)
+            )
+            eq3.append(
+                SpeedOfSound(dest=fluid, sources=None, gamma=self.gamma)
+            )
+        equations_stage1.append(Group(equations=eq3))
+
+        if self.has_ghosts:
+            gh = []
+            for fluid in self.fluids:
+                gh.append(
+                    CRKSPHUpdateGhostProps(
+                        dest=fluid, sources=None, dim=self.dim
+                        )
+                )
+            equations_stage1.append(Group(equations=gh, real=False))
 
         eq4 = []
         for fluid in self.fluids:
             eq4.extend([
-                CRKSPH(dest=fluid, sources=all, dim=self.dim, tol=self.tol),
+                CRKSPHSymmetric(
+                    dest=fluid, sources=all, dim=self.dim, tol=self.tol
+                    ),
                 VelocityGradient(dest=fluid, sources=all, dim=self.dim)
             ])
-        equations.append(Group(equations=eq4))
+        equations_stage1.append(Group(equations=eq4))
+
+        if self.has_ghosts:
+            gh = []
+            for fluid in self.fluids:
+                gh.append(
+                    CRKSPHUpdateGhostProps(
+                        dest=fluid, sources=None, dim=self.dim
+                        )
+                )
+            equations_stage1.append(Group(equations=gh, real=False))
 
         eq5 = []
         for fluid in self.fluids:
-            eq5.extend([
-                CRKSPHSymmetric(dest=fluid, sources=all, dim=self.dim,
-                                tol=self.tol),
+            eq5.append(
+                CRKSPHSymmetric(
+                    dest=fluid, sources=all, dim=self.dim, tol=self.tol
+                )
+            )
+            eq5.append(
                 MomentumEquation(
                     dest=fluid, sources=all, dim=self.dim, gx=self.gx,
                     gy=self.gy, gz=self.gz, cl=self.cl, cq=self.cq,
                     eta_crit=self.eta_crit, eta_fold=self.eta_fold
-                ),
-                XSPHCorrection(dest=fluid, sources=all)
-            ])
-
+                )
+            )
             if abs(self.nu) > 1e-14:
                 eq5.append(LaminarViscosity(
                     dest=fluid, sources=self.fluids, nu=self.nu
                 ))
-        equations.append(Group(equations=eq5))
-        return equations
+        equations_stage1.append(Group(equations=eq5))
+
+        if self.has_ghosts:
+            gh = []
+            for fluid in self.fluids:
+                gh.append(
+                    CRKSPHUpdateGhostProps(
+                        dest=fluid, sources=None, dim=self.dim
+                        )
+                )
+            equations_stage2.append(Group(equations=gh, real=False))
+
+        eq6 = []
+        for fluid in self.fluids:
+            eq6.append(
+                CRKSPHSymmetric(
+                    dest=fluid, sources=all, dim=self.dim, tol=self.tol
+                    )
+            )
+            eq6.append(
+                EnergyEquation(
+                    dest=fluid, sources=all, dim=self.dim, gamma=self.gamma
+                    )
+            )
+        equations_stage2.append(Group(equations=eq6))
+
+        return MultiStageEquations([equations_stage1, equations_stage2])
 
     def setup_properties(self, particles, clean=True):
+        import numpy
         particle_arrays = dict([(p.name, p) for p in particles])
+        crksph_props = [
+            'au', 'av', 'aw', 'ae', 'u0', 'v0', 'w0', 'cs', 'V', 'rhofac',
+            'x0', 'y0', 'z0', 'rho0', 'ax', 'ay', 'az', 'arho'
+        ]
         dummy = get_particle_array_crksph(name='junk')
         props = list(dummy.properties.keys())
         props += [dict(name=p, stride=v) for p, v in dummy.stride.items()]
+        props += crksph_props
         output_props = dummy.output_property_arrays
+        output_props += ['p', 'V', 'e']
         for fluid in self.fluids:
             pa = particle_arrays[fluid]
             self._ensure_properties(pa, props, clean)
+            pa.add_property('cwij')
+            pa.add_property('ai')
+            pa.add_property('bi', stride=3)
+            pa.add_property('gradai', stride=3)
+            pa.add_property('gradbi', stride=9)
+            pa.add_property('gradv', stride=9)
+            pa.add_property('orig_idx', type='int')
+            nfp = pa.get_number_of_particles()
+            pa.orig_idx[:] = numpy.arange(nfp)
             pa.set_output_arrays(output_props)

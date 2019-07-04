@@ -4,7 +4,10 @@ from compyle.api import declare
 from pysph.base.reduce_array import serial_reduce_array, parallel_reduce_array
 from pysph.sph.equation import Equation
 from math import sqrt, exp, log
+from pysph.base.particle_array import get_ghost_tag
 import numpy
+
+GHOST_TAG = get_ghost_tag()
 
 
 class ScaleSmoothingLength(Equation):
@@ -473,5 +476,34 @@ class MPMAccelerations(Equation):
             d_aalpha1[d_idx] = (self.alpha1_min - d_alpha1[d_idx])/tau + S1
 
         if self.update_alpha2:
-            S2 = 0.01 * d_h[d_idx] * d_del2e[d_idx]
+            S2 = 0.01 * d_h[d_idx] * abs(d_del2e[d_idx])/sqrt(d_e[d_idx])
             d_aalpha2[d_idx] = (self.alpha2_min - d_alpha2[d_idx])/tau + S2
+
+
+class MPMUpdateGhostProps(Equation):
+    def __init__(self, dest, sources=None, dim=2):
+        super(MPMUpdateGhostProps, self).__init__(dest, sources)
+        self.dim = dim
+        assert GHOST_TAG == 2
+
+    def initialize(self, d_idx, d_orig_idx, d_p, d_cs, d_tag):
+        idx = declare('int')
+        if d_tag[d_idx] == 2:
+            idx = d_orig_idx[d_idx]
+            d_p[d_idx] = d_p[idx]
+            d_cs[d_idx] = d_cs[idx]
+
+
+class ADKEUpdateGhostProps(Equation):
+    def __init__(self, dest, sources=None, dim=2):
+        super(ADKEUpdateGhostProps, self).__init__(dest, sources)
+        self.dim = dim
+        assert GHOST_TAG == 2
+
+    def initialize(self, d_idx, d_orig_idx, d_p, d_cs, d_tag, d_rho):
+        idx = declare('int')
+        if d_tag[d_idx] == 2:
+            idx = d_orig_idx[d_idx]
+            d_p[d_idx] = d_p[idx]
+            d_cs[d_idx] = d_cs[idx]
+            d_rho[d_idx] = d_rho[idx]

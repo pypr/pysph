@@ -613,15 +613,17 @@ cdef class CPUDomainManager(DomainManagerBase):
             if mirror_in_x:
                 # x_low
                 copy = pa.extract_particles( x_low )
-                self._add_array_to_array(copy.get_carray('x'), xt_low)
-                self._mul_to_array(copy.get_carray('u'), -1)
-                added.append_parray(copy)
+                if copy.get_number_of_particles() > 0:
+                    self._add_array_to_array(copy.get_carray('x'), xt_low)
+                    self._mul_to_array(copy.get_carray('u'), -1)
+                    added.append_parray(copy)
 
                 # x_high
                 copy = pa.extract_particles( x_high )
-                self._add_array_to_array(copy.get_carray('x'), xt_high)
-                self._mul_to_array(copy.get_carray('u'), -1)
-                added.append_parray(copy)
+                if copy.get_number_of_particles() > 0:
+                    self._add_array_to_array(copy.get_carray('x'), xt_high)
+                    self._mul_to_array(copy.get_carray('u'), -1)
+                    added.append_parray(copy)
 
             if mirror_in_y:
                 # Now do the corners from the previous.
@@ -638,27 +640,31 @@ cdef class CPUDomainManager(DomainManagerBase):
                         high_translate.append(2*(ymax - yi))
 
                 copy = added.extract_particles(low)
-                self._add_array_to_array(copy.get_carray('y'), low_translate)
-                self._mul_to_array(copy.get_carray('v'), -1)
-                added.append_parray(copy)
+                if copy.get_number_of_particles() > 0:
+                    self._add_array_to_array(copy.get_carray('y'), low_translate)
+                    self._mul_to_array(copy.get_carray('v'), -1)
+                    added.append_parray(copy)
 
                 copy = added.extract_particles(high)
-                self._add_array_to_array(copy.get_carray('y'), high_translate)
-                self._mul_to_array(copy.get_carray('v'), -1)
-                added.append_parray(copy)
+                if copy.get_number_of_particles() > 0:
+                    self._add_array_to_array(copy.get_carray('y'), high_translate)
+                    self._mul_to_array(copy.get_carray('v'), -1)
+                    added.append_parray(copy)
 
                 # Add the actual y_high and y_low now.
                 # y_high
                 copy = pa.extract_particles( y_high )
-                self._add_array_to_array(copy.get_carray('y'), yt_high)
-                self._mul_to_array(copy.get_carray('v'), -1)
-                added.append_parray(copy)
+                if copy.get_number_of_particles() > 0:
+                    self._add_array_to_array(copy.get_carray('y'), yt_high)
+                    self._mul_to_array(copy.get_carray('v'), -1)
+                    added.append_parray(copy)
 
                 # y_low
                 copy = pa.extract_particles( y_low )
-                self._add_array_to_array(copy.get_carray('y'), yt_low)
-                self._mul_to_array(copy.get_carray('v'), -1)
-                added.append_parray(copy)
+                if copy.get_number_of_particles() > 0:
+                    self._add_array_to_array(copy.get_carray('y'), yt_low)
+                    self._mul_to_array(copy.get_carray('v'), -1)
+                    added.append_parray(copy)
 
             if mirror_in_z:
                 # Now do the corners from the previous.
@@ -675,27 +681,31 @@ cdef class CPUDomainManager(DomainManagerBase):
                         high_translate.append(2*(zmax - zi))
 
                 copy = added.extract_particles(low)
-                self._add_array_to_array(copy.get_carray('z'), low_translate)
-                self._mul_to_array(copy.get_carray('w'), -1)
-                added.append_parray(copy)
+                if copy.get_number_of_particles() > 0:
+                    self._add_array_to_array(copy.get_carray('z'), low_translate)
+                    self._mul_to_array(copy.get_carray('w'), -1)
+                    added.append_parray(copy)
 
                 copy = added.extract_particles(high)
-                self._add_array_to_array(copy.get_carray('z'), high_translate)
-                self._mul_to_array(copy.get_carray('w'), -1)
-                added.append_parray(copy)
+                if copy.get_number_of_particles() > 0:
+                    self._add_array_to_array(copy.get_carray('z'), high_translate)
+                    self._mul_to_array(copy.get_carray('w'), -1)
+                    added.append_parray(copy)
 
                 # Add the actual z_high and z_low now.
                 # z_high
                 copy = pa.extract_particles( z_high )
-                self._add_array_to_array(copy.get_carray('z'), zt_high)
-                self._mul_to_array(copy.get_carray('w'), -1)
-                added.append_parray(copy)
+                if copy.get_number_of_particles() > 0:
+                    self._add_array_to_array(copy.get_carray('z'), zt_high)
+                    self._mul_to_array(copy.get_carray('w'), -1)
+                    added.append_parray(copy)
 
                 # z_low
                 copy = pa.extract_particles( z_low )
-                self._add_array_to_array(copy.get_carray('z'), zt_low)
-                self._mul_to_array(copy.get_carray('w'), -1)
-                added.append_parray(copy)
+                if copy.get_number_of_particles() > 0:
+                    self._add_array_to_array(copy.get_carray('z'), zt_low)
+                    self._mul_to_array(copy.get_carray('w'), -1)
+                    added.append_parray(copy)
 
 
             added.tag[:] = Ghost

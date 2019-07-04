@@ -2,6 +2,8 @@
 """
 from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
 from pysph.sph.scheme import ADKEScheme, GasDScheme, GSPHScheme, SchemeChooser
+from pysph.sph.wc.crksph import CRKSPHScheme
+from pysph.base.nnps import DomainManager
 import numpy
 
 # Numerical constants
@@ -10,7 +12,7 @@ gamma = 1.4
 gamma1 = gamma - 1.0
 
 # solution parameters
-dt = 3e-4
+dt = 1e-4
 tf = 0.15
 
 
@@ -34,7 +36,7 @@ class SodShockTube(ShockTubeSetup):
             help="Ratio h/dx."
         )
         group.add_argument(
-            "--nl", action="store", type=float, dest="nl", default=320,
+            "--nl", action="store", type=float, dest="nl", default=640,
             help="Number of particles in left region"
         )
 
@@ -56,6 +58,11 @@ class SodShockTube(ShockTubeSetup):
                                        h0=self.h0, bx=0.03, gamma1=gamma1,
                                        ul=self.ul, ur=self.ur)
 
+    def create_domain(self):
+        return DomainManager(
+            xmin=self.xmin, xmax=self.xmax, mirror_in_x=True
+        )
+
     def create_scheme(self):
         self.dt = dt
         self.tf = tf
@@ -75,7 +82,13 @@ class SodShockTube(ShockTubeSetup):
             interface_zero=True, hybrid=False, blend_alpha=2.0,
             niter=20, tol=1e-6
         )
-        s = SchemeChooser(default='adke', adke=adke, mpm=mpm, gsph=gsph)
+        crk = CRKSPHScheme(
+            fluids=['fluid'], dim=dim, rho0=0, c0=0, nu=0, h0=0, p0=0,
+            gamma=gamma, cl=3
+        )
+        s = SchemeChooser(
+            default='adke', adke=adke, mpm=mpm, gsph=gsph, crk=crk
+            )
         return s
 
 

@@ -11,7 +11,10 @@ from pysph.sph.wc.kernel_correction import (
     GradientCorrectionPreStep,  MixedKernelCorrectionPreStep,
     GradientCorrection, MixedGradientCorrection
 )
-from pysph.sph.wc.crksph import CRKSPHPreStep, CRKSPH, CRKSPHSymmetric
+from pysph.sph.wc.crksph import (
+    CRKSPHPreStep, CRKSPH, CRKSPHSymmetric, SummationDensityCRKSPH,
+    NumberDensity
+)
 
 
 class GradPhi(Equation):
@@ -63,7 +66,7 @@ class TestKernelCorrection2D(unittest.TestCase):
         x, y = np.mgrid[0.5:1:2j, 0.5:1:2j]
         u = x + y
         pa = get_particle_array(
-            name='fluid', x=x, y=y, h=0.5, m=1.0, u=u
+            name='fluid', x=x, y=y, h=0.5, m=1.0, u=u, V=1.0
         )
         pa.add_property('gradu', stride=3)
         pa.add_property('cwij')
@@ -167,9 +170,13 @@ class TestKernelCorrection2D(unittest.TestCase):
         dest = 'fluid'
         sources = ['fluid']
         pa.add_property('zero_mom')
+        pa.add_property('V')
         pa.add_property('first_mom', stride=3)
         pa.rho[:] = 1.0
         eqs = [
+            Group(equations=[
+                NumberDensity(dest=dest, sources=sources),
+            ]),
             Group(equations=[
                 SummationDensity(dest=dest, sources=sources),
             ]),
@@ -204,9 +211,14 @@ class TestKernelCorrection2D(unittest.TestCase):
         dest = 'fluid'
         sources = ['fluid']
         pa.add_property('zero_mom')
+        pa.add_property('V')
+        pa.add_property('rhofac')
         pa.add_property('first_mom', stride=3)
         pa.rho[:] = 1.0
         eqs = [
+            Group(equations=[
+                NumberDensity(dest=dest, sources=sources),
+            ]),
             Group(equations=[
                 SummationDensity(dest=dest, sources=sources),
             ]),
