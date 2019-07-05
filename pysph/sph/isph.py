@@ -377,12 +377,12 @@ class SetPressureSolid(Equation):
 
 class GTVFAcceleration(Equation):
     def __init__(self, dest, sources, pref, internal_flow=False,
-                 gtvf_delta=0.02):
+                 use_pref=False):
         self.pref = pref
         assert self.pref is not None, "pref should not be None"
         self.internal = internal_flow
         self.hij_fac = 1 if self.internal else 0.5
-        self.gtvf_delta = gtvf_delta
+        self.use_pref = use_pref
         super(GTVFAcceleration, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_auhat, d_avhat, d_awhat, d_p0, d_p, d_pmax):
@@ -391,8 +391,11 @@ class GTVFAcceleration(Equation):
         d_awhat[d_idx] = 0.0
 
         if self.internal:
-            pref = 2*d_pmax[0]
-            d_p0[d_idx] = pref
+            if self.use_pref:
+                d_p0[d_idx] = self.pref
+            else:
+                pref = 2*d_pmax[0]
+                d_p0[d_idx] = pref
         else:
             d_p0[d_idx] = min(10*abs(d_p[d_idx]), self.pref)
 
@@ -491,7 +494,8 @@ class ISPHScheme(Scheme):
                  omega=0.5, hg_correction=False, has_ghosts=False,
                  inviscid_solids=None, inlet_outlet_manager=None, pref=None,
                  gtvf=False, symmetric=False, rho_cutoff=0.8,
-                 max_iterations=1000, internal_flow=False, gtvf_delta=0.02):
+                 max_iterations=1000, internal_flow=False,
+                 use_pref=False):
         self.fluids = fluids
         self.solids = solids
         self.solver = None
@@ -520,7 +524,7 @@ class ISPHScheme(Scheme):
         self.symmetric = symmetric
         self.max_iterations = max_iterations
         self.internal_flow = internal_flow
-        self.gtvf_delta = gtvf_delta
+        self.use_pref = use_pref
 
     def add_user_options(self, group):
         group.add_argument(
@@ -543,11 +547,6 @@ class ISPHScheme(Scheme):
             default=None,
             help='Artificial viscosity.'
         )
-        group.add_argument(
-            '--gtvf-delta', action='store', type=float, dest='gtvf_delta',
-            default=0.02,
-            help='Factor limiting GTVF acceleration.'
-        )
         add_bool_argument(
             group, 'gtvf', dest='gtvf', default=None,
             help='Use GTVF.'
@@ -563,7 +562,7 @@ class ISPHScheme(Scheme):
 
     def consume_user_options(self, options):
         _vars = ['variant', 'tolerance', 'omega', 'alpha', 'gtvf', 'symmetric',
-                 'gtvf_delta', 'internal_flow']
+                 'internal_flow']
         data = dict((var, self._smart_getattr(options, var))
                     for var in _vars)
         self.configure(**data)
@@ -858,7 +857,7 @@ class ISPHScheme(Scheme):
                 eq4.append(
                     GTVFAcceleration(dest=fluid, sources=all, pref=self.pref,
                                      internal_flow=self.internal_flow,
-                                     gtvf_delta=self.gtvf_delta)
+                                     use_pref=self.use_pref)
                 )
         stg2.append(Group(equations=eq4))
         return MultiStageEquations([stg1, stg2])
