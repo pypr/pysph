@@ -173,7 +173,8 @@ class Application(object):
 
     """
 
-    def __init__(self, fname=None, output_dir=None, domain=None):
+    def __init__(self, fname=None, output_dir=None, domain=None,
+                 no_parse=False):
         """ Constructor
 
         Parameters
@@ -184,6 +185,8 @@ class Application(object):
             output directory name.
         domain : pysph.base.nnps_base.DomainManager
             A domain manager to use. This is used for periodic domains etc.
+        no_parse : bool
+            if True commandline arguments will not be parsed
         """
         self.domain = domain
 
@@ -198,7 +201,11 @@ class Application(object):
 
         self.fname = fname
 
-        self.args = sys.argv[1:]
+        self.no_parse = no_parse
+        if no_parse:
+            self.args = []
+        else:
+            self.args = sys.argv[1:]
 
         # MPI related vars.
         self.comm = None
@@ -810,6 +817,8 @@ class Application(object):
         :py:meth:`configure_scheme`.
 
         """
+        if self.no_parse:
+            return
         options = self.options
         if options.post_process:
             self._message('-'*70)
