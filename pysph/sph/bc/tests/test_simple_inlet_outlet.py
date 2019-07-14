@@ -12,9 +12,8 @@ except ImportError:
 
 from pysph.base.utils import get_particle_array
 from pysph.base.kernels import QuinticSpline
-from pysph.sph.bc.inlet import Inlet
-from pysph.sph.bc.outlet import Outlet
-from pysph.sph.bc.inlet_outlet_manager import InletInfo, OutletInfo
+from pysph.sph.bc.inlet_outlet_manager import (
+    InletInfo, OutletInfo, InletBase, OutletBase)
 
 
 class TestSimpleInlet1D(unittest.TestCase):
@@ -40,7 +39,7 @@ class TestSimpleInlet1D(unittest.TestCase):
 
     def test_update_creates_particles_in_destination(self):
         # Given
-        inlet = Inlet(
+        inlet = InletBase(
             self.inlet_pa, self.dest_pa, self.inletinfo,
             dim=1, kernel=self.kernel)
         # Two rows of particles should move out.
@@ -76,7 +75,7 @@ class TestSimpleInlet1D(unittest.TestCase):
 
     def test_particles_should_update_in_given_stage(self):
         # Given
-        inlet = Inlet(
+        inlet = InletBase(
             self.inlet_pa, self.dest_pa, self.inletinfo,
             dim=1, kernel=self.kernel)
         # Two rows of particles should move out.
@@ -108,7 +107,7 @@ class TestSimpleInlet1D(unittest.TestCase):
         def _callback(d, i):
             calls.append((d, i))
 
-        inlet = Inlet(
+        inlet = InletBase(
             self.inlet_pa, self.dest_pa, self.inletinfo,
             dim=1.0, kernel=self.kernel, callback=_callback)
 
@@ -133,7 +132,7 @@ class TestSimpleOutlet1D(unittest.TestCase):
         self.source_pa = get_particle_array(name='fluid', x=x, m=m, h=h, p=p)
         # Empty particle array.
         self.outlet_pa = get_particle_array(name='outlet')
-        props = ['ioid', 'disp']
+        props = ['ioid', 'disp', 'x0', 'y0', 'z0', 'uhat', 'vhat', 'what']
         for p in props:
             for pa_arr in [self.source_pa, self.outlet_pa]:
                 pa_arr.add_property(p)
@@ -146,7 +145,7 @@ class TestSimpleOutlet1D(unittest.TestCase):
 
     def test_outlet_absorbs_particles_from_source(self):
         # Given
-        outlet = Outlet(
+        outlet = OutletBase(
             self.outlet_pa, self.source_pa, self.outletinfo,
             dim=1, kernel=self.kernel)
         # Two rows of particles should move out.
@@ -183,7 +182,7 @@ class TestSimpleOutlet1D(unittest.TestCase):
 
     def test_particles_should_update_in_given_stage(self):
         # Given
-        outlet = Outlet(
+        outlet = OutletBase(
             self.outlet_pa, self.source_pa, self.outletinfo,
             dim=1, kernel=self.kernel)
         # Two rows of particles should move out.
@@ -210,7 +209,7 @@ class TestSimpleOutlet1D(unittest.TestCase):
 
     def test_outlet_deletes_particles(self):
         # Given
-        outlet = Outlet(
+        outlet = OutletBase(
             self.outlet_pa, self.source_pa, self.outletinfo,
             dim=1, kernel=self.kernel)
         # Two rows of particles should move out.
@@ -237,7 +236,7 @@ class TestSimpleOutlet1D(unittest.TestCase):
         def _callback(s, o):
             calls.append((s, o))
 
-        outlet = Outlet(
+        outlet = OutletBase(
             self.outlet_pa, self.source_pa, self.outletinfo,
             dim=1.0, kernel=self.kernel, callback=_callback)
 
