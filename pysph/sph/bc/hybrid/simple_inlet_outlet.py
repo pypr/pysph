@@ -43,7 +43,7 @@ class SimpleInletOutlet(InletOutletManager):
         pa.add_constant('uref', 0.0)
 
     def get_stepper(self, scheme, cls, edactvf=True):
-        from inlet_outlet_manager import InletStep, OutletStep
+        from pysph.sph.bc.inlet_outlet_manager import InletStep, OutletStep
         steppers = {}
         if (cls == PECIntegrator):
             if isinstance(scheme, EDACScheme):
