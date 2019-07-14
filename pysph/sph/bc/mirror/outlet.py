@@ -24,10 +24,7 @@ class Outlet(OutletBase):
             self.initialize()
             self._init = True
         if stage in self.active_stages:
-            props_to_copy = [
-                'x0', 'y0', 'z0', 'uhat', 'vhat', 'what', 'x', 'y',
-                'z', 'u', 'v', 'w', 'm', 'h', 'rho', 'p',
-                'gid', 'pid', 'tag', 'ioid']
+            props_to_copy = self.props_to_copy
             outlet_pa = self.outlet_pa
             source_pa = self.source_pa
             ghost_pa = self.ghost_pa

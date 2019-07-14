@@ -132,15 +132,16 @@ class TestSimpleOutlet1D(unittest.TestCase):
         self.source_pa = get_particle_array(name='fluid', x=x, m=m, h=h, p=p)
         # Empty particle array.
         self.outlet_pa = get_particle_array(name='outlet')
-        props = ['ioid', 'disp', 'x0', 'y0', 'z0', 'uhat', 'vhat', 'what']
+        props = ['ioid', 'disp']
         for p in props:
             for pa_arr in [self.source_pa, self.outlet_pa]:
                 pa_arr.add_property(p)
         self.dx = dx
         self.kernel = QuinticSpline(dim=1)
 
-        self.outletinfo = OutletInfo('outlet', normal=[1., 0., 0.],
-                                     refpoint=[-dx/2, 0., 0.])
+        self.outletinfo = OutletInfo(
+            'outlet', normal=[1., 0., 0.], refpoint=[-dx/2, 0., 0.],
+            props_to_copy=self.source_pa.get_lb_props())
         self.outletinfo.length = 0.5
 
     def test_outlet_absorbs_particles_from_source(self):

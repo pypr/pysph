@@ -12,7 +12,8 @@ from compyle.api import declare
 
 class InletInfo(object):
     def __init__(self, pa_name, normal, refpoint, has_ghost=True,
-                 update_cls=None, equations=None, umax=1.0):
+                 update_cls=None, equations=None, umax=1.0,
+                 props_to_copy=None):
         """Create object with information of inlets, all the others parameters
            which are not passed here get evaluated by `InletOutletManager`once
            the inlet is created.
@@ -32,8 +33,8 @@ class InletInfo(object):
             the class which is to be used to update the inlet/outlet
         equations : list
             List of equations (optional)
-        nl : int
-            Number of ghost entities
+        props_to_copy : array
+            properties to copy
         """
 
         self.pa_name = pa_name
@@ -45,18 +46,20 @@ class InletInfo(object):
         self.dx = 0.1
         self.umax = umax
         self.equations = [] if equations is None else equations
+        self.props_to_copy = props_to_copy
 
 
 class OutletInfo(InletInfo):
     def __init__(self, pa_name, normal, refpoint, has_ghost=False,
-                 update_cls=None, equations=None):
+                 update_cls=None, equations=None, umax=1.0,
+                 props_to_copy=None):
         """Create object with information of outlet
 
         The name is kept different for distinction only.
         """
         super(OutletInfo, self).__init__(
-            pa_name, normal, refpoint, has_ghost, update_cls, equations
-                )
+            pa_name, normal, refpoint, has_ghost, update_cls,
+            equations, umax, props_to_copy)
         self.update_cls = OutletBase if update_cls is None else update_cls
 
 
@@ -655,6 +658,7 @@ class OutletBase(object):
         self.active_stages = active_stages
         self.io_eval = None
         self._init = False
+        self.props_to_copy = None
         cfg = get_config()
         self.gpu = cfg.use_opencl or cfg.use_cuda
 
@@ -669,6 +673,7 @@ class OutletBase(object):
         self.yn = outletinfo.normal[1]
         self.zn = outletinfo.normal[2]
         self.length = outletinfo.length
+        self.props_to_copy = outletinfo.props_to_copy
 
     def _create_io_eval(self):
         """Evaluator to assign ioid to particles leaving a domain"""
@@ -707,10 +712,8 @@ class OutletBase(object):
             self.initialize()
             self._init = True
         if stage in self.active_stages:
-            props_to_copy = [
-                'x0', 'y0', 'z0', 'uhat', 'vhat', 'what', 'x', 'y',
-                'z', 'u', 'v', 'w', 'm', 'h', 'rho', 'p',
-                'ioid']
+            props_to_copy = self.props_to_copy
+
             outlet_pa = self.outlet_pa
             source_pa = self.source_pa
 

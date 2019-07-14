@@ -108,7 +108,8 @@ class InletOutletApp(Application):
 
         outlet_info = OutletInfo(
             pa_name='outlet', normal=[1.0, 0.0, 0.0],
-            refpoint=[1.0, 0.0, 0.0], update_cls=Outlet
+            refpoint=[1.0, 0.0, 0.0], update_cls=Outlet,
+            props_to_copy=['uhat', 'ioid']
         )
 
         iom = SimpleInletOutlet(

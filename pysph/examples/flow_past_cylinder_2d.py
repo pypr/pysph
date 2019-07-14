@@ -303,6 +303,9 @@ class WindTunnel(Application):
         o_update_cls = None
         o_has_ghost = True
         manager = None
+        props_to_copy = ['x0', 'y0', 'z0', 'uhat', 'vhat', 'what', 'x', 'y',
+                         'z', 'u', 'v', 'w', 'm', 'h', 'rho', 'p', 'ioid']
+
         if self.io_method == 'donothing':
             from pysph.sph.bc.donothing.inlet import Inlet
             from pysph.sph.bc.donothing.outlet import Outlet
@@ -329,6 +332,7 @@ class WindTunnel(Application):
             o_update_cls = Outlet
             o_has_ghost = False
             manager = SimpleInletOutlet
+            props_to_copy += ['uta', 'pta', 'u0', 'v0', 'w0', 'p0']
         if self.io_method == 'mod_donothing':
             from pysph.sph.bc.mod_donothing.inlet import Inlet
             from pysph.sph.bc.mod_donothing.outlet import Outlet
@@ -351,13 +355,15 @@ class WindTunnel(Application):
         inlet_info = InletInfo(
             pa_name='inlet', normal=[-1.0, 0.0, 0.0],
             refpoint=[0.0, 0.0, 0.0], equations=inleteqns,
-            has_ghost=i_has_ghost, update_cls=i_update_cls, umax=umax
-        )
+            has_ghost=i_has_ghost, update_cls=i_update_cls,
+            umax=umax
+            )
 
         outlet_info = OutletInfo(
             pa_name='outlet', normal=[1.0, 0.0, 0.0],
             refpoint=[self.Lt, 0.0, 0.0], has_ghost=o_has_ghost,
-            update_cls=o_update_cls, equations=None
+            update_cls=o_update_cls, equations=None,
+            props_to_copy=props_to_copy
         )
 
         return inlet_info, outlet_info, manager
