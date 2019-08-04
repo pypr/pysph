@@ -140,6 +140,23 @@ class TestIntegratorAdaptiveTimestep(TestIntegratorBase):
         # Then
         self.assertEqual(dt, 0.1)
 
+    def test_compute_timestep_with_dt_adapt_with_invalid_values(self):
+        # Given.
+        self.pa.extend(1)
+        self.pa.align_particles()
+        self.pa.add_property('dt_adapt')
+        self.pa.dt_adapt[:] = [0.0, -2.0]
+
+        integrator = EulerIntegrator(fluid=EulerStep())
+        equations = [SHM(dest="fluid", sources=None)]
+        self._setup_integrator(equations=equations, integrator=integrator)
+
+        # When
+        dt = integrator.compute_time_step(0.1, 0.5)
+
+        # Then
+        self.assertEqual(dt, None)
+
     def test_compute_timestep_with_dt_adapt_trumps_dt_cfl(self):
         # Given.
         self.pa.extend(1)

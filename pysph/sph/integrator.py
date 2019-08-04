@@ -95,7 +95,10 @@ class Integrator(object):
                     else:
                         min_val = np.min(pa.dt_adapt)
                     dt_min = min(dt_min, min_val)
-            return dt_min
+            if dt_min > 0.0:
+                return dt_min
+            else:
+                return None
         else:
             return None
 
