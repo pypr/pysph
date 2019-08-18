@@ -126,7 +126,8 @@ def remove_repeated_points(x, y, z, dx_triangle):
     cdef int src_index = 1, dst_index = 0
     nps.set_context(src_index=1, dst_index=0)
     nbrs = UIntArray()
-    idx = []
+    cdef list idx = []
+    cdef int i = 0
     for i in range(len(x)):
         nps.get_nearest_particles(src_index, dst_index, i, nbrs)
         neighbours = nbrs.get_npy_array()
