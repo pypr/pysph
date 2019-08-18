@@ -148,13 +148,13 @@ class TestGeometry(unittest.TestCase):
         pa_mesh = ParticleArray(name='mesh', x=x, y=y, z=z, h=h)
         offset = h
         x_grid, y_grid, z_grid = np.meshgrid(
-         np.arange(x.min() - offset, x.max() + offset, h),
-         np.arange(y.min() - offset, y.max() + offset, h),
-         np.arange(z.min() - offset, z.max() + offset, h))
+            np.arange(x.min() - offset, x.max() + offset, h),
+            np.arange(y.min() - offset, y.max() + offset, h),
+            np.arange(z.min() - offset, z.max() + offset, h))
         pa_grid = ParticleArray(name='grid', x=x_grid, y=y_grid, z=z_grid, h=h)
-        x_grid, y_grid, z_grid = \
-         G.get_points_from_mgrid(pa_grid, pa_mesh, x_list,
-                                 y_list, z_list, 1, h, mesh)
+        x_grid, y_grid, z_grid = G.get_points_from_mgrid(
+            pa_grid, pa_mesh, x_list, y_list, z_list, 1, h, mesh
+        )
 
         for i in range(x.shape[0]):
             assert((x[i] ** 2 + y[i] ** 2 + z[i] ** 2) <= 4)

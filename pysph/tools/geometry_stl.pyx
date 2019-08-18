@@ -89,7 +89,6 @@ def _fill_triangle(triangle, h=0.1):
                                st[2, 0], st[2, 1])
 
     s_mesh, t_mesh = s_mesh[mask], t_mesh[mask]
-    # st_mesh = np.vstack([s_mesh, t_mesh])
 
     # Final mesh coordinates generated from parameters s and t
 
@@ -98,7 +97,7 @@ def _fill_triangle(triangle, h=0.1):
     return result[:, 0], result[:, 1], result[:, 2]
 
 
-def _get_stl_mesh(stl_fname, dx_triangle):
+def _get_stl_mesh(stl_fname, dx_triangle, uniform = False):
     """Interpolates points within triangles in the stl file"""
     m = mesh.Mesh.from_file(stl_fname)
     x_list, y_list, z_list = [], [], []
@@ -112,7 +111,10 @@ def _get_stl_mesh(stl_fname, dx_triangle):
     x = np.concatenate(x_list)
     y = np.concatenate(y_list)
     z = np.concatenate(z_list)
-    return x, y, z
+    if uniform:
+        return x, y, z, x_list, y_list, z_list, m
+    else:
+        return x, y, z
 
 
 def remove_repeated_points(x, y, z, dx_triangle):
@@ -121,10 +123,10 @@ def remove_repeated_points(x, y, z, dx_triangle):
     pa_grid = ParticleArray(name="grid", x=x, y=y, z=z, h=EPS)
     pa_list = [pa_mesh, pa_grid]
     nps = nnps.LinkedListNNPS(dim=3, particles=pa_list, radius_scale=1)
-    cdef float src_index = 1, dst_index = 0
+    cdef int src_index = 1, dst_index = 0
     nps.set_context(src_index=1, dst_index=0)
     nbrs = UIntArray()
-    cdef list idx = []
+    idx = []
     for i in range(len(x)):
         nps.get_nearest_particles(src_index, dst_index, i, nbrs)
         neighbours = nbrs.get_npy_array()
@@ -132,29 +134,6 @@ def remove_repeated_points(x, y, z, dx_triangle):
     idx_set = set(idx)
     idx = list(idx_set)
     return pa_mesh.x[idx], pa_mesh.y[idx], pa_mesh.z[idx]
-
-
-def _get_stl_mesh_uniform(stl_fname, dx_triangle):
-    """Interpolates points within triangles in the stl file.
-
-        Return
-        ------
-        x, y, z : Coordinates of all points on surface of object
-        x_list, y_list, z_list: Coordinates of surface points grouped
-                                as lists corresponding to their triangle
-    """
-    m = mesh.Mesh.from_file(stl_fname)
-    x_list, y_list, z_list = [], [], []
-    for i in range(len(m.vectors)):
-        x1, y1, z1 = _fill_triangle(m.vectors[i], dx_triangle)
-        x2, y2, z2 = _get_triangle_sides(m.vectors[i], dx_triangle)
-        x_list.append(np.r_[x1, x2])
-        y_list.append(np.r_[y1, y2])
-        z_list.append(np.r_[z1, z2])
-    x = np.concatenate(x_list)
-    y = np.concatenate(y_list)
-    z = np.concatenate(z_list)
-    return x, y, z, x_list, y_list, z_list, m
 
 
 def prism(tri_normal, tri_points, dx_sph):
@@ -346,7 +325,7 @@ def get_stl_surface_uniform(stl_fname, dx_sph=1, h_sph=1,
         dx_triangle = 0.5 * dx_sph
 
     x, y, z, x_list, y_list, z_list, my_mesh = \
-        _get_stl_mesh_uniform(stl_fname, dx_triangle)
+        _get_stl_mesh(stl_fname, dx_triangle, unifrom = True)
     pa_mesh = ParticleArray(name='mesh', x=x, y=y, z=z, h=h_sph)
     offset = radius_scale * h_sph
     x_grid, y_grid, z_grid = np.meshgrid(
@@ -374,6 +353,6 @@ def get_stl_surface(stl_fname, dx_triangle, radius_scale=1.0):
         1d numpy array with z coordinates of surface grid
     """
 
-    x, y, z = _get_stl_mesh(stl_fname, dx_triangle)
+    x, y, z = _get_stl_mesh(stl_fname, dx_triangle, uniform = False)
     xf, yf, zf = remove_repeated_points(x, y, z, dx_triangle)
     return xf, yf, zf
