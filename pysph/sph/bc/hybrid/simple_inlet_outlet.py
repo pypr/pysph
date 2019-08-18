@@ -59,7 +59,7 @@ class SimpleInletOutlet(InletOutletManager):
                       edactvf=True):
         from pysph.sph.equation import Group
         from pysph.sph.bc.interpolate import (
-            UpdateD, EvaluateUhat, EvaluateP, ExtrapolateUhat,
+            UpdateMomentMatrix, EvaluateUhat, EvaluateP, ExtrapolateUhat,
             ExtrapolateP, CopyUhatFromGhost, CopyPFromGhost)
         from pysph.sph.bc.inlet_outlet_manager import (
             UpdateNormalsAndDisplacements, CopyNormalsandDistances)
@@ -94,7 +94,7 @@ class SimpleInletOutlet(InletOutletManager):
                                                  rho0=scheme.rho0)))
 
         for name in self.ghost_inlets:
-            g02.append(UpdateD(dest=name, sources=self.fluids, dim=self.dim))
+            g02.append(UpdateMomentMatrix(dest=name, sources=self.fluids, dim=self.dim))
 
         equations.append(Group(equations=g02, real=False))
 

@@ -195,11 +195,11 @@ class Copy${var}FromGhost(Equation):
     % endif
 % endfor
 
-class UpdateD(Equation):
+class UpdateMomentMatrix(Equation):
     def __init__(self,dest, sources, dim=1):
         self.dim = dim
 
-        super(UpdateD,self).__init__(dest, sources)
+        super(UpdateMomentMatrix,self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_A):
         i, j = declare('int', 2)
