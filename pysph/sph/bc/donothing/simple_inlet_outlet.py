@@ -1,4 +1,4 @@
-"""do-nothing outlet first used in SPH by 
+"""do-nothing outlet first used in SPH by
 
     - Federico, Ivan, et al. "Simulating 2D open-channel flows through an SPH
       model." European Journal of Mechanics-B/Fluids 34 (2012): 35-46.
