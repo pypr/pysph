@@ -81,7 +81,8 @@ class SimpleInletOutlet(InletOutletManager):
 
         g02 = []
         for name in self.ghost_inlets:
-            g02.append(UpdateMomentMatrix(dest=name, sources=self.fluids, dim=self.dim))
+            g02.append(UpdateMomentMatrix(
+                dest=name, sources=self.fluids, dim=self.dim))
 
         equations.append(Group(equations=g02, real=False))
 

@@ -488,7 +488,7 @@ gradient approximation of the property. This can be done by passing a
 
     interp = Interpolator(list(parrays.values()), num_points=10000, method='order1')
 
-Currently, PySPH have three method of interpolation namely ``shepard``,
+Currently, PySPH has three method of interpolation namely ``shepard``,
 ``sph`` and ``order1``. When ``order1`` is set as method then one can get the
 higher order interpolation or it's derivative by just passing an extra
 argument to the interpolate method suggesting the component. To get
