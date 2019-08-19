@@ -482,6 +482,23 @@ the interpolation is desired.  This can also be done with the constructor as::
 
     interp = Interpolator(list(parrays.values()), x=x, y=y, z=z)
 
+There are some cases, where one may require a higher order interpolation or
+gradient approximation of the property. This can be done by passing a
+``method`` for interpolation to the interplator as::
+
+    interp = Interpolator(list(parrays.values()), num_points=10000, method='order1')
+
+Currently, PySPH has three method of interpolation namely ``shepard``,
+``sph`` and ``order1``. When ``order1`` is set as method then one can get the
+higher order interpolation or it's derivative by just passing an extra
+argument to the interpolate method suggesting the component. To get
+derivative in `x` we can do as::
+
+    px = interp.interpolate('p', comp=1)
+
+Here for `comp=0`, the interpolated property is returned and `1`, `2`, `3`
+will return gradient in `x`, `y` and `z` directions respectively.
+
 For more details on the class and the available methods, see
 :py:class:`pysph.tools.interpolator.Interpolator`.
 
