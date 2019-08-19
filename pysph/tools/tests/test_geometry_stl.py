@@ -144,7 +144,7 @@ class TestGeometry(unittest.TestCase):
         h = 0.1
         cube_fname = self._generate_cube_stl()
         x, y, z, x_list, y_list, z_list, mesh = \
-        G._get_stl_mesh_uniform(cube_fname, h)
+        G._get_stl_mesh(cube_fname, h, uniform=True)
         pa_mesh = ParticleArray(name='mesh', x=x, y=y, z=z, h=h)
         offset = h
         x_grid, y_grid, z_grid = np.meshgrid(
