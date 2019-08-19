@@ -137,7 +137,7 @@ class InletOutletApp(Application):
         kernel = CubicSpline(dim=2)
         integrator = PECIntegrator(
             fluid=InletStep(), inlet=InletStep(),
-            outlet=InletStep()
+            outlet=OutletStep()
         )
         self.iom.active_stages = [2]
         self.iom.setup_iom(dim=2, kernel=kernel)
