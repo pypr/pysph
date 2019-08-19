@@ -51,7 +51,6 @@ from pysph.sph.wc.linalg import gj_solve, augmented_matrix\
 <%array7=array7+', d_'+acc+u+h+'o'%>\
 <%array7=array7+', d_B'+acc+u+h%>\
 % endfor
-
 class Evaluate${var}(Equation):
     def _get_helpers_(self):
         return [gj_solve, augmented_matrix]
@@ -59,19 +58,20 @@ class Evaluate${var}(Equation):
     def __init__(self, dest, sources, dim=1):
         self.dim = dim
 
-        super(Evaluate${var},self).__init__(dest, sources)
+        super(Evaluate${var}, self).__init__(dest, sources)
 
     def initialize(self, d_idx${array5}):
         i = declare('int')
 
         for i in range(3):
             %for u in vec_var:
-            d_${acc}${u}${h}o[4*d_idx +i] = 0.0
-            d_B${acc}${u}${h}[4*d_idx +i] = 0.0
+            d_${acc}${u}${h}o[4*d_idx+i] = 0.0
+            d_B${acc}${u}${h}[4*d_idx+i] = 0.0
             % endfor
 
     def loop(self, d_idx, d_h, s_h, s_x, s_y, s_z, d_x, d_y, d_z, s_rho,
-        s_m, s_idx, XIJ, DWIJ, WIJ${array6}):
+             s_m, s_idx, XIJ, DWIJ,
+             WIJ${array6}):
         Vj = s_m[s_idx] / s_rho[s_idx]
         %for u in vec_var:
         ${acc}${u}${h}j = s_${acc}${u}${hat}[s_idx]
@@ -84,11 +84,9 @@ class Evaluate${var}(Equation):
         d_B${acc}${u}${h}[i4+1] += ${acc}${u}${h}j * DWIJ[0] * Vj
         d_B${acc}${u}${h}[i4+2] += ${acc}${u}${h}j * DWIJ[1] * Vj
         d_B${acc}${u}${h}[i4+3] += ${acc}${u}${h}j * DWIJ[2] * Vj
-
         % endfor
 
     def post_loop(self, d_idx, d_A${array7}):
-
         a_mat = declare('matrix(16)')
         aug_mat = declare('matrix(20)')
         %for u in vec_var:
@@ -140,26 +138,27 @@ class Extrapolate${var}(Equation):
         d_${acc}${u}${hat}[d_idx] = 0.0
         % endfor
 
-    def loop(self, d_idx${array9}${array10}, d_disp):
+    def loop(self, d_idx${array9},
+             d_disp${array10}):
 
       %for x in vec_x:
         del${x} = 2 * d_disp[d_idx] * d_${x}n[d_idx]
       % endfor
       %for u in vec_var:
        %if (loop.index > 0):
-        <% factor = '' %>
+<% factor = '' %>
        % endif
         d_${acc}${u}${hat}[d_idx] = ${factor}(
-                 d_${acc}${u}${h}o[4*d_idx+0]
+             d_${acc}${u}${h}o[4*d_idx+0]
        %for x in vec_x:
         %if ((u=='u') or (u=='x')) and (acc==''):
-                 - del${x} * d_${acc}${u}${h}o[4*d_idx+${loop.index + 1}]
+             - del${x} * d_${acc}${u}${h}o[4*d_idx+${loop.index + 1}]
         %else:
-                 - del${x} * d_${acc}${u}${h}o[4*d_idx+${loop.index + 1}]
+             - del${x} * d_${acc}${u}${h}o[4*d_idx+${loop.index + 1}]
         %endif
-       % endfor
+       %endfor
                       )
-    % endfor
+      %endfor
 ## ****************************
 ## * function CopyfromGhost ***
 ## ****************************
@@ -168,25 +167,22 @@ class Extrapolate${var}(Equation):
 <%array11=array11+', d_'+acc+u+hat%>\
 <%array11=array11+', s_'+acc+u+hat%>\
 % endfor
-%for x in vec_x:
-<%array11=array11+', d_'+x+'n'%>\
-% endfor
 <%array12 = ''%>\
 %for u in vec_var:
 <%array12=array12 +'+ s_'+acc+u+hat+'[d_idx] * d_'+x_vec[loop.index]+'n[d_idx]'%>\
 % endfor
-<% factor = '-1.0 * ' %>\
+<% factor = ' -1.0 *' %>\
 
 
 class Copy${var}FromGhost(Equation):
-    def initialize_pair(self, d_idx${array11}):
+    def initialize_pair(self,
+                        d_idx${array11}):
     %if not ((var == 'P') or (var == 'Rho')):
-        #projection = 0.0${array12}
      %for u in vec_var:
       %if (loop.index > 0):
-       <% factor = '' %>
+<% factor = '' %>
       % endif
-        d_${acc}${u}${hat}[d_idx] = ${factor} s_${acc}${u}${hat}[d_idx] #- 2.0 * projection * d_${x_vec[loop.index]}n[d_idx]
+        d_${acc}${u}${hat}[d_idx] =${factor} s_${acc}${u}${hat}[d_idx]
      %endfor
     % else:
      %for u in vec_var:
@@ -195,11 +191,12 @@ class Copy${var}FromGhost(Equation):
     % endif
 % endfor
 
+
 class UpdateMomentMatrix(Equation):
-    def __init__(self,dest, sources, dim=1):
+    def __init__(self, dest, sources, dim=1):
         self.dim = dim
 
-        super(UpdateMomentMatrix,self).__init__(dest, sources)
+        super(UpdateMomentMatrix, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_A):
         i, j = declare('int', 2)
@@ -209,7 +206,7 @@ class UpdateMomentMatrix(Equation):
                 d_A[16*d_idx + j+4*i] = 0.0
 
     def loop(self, d_idx, s_idx, d_h, s_h, s_x, s_y, s_z, d_x, d_y,
-                 d_z, s_rho, s_m, d_A, XIJ, WIJ, DWIJ):
+             d_z, s_rho, s_m, d_A, XIJ, WIJ, DWIJ):
         Vj = s_m[s_idx] / s_rho[s_idx]
         i16 = declare('int')
         i16 = 16*d_idx
