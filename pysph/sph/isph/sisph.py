@@ -558,7 +558,7 @@ class SISPHScheme(Scheme):
 
     def _get_velocity_bc(self):
         from pysph.sph.wc.edac import NoSlipVelocityExtrapolation
-        from pysph.sph.ic.wall_normal import SetWallVelocityNew
+        from pysph.sph.isph.wall_normal import SetWallVelocityNew
 
         eqs = [SetWallVelocityNew(dest=s, sources=self.fluid_with_io)
                for s in self.solids]
@@ -598,7 +598,7 @@ class SISPHScheme(Scheme):
 
     def _get_normals(self, pa):
         from pysph.tools.sph_evaluator import SPHEvaluator
-        from pysph.sph.ic.wall_normal import ComputeNormals, SmoothNormals
+        from pysph.sph.isph.wall_normal import ComputeNormals, SmoothNormals
 
         pa.add_property('normal', stride=3)
         pa.add_property('normal_tmp', stride=3)
@@ -712,7 +712,9 @@ class SISPHScheme(Scheme):
         eq3 = []
         for fluid in self.fluid_with_io:
             if not fluid == 'outlet':
-                eq3.append(PressureCoeffMatrixIterative(dest=fluid, sources=all))
+                eq3.append(
+                    PressureCoeffMatrixIterative(dest=fluid, sources=all)
+                )
                 eq3.append(
                     PPESolve(
                         dest=fluid, sources=all, rho0=self.rho0,
