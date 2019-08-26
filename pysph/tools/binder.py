@@ -25,7 +25,7 @@ def find_viewer_type(path):
     log_file_path = os.path.abspath(path) + '/*.log'
     regex = 'dim=(\d)'
     # The above '\d' is marked as an invalid escape sequence in PEP 8.
-    # It is a valid regex sequence that matches to a digit.
+    # It is a valid regex sequence that matches a digit group.
 
     match_list = []
     with open(glob.glob(log_file_path)[0], 'r') as file:
@@ -129,7 +129,7 @@ def make_binder(path):
             for f in files:
                 try:
                     copy(f, src_path+'/'+sim_name)
-                except:
+                except BaseException:
                     could_not_copy.append(f)
                     continue
                 os.remove(f)
