@@ -449,8 +449,7 @@ class SISPHScheme(Scheme):
     def __init__(self, fluids, solids, dim, nu, rho0, c0, alpha=0.0, beta=0.0,
                  gx=0.0, gy=0.0, gz=0.0, tolerance=0.05,
                  omega=0.5, hg_correction=False, has_ghosts=False,
-                 inviscid_solids=None, inlet_outlet_manager=None, pref=None,
-                 gtvf=False, symmetric=False, rho_cutoff=0.8,
+                 pref=None, gtvf=False, symmetric=False, rho_cutoff=0.8,
                  max_iterations=1000, internal_flow=False,
                  use_pref=False):
         self.fluids = fluids
@@ -470,11 +469,6 @@ class SISPHScheme(Scheme):
         self.omega = omega
         self.hg_correction = hg_correction
         self.has_ghosts = has_ghosts
-        self.inviscid_solids = [] if inviscid_solids is None else\
-            inviscid_solids
-        self.inlet_outlet_manager = None if inlet_outlet_manager is None\
-            else inlet_outlet_manager
-        self.fluid_with_io = self.fluids.copy()
         self.pref = pref
         self.gtvf = gtvf
         self.symmetric = symmetric
@@ -540,12 +534,6 @@ class SISPHScheme(Scheme):
         else:
             cls = SISPHIntegrator
 
-        iom = self.inlet_outlet_manager
-        if iom is not None:
-            iom_stepper = iom.get_stepper(self, cls)
-            for name in iom_stepper:
-                steppers[name] = iom_stepper[name]
-
         integrator = cls(**steppers)
 
         from pysph.solver.solver import Solver
@@ -553,42 +541,25 @@ class SISPHScheme(Scheme):
             dim=self.dim, integrator=integrator, kernel=kernel, **kw
         )
 
-        if iom is not None:
-            iom.setup_iom(dim=self.dim, kernel=kernel)
-
     def _get_velocity_bc(self):
-        from pysph.sph.wc.edac import NoSlipVelocityExtrapolation
         from pysph.sph.isph.wall_normal import SetWallVelocityNew
 
-        eqs = [SetWallVelocityNew(dest=s, sources=self.fluid_with_io)
+        eqs = [SetWallVelocityNew(dest=s, sources=self.fluids)
                for s in self.solids]
-
-        for solids in self.inviscid_solids:
-            eqs.append(
-                EvaluateNumberDensity(
-                    dest=solids, sources=self.fluid_with_io
-                )
-            )
-            eqs.append(
-                NoSlipVelocityExtrapolation(
-                    dest=solids, sources=self.fluid_with_io
-                )
-            )
-
         return Group(equations=eqs)
 
     def _get_pressure_bc(self):
         eqs = []
-        all_solids = self.solids + self.inviscid_solids
+        all_solids = self.solids
         for solid in all_solids:
             eqs.append(
                 EvaluateNumberDensity(
-                    dest=solid, sources=self.fluid_with_io
+                    dest=solid, sources=self.fluids
                 )
             )
             eqs.append(
                 SetPressureSolid(
-                    dest=solid, sources=self.fluid_with_io,
+                    dest=solid, sources=self.fluids,
                     gx=self.gx, gy=self.gy, gz=self.gz,
                     hg_correction=self.hg_correction
                 )
@@ -624,10 +595,7 @@ class SISPHScheme(Scheme):
         from pysph.sph.wc.viscosity import LaminarViscosity
         from pysph.sph.wc.gtvf import MomentumEquationArtificialStress
 
-        iom = self.inlet_outlet_manager
-        if iom is not None:
-            self.fluid_with_io = self.fluids + iom.get_io_names()
-        all = self.fluid_with_io + self.solids + self.inviscid_solids
+        all = self.fluids + self.solids
 
         eq, stg = [], []
         for fluid in self.fluids:
@@ -670,25 +638,22 @@ class SISPHScheme(Scheme):
     def _get_ppe(self):
         from pysph.sph.wc.transport_velocity import VolumeSummation
 
-        iom = self.inlet_outlet_manager
-        if iom is not None:
-            self.fluid_with_io = self.fluids + iom.get_io_names()
-        all = self.fluid_with_io + self.solids + self.inviscid_solids
-        all_solids = self.solids + self.inviscid_solids
+        all = self.fluids + self.solids
+        all_solids = self.solids
 
         eq, stg = [], []
 
-        for fluid in self.fluid_with_io:
+        for fluid in self.fluids:
             eq.append(SummationDensity(dest=fluid, sources=all))
         stg.append(Group(equations=eq, real=False))
 
         eq2 = []
-        for fluid in self.fluid_with_io:
+        for fluid in self.fluids:
             eq2.append(VolumeSummation(dest=fluid, sources=all))
             eq2.append(
                 VelocityDivergence(
                     dest=fluid,
-                    sources=self.fluid_with_io+self.inviscid_solids
+                    sources=self.fluids
                 ))
             if self.solids:
                 eq2.append(
@@ -700,7 +665,7 @@ class SISPHScheme(Scheme):
         if self.has_ghosts:
             ghost_eqns = Group(
                 equations=[UpdateGhostPressure(dest=fluid, sources=None)
-                           for fluid in self.fluid_with_io],
+                           for fluid in self.fluids],
                 real=False
             )
             solver_eqns = [ghost_eqns]
@@ -710,7 +675,7 @@ class SISPHScheme(Scheme):
             solver_eqns.append(g3)
 
         eq3 = []
-        for fluid in self.fluid_with_io:
+        for fluid in self.fluids:
             if not fluid == 'outlet':
                 eq3.append(
                     PressureCoeffMatrixIterative(dest=fluid, sources=all)
@@ -736,28 +701,20 @@ class SISPHScheme(Scheme):
         if self.has_ghosts:
             ghost_eqns = Group(
                 equations=[UpdateGhostPressure(dest=fluid, sources=None)
-                           for fluid in self.fluid_with_io],
+                           for fluid in self.fluids],
                 real=False
             )
             stg.append(ghost_eqns)
         return stg
 
     def get_equations(self):
-        iom = self.inlet_outlet_manager
-        if iom is not None:
-            self.fluid_with_io = self.fluids + iom.get_io_names()
-        all = self.fluid_with_io + self.solids + self.inviscid_solids
-        all_solids = self.solids + self.inviscid_solids
+        all = self.fluids + self.solids
+        all_solids = self.solids
 
         stg1 = []
         if all_solids:
             g0 = self._get_velocity_bc()
             stg1.append(g0)
-
-        if iom is not None:
-            io_eqs = iom.get_equations(self)
-            for grp in io_eqs:
-                stg1.append(grp)
 
         stg1.extend(self._get_viscous_eqns())
 
@@ -767,10 +724,6 @@ class SISPHScheme(Scheme):
             stg2.append(g0)
 
         stg2.extend(self._get_ppe())
-
-        if iom is not None:
-            io_eqs = iom.get_equations(self)
-            stg2.extend(io_eqs)
 
         if all_solids:
             g3 = self._get_pressure_bc()
@@ -808,18 +761,15 @@ class SISPHScheme(Scheme):
         props += [dict(name=x, stride=v) for x, v in dummy.stride.items()]
         constants = [dict(name=x, data=v) for x, v in dummy.constants.items()]
         output_props = dummy.output_property_arrays
-        iom = self.inlet_outlet_manager
-        for fluid in self.fluid_with_io:
+        for fluid in self.fluids:
             pa = particle_arrays[fluid]
             self._ensure_properties(pa, props, clean)
             pa.set_output_arrays(output_props)
             for const in constants:
                 pa.add_constant(**const)
-            if iom is not None:
-                iom.add_io_properties(pa, self)
 
         solid_props = ['wij', 'ug', 'vg', 'wg', 'uf', 'vf', 'wf', 'pk', 'V']
-        all_solids = self.solids + self.inviscid_solids
+        all_solids = self.solids
         for solid in all_solids:
             pa = particle_arrays[solid]
             for prop in solid_props:

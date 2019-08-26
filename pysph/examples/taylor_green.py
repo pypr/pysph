@@ -1,9 +1,9 @@
 """Taylor Green vortex flow (5 minutes).
 """
 
+import os
 import numpy as np
 from numpy import pi, sin, cos, exp
-import os
 
 from pysph.base.nnps import DomainManager
 from pysph.base.utils import get_particle_array
@@ -23,6 +23,7 @@ from pysph.sph.wc.crksph import CRKSPHPreStep, CRKSPH, CRKSPHScheme
 from pysph.sph.wc.gtvf import GTVFScheme
 from pysph.sph.wc.pcisph import PCISPHScheme
 from pysph.sph.wc.shift import ShiftPositions
+from pysph.sph.isph.sisph import SISPHScheme
 
 
 # domain and constants
@@ -152,6 +153,8 @@ class TaylorGreen(Application):
         h0 = self.hdx * self.dx
         if self.options.scheme == 'iisph' or self.options.scheme == 'pcisph':
             dt_cfl = 0.25 * h0 / U
+        if self.options.scheme == 'sisph':
+            dt_cfl = 0.25 * h0 / U
         else:
             dt_cfl = 0.25 * h0 / (c0 + U)
         dt_viscous = 0.125 * h0**2 / nu
@@ -179,6 +182,9 @@ class TaylorGreen(Application):
             scheme.configure(h0=h0, nu=self.nu)
         elif self.options.scheme == 'gtvf':
             scheme.configure(pref=p0, nu=self.nu, h0=h0)
+        elif self.options.scheme == 'sisph':
+            pfreq = 10
+            scheme.configure(nu=self.nu)
         scheme.configure_solver(kernel=kernel, tf=self.tf, dt=self.dt,
                                 pfreq=pfreq)
 
@@ -212,9 +218,14 @@ class TaylorGreen(Application):
         pcisph = PCISPHScheme(
             fluids=['fluid'], dim=2, rho0=rho0, nu=None
         )
+        sisph = SISPHScheme(
+            fluids=['fluid'], solids=[], dim=2, nu=None, rho0=rho0,
+            c0=c0, alpha=0.0, has_ghosts=True, pref=p0,
+            rho_cutoff=0.2, internal_flow=True, gtvf=True
+        )
         s = SchemeChooser(
             default='tvf', wcsph=wcsph, tvf=tvf, edac=edac, iisph=iisph,
-            crksph=crksph, gtvf=gtvf, pcisph=pcisph
+            crksph=crksph, gtvf=gtvf, pcisph=pcisph, sisph=sisph
         )
         return s
 
@@ -290,6 +301,10 @@ class TaylorGreen(Application):
             fluid.get_number_of_particles(), self.dt))
 
         # volume is set as dx^2
+        if self.options.scheme == 'sisph':
+            nfp = fluid.get_number_of_particles()
+            fluid.gid[:] = np.arange(nfp)
+            fluid.add_output_arrays(['gid'])
         if self.options.scheme == 'tvf':
             fluid.V[:] = 1. / self.volume
         if self.options.scheme == 'iisph':
@@ -482,6 +497,12 @@ class TaylorGreen(Application):
         plt.ylabel(r'$L_1$ error for $p$')
         fig = os.path.join(self.output_dir, "p_l1_error.png")
         plt.savefig(fig, dpi=300)
+
+    def customize_output(self):
+        self._mayavi_config('''
+        b = particle_arrays['fluid']
+        b.scalar = 'vmag'
+        ''')
 
 
 if __name__ == '__main__':
