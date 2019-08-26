@@ -10,6 +10,7 @@ from pysph.solver.utils import get_files
 import os
 import sys
 import argparse
+import numpy as np
 
 
 def cull(src_path, c):
@@ -21,11 +22,14 @@ def cull(src_path, c):
 
     for path in sim_paths_list:
         files = get_files(path)
-        safe_files = [files[i] for i in range(0, len(files), c)]
-        for f in files:
-            if f in safe_files:
-                continue
-            else:
+        del_files = [
+            files[i] for i in np.setdiff1d(
+                np.arange(0, len(files)),
+                np.arange(0, len(files), c)
+            )
+        ]
+        if len(del_files) != 0:
+            for f in del_files:
                 os.remove(f)
 
     final_size = find_dir_size(src_path)

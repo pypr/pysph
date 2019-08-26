@@ -4,7 +4,6 @@ upload to a Github repo.
 
 from pysph.solver.utils import get_files, mkdir
 import os
-import collections
 from shutil import copy
 import nbformat as nbf
 import argparse
@@ -23,9 +22,7 @@ def find_viewer_type(path):
     '''
 
     log_file_path = os.path.abspath(path) + '/*.log'
-    regex = 'dim=(\d)'
-    # The above '\d' is marked as an invalid escape sequence in PEP 8.
-    # It is a valid regex sequence that matches a digit group.
+    regex = r'dim=(\d)'
 
     match_list = []
     with open(glob.glob(log_file_path)[0], 'r') as file:
@@ -75,7 +72,13 @@ def make_notebook(path, sim_name, config_dict={}):
         nbf.v4.new_code_cell(source=cell3_src)
     ]
 
-    nbf.write(nb, path+'/'+sim_name+'.ipynb')
+    nbf.write(
+        nb,
+        os.path.join(
+            path,
+            sim_name+'.ipynb'
+        )
+    )
     return
 
 
@@ -123,22 +126,23 @@ def make_binder(path):
         make_notebook(path, sim_name)
         if len(sim_paths_list) == 1 and sim_paths_list[0] == src_path:
             files = os.listdir(src_path)
-            files = [src_path+'/'+f for f in files]
-            mkdir(src_path+'/'+sim_name)
+            files = [os.path.join(src_path, f) for f in files]
+            mkdir(os.path.join(src_path, sim_name))
             could_not_copy = []
             for f in files:
                 try:
-                    copy(f, src_path+'/'+sim_name)
-                except BaseException:
-                    could_not_copy.append(f)
+                    copy(f, os.path.join(src_path, sim_name))
+                except BaseException as exc:
+                    could_not_copy.append([f, exc])
                     continue
                 os.remove(f)
             if len(could_not_copy) != 0:
                 print("Could not copy the following files:\n")
                 for f in could_not_copy:
-                    print(f+'\n')
+                    print('file: ', f[0])
+                    print('error: ', f[1], '\n')
 
-    with open(src_path+'/requirements.txt', 'w') as file:
+    with open(os.path.join(src_path, 'requirements.txt'), 'w') as file:
         file.write(
             "ipympl\n" +
             "matplotlib\n" +
@@ -149,21 +153,15 @@ def make_binder(path):
             "-e git+https://github.com/pypr/pysph#egg=pysph"
         )
 
-    with open(src_path+'/README.md', 'w') as file:
+    with open(os.path.join(src_path, 'README.md'), 'w') as file:
         file.write(
             "# Title\n" +
             "[![Binder](https://mybinder.org/badge_logo.svg)]" +
-            "(https://mybinder.org/v2/[hosting_service]/[repo_specifics]" +
-            "/[branch_name])\n" +
+            "(https://mybinder.org/v2/gh/user_name/repo_name/branch_name" +
             "\n" +
-            "[comment]: # (GitLab users: hosting_service = gl, " +
-            "repo_specifics = [user_name]%2F[repo_name])\n" +
-            "\n" +
-            "[comment]: # (GitHub users: hosting_service = gh, " +
-            "repo_specifics = [user_name]/[repo_name])\n" +
-            "\n" +
-            "[comment]: # (Gist users: hosting_service = gist, " +
-            "repo_specifics = [user_name]/[repo_name])\n"
+            "[comment]: # (The above link is for repositories hosted " +
+            "on GitHub. For links corresponding to other hosting services, " +
+            "please visit mybinder.org"
         )
 
 
