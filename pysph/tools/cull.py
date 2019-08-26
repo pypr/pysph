@@ -83,5 +83,6 @@ def main(argv=None):
 
     cull(src_path, c)
 
+
 if __name__ == '__main__':
     main()

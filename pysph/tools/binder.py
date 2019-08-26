@@ -24,6 +24,8 @@ def find_viewer_type(path):
 
     log_file_path = os.path.abspath(path) + '/*.log'
     regex = 'dim=(\d)'
+    # The above '\d' is marked as an invalid escape sequence in PEP 8.
+    # It is a valid regex sequence that matches to a digit.
 
     match_list = []
     with open(glob.glob(log_file_path)[0], 'r') as file:
@@ -34,7 +36,7 @@ def find_viewer_type(path):
                 if len(match_list) > 0:
                     break
             if len(match_list) > 0:
-                    break
+                break
     return match_list[0][-1] + 'D'
 
 
@@ -200,6 +202,7 @@ def main(argv=None):
     src_path = options.src_path[0]
 
     make_binder(src_path)
+
 
 if __name__ == '__main__':
     main()
