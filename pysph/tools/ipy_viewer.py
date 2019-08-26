@@ -673,7 +673,6 @@ class ParticleArrayWidgets1D(object):
         return hbox
 
 
-
 class Viewer1DWidgets(object):
 
     def __init__(self, file_name, file_count):
@@ -805,8 +804,7 @@ class Viewer1D(Viewer):
 
         self.figure, temp = plt.subplots()
         self.add_axes = False
-        #self._scatter_ax = self.figure.add_axes([0, 0, 1, 1])
-        self._scatters_ax = {'host':temp}
+        self._scatters_ax = {'host': temp}
         self._scatters = {}
         self._solver_time_ax = {}
 
@@ -832,7 +830,7 @@ class Viewer1D(Viewer):
         for array_name in self._widgets.particles.keys():
             pa_widgets = self._widgets.particles[array_name]
             if (pa_widgets.scalar.value != 'None' and
-                pa_widgets.is_visible.value is True):
+                    pa_widgets.is_visible.value is True):
 
                 n = pa_widgets.masking_factor.value
                 stride, component = self._stride_and_component(
@@ -1019,7 +1017,9 @@ class Viewer1D(Viewer):
                         self._widgets.particles.keys()
                     ).index(array_name)
                 )
-                self._scatters[array_name] = self._scatters_ax[array_name].scatter(
+                self._scatters[array_name] = self._scatters_ax[
+                    array_name
+                ].scatter(
                     temp_data[array_name].x[component::stride][::n],
                     c_norm[::n],
                     color=color
@@ -1038,7 +1038,7 @@ class Viewer1D(Viewer):
                 self._scatters_ax[array_name].set_ylim(-0.1, 1.1)
 
             self._scatters_ax['host'].set_xlim(self.xmin-0.1, self.xmax+0.1)
-            self._right_spine_handler(None)            
+            self._right_spine_handler(None)
             self.figure.show()
 
     def _save_figure_handler(self, change):
@@ -1118,7 +1118,9 @@ class Viewer1D(Viewer):
                         self._widgets.particles.keys()
                     ).index(array_name)
                 )
-                self._scatters[array_name] = self._scatters_ax[array_name].scatter(
+                self._scatters[array_name] = self._scatters_ax[
+                    array_name
+                ].scatter(
                     temp_data[array_name].x[component::stride][::n],
                     c_norm[::n],
                     color=color
@@ -1168,8 +1170,8 @@ class Viewer1D(Viewer):
             ax = self._scatters_ax[array_name]
             self._make_patch_spines_invisible(ax, False)
             if (pa_widgets.right_spine.value is True and
-                pa_widgets.is_visible.value is True and
-                pa_widgets.scalar.value != 'None'):
+                    pa_widgets.is_visible.value is True and
+                    pa_widgets.scalar.value != 'None'):
 
                 number_of_spines += 1
                 stride, component = self._stride_and_component(
@@ -1254,7 +1256,6 @@ class Viewer1D(Viewer):
 
     def _right_spine_lim_handler(self, change):
         self._frame_handler(None)
-
 
 
 class ParticleArrayWidgets2D(object):

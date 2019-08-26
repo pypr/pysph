@@ -1,8 +1,8 @@
 """Culls files in a given directory, one in every 'c' files is spared.
 
-The specified directory can contain other directories that house the output files; 
-files in all these directories will be culled, sparing one in every 'c' files. Note 
-that DELETION IS PERMANENT.
+The specified directory can contain other directories that house the output
+ files; files in all these directories will be culled, sparing one in every
+ 'c' files. Note that DELETION IS PERMANENT.
 """
 
 from pysph.tools.binder import find_sim_dirs, find_dir_size
@@ -10,6 +10,7 @@ from pysph.solver.utils import get_files
 import os
 import sys
 import argparse
+
 
 def cull(src_path, c):
 
@@ -32,6 +33,7 @@ def cull(src_path, c):
     print("Initial size of the directory was: "+str(initial_size)+" bytes")
     print("Final size of the directory is: "+str(final_size)+" bytes")
     return
+
 
 def main(argv=None):
     if argv is None:
@@ -66,7 +68,8 @@ def main(argv=None):
         type=int,
         nargs=1,
         default=2,
-        help="one in every 'c' files is spared, all remaining output files are deleted [default=2]"
+        help="one in every 'c' files is spared, all remaining output " +
+             "files are deleted [default=2]"
     )
 
     if len(argv) > 0 and argv[0] in ['-h', '--help']:

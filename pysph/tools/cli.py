@@ -39,6 +39,7 @@ def make_binder(args):
     from pysph.tools.binder import main
     main(args)
 
+
 def cull_files(args):
     from pysph.tools.cull import main
     main(args)
@@ -78,7 +79,8 @@ def main():
 
     binder = subparsers.add_parser(
         'binder',
-        help='Make a mybinder.org compatible directory for upload to a GitHub repo',
+        help='Make a mybinder.org compatible directory for upload to a ' +
+             'host repo',
         add_help=False
     )
     binder.set_defaults(func=make_binder)

@@ -12,14 +12,14 @@ import sys
 import re
 import glob
 
+
 def find_viewer_type(path):
     '''
     Finds the type of viewer to use in the jupyter notebook.
     Parses the log file at the file path and searches for
     'dim=d', where 'dD' is taken to be the viewer type.
-    
-    example: if 'dim=2', then what is returned is '2D'
 
+    example: if 'dim=2', then what is returned is '2D'
     '''
 
     log_file_path = os.path.abspath(path) + '/*.log'
@@ -40,7 +40,8 @@ def find_viewer_type(path):
 
 def make_notebook(path, sim_name, config_dict={}):
     '''
-    Makes a jupyter notebook to view simulation results stored in a given directory
+    Makes a jupyter notebook to view simulation results stored in
+    a given directory
 
     path: the directory conatining the output files
 
@@ -148,19 +149,21 @@ def make_binder(path):
 
     with open(src_path+'/README.md', 'w') as file:
         file.write(
-            "# Title\n"
-            "[![Binder](https://mybinder.org/badge_logo.svg)]"+
-            "(https://mybinder.org/v2/[hosting_service]/[repo_specifics]/[branch_name])\n"+
-            "\n"+
-            "[comment]: # (GitLab users: hosting_service = gl, "+
-            "repo_specifics = [user_name]%2F[repo_name])\n"+
-            "\n"+
-            "[comment]: # (GitHub users: hosting_service = gh, "+
-            "repo_specifics = [user_name]/[repo_name])\n"+
-            "\n"+
-            "[comment]: # (Gist users: hosting_service = gist, "+
+            "# Title\n" +
+            "[![Binder](https://mybinder.org/badge_logo.svg)]" +
+            "(https://mybinder.org/v2/[hosting_service]/[repo_specifics]" +
+            "/[branch_name])\n" +
+            "\n" +
+            "[comment]: # (GitLab users: hosting_service = gl, " +
+            "repo_specifics = [user_name]%2F[repo_name])\n" +
+            "\n" +
+            "[comment]: # (GitHub users: hosting_service = gh, " +
+            "repo_specifics = [user_name]/[repo_name])\n" +
+            "\n" +
+            "[comment]: # (Gist users: hosting_service = gist, " +
             "repo_specifics = [user_name]/[repo_name])\n"
         )
+
 
 def main(argv=None):
     if argv is None:
