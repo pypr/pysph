@@ -10,7 +10,6 @@ from pysph.solver.utils import get_files
 import os
 import sys
 import argparse
-import numpy as np
 
 
 def cull(src_path, c):
@@ -22,11 +21,9 @@ def cull(src_path, c):
 
     for path in sim_paths_list:
         files = get_files(path)
+        l = len(files)
         del_files = [
-            files[i] for i in np.setdiff1d(
-                np.arange(0, len(files)),
-                np.arange(0, len(files), c)
-            )
+            files[i] for i in set(range(l)) - set(range(0, l, c))
         ]
         if len(del_files) != 0:
             for f in del_files:

@@ -157,11 +157,11 @@ def make_binder(path):
         file.write(
             "# Title\n" +
             "[![Binder](https://mybinder.org/badge_logo.svg)]" +
-            "(https://mybinder.org/v2/gh/user_name/repo_name/branch_name" +
+            "(https://mybinder.org/v2/gh/user_name/repo_name/branch_name)" +
             "\n" +
             "[comment]: # (The above link is for repositories hosted " +
             "on GitHub. For links corresponding to other hosting services, " +
-            "please visit mybinder.org"
+            "please visit https://mybinder.readthedocs.io)"
         )
 
 
