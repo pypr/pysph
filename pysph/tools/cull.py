@@ -64,10 +64,9 @@ def main(argv=None):
     )
 
     parser.add_argument(
-        "-c",
-        metavar='c',
+        "-c", "--cull-factor",
+        metavar="cull_factor",
         type=int,
-        nargs=1,
         default=2,
         help="one in every 'c' files is spared, all remaining output " +
              "files are deleted [default=2]"
@@ -80,9 +79,9 @@ def main(argv=None):
     options, extra = parser.parse_known_args(argv)
 
     src_path = options.src_path[0]
-    x = options.c[0]
+    x = options.cull_factor
 
-    cull(src_path, c)
+    cull(src_path, x)
 
 
 if __name__ == '__main__':
