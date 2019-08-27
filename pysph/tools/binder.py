@@ -23,9 +23,12 @@ def find_viewer_type(path):
 
     log_file_path = os.path.abspath(path) + '/*.log'
     regex = r'dim=(\d)'
+    log_files = glob.glob(log_file_path)
+    if not log_files:
+        return '2D'
 
     match_list = []
-    with open(glob.glob(log_file_path)[0], 'r') as file:
+    with open(log_files[0], 'r') as file:
         for line in file:
             for match in re.finditer(regex, line, re.S):
                 match_text = match.group()
