@@ -80,14 +80,7 @@ class InletOutletApp(Application):
         outlet = get_particle_array(name='outlet', x=x, y=y, m=m, h=h, u=u,
                                     rho=rho)
 
-        ghost_inlet = self.iom.create_ghost(inlet, inlet=True)
-        ghost_outlet = self.iom.create_ghost(outlet, inlet=False)
-
         particles = [inlet, fluid, outlet]
-        if ghost_inlet:
-            particles.append(ghost_inlet)
-        if ghost_outlet:
-            particles.append(ghost_outlet)
 
         props = ['ioid', 'disp', 'x0']
         for p in props:
@@ -100,16 +93,18 @@ class InletOutletApp(Application):
         from pysph.sph.bc.donothing.inlet import Inlet
         from pysph.sph.bc.donothing.outlet import Outlet
 
+        props_to_copy = ['x', 'y', 'z', 'u', 'v', 'w', 'm',
+                         'h', 'rho', 'p', 'ioid']
         inlet_info = InletInfo(
             pa_name='inlet', normal=[-1.0, 0.0, 0.0],
-            refpoint=[0.0, 0.0, 0.0], has_ghost=True,
+            refpoint=[0.0, 0.0, 0.0], has_ghost=False,
             update_cls=Inlet
         )
 
         outlet_info = OutletInfo(
             pa_name='outlet', normal=[1.0, 0.0, 0.0],
             refpoint=[1.0, 0.0, 0.0], update_cls=Outlet,
-            props_to_copy=['uhat', 'ioid']
+            props_to_copy=props_to_copy
         )
 
         iom = SimpleInletOutlet(
