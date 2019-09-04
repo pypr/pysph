@@ -397,6 +397,15 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.y, [0, 1, 2, 3, 0, 0]), True)
         self.assertEqual(check_array(p.z, [0, 0, 0, 0, 0, 0]), True)
 
+        # adding particles with tags
+        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
+                                         z={'data': z}, m={'data': m},
+                                         h={'data': h},
+                                         A={'data': A, 'stride': 3},
+                                         backend=self.backend)
+
+        self.assertRaises(AssertionError, p.add_particles, A=[5, 6, 7, 8])
+
     def test_remove_tagged_particles(self):
         x = [1, 2, 3, 4.]
         y = [0., 1., 2., 3.]

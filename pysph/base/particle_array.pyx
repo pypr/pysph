@@ -550,6 +550,17 @@ cdef class ParticleArray:
         if len(particle_props) == 0:
             return 0
 
+        # check if the input properties are valid.
+        prop = ''
+        for prop in particle_props:
+            self._check_property(prop)
+            if prop in self.stride.keys():
+                stride = self.stride[prop]
+                prop_len = len(particle_props[prop])
+                base_len = self.get_number_of_particles()
+                msg = 'Property %s length should be %d' % (prop, base_len * stride)
+                assert prop_len == base_len * stride, msg
+
         if self.gpu is not None and self.backend is not 'cython':
             gpu_particle_props = {}
             for prop, ary in particle_props.items():
@@ -564,11 +575,6 @@ cdef class ParticleArray:
 
         cdef int num_extra_particles, old_num_particles, new_num_particles
         cdef numpy.ndarray s_arr, nparr
-
-        # check if the input properties are valid.
-        prop = ''
-        for prop in particle_props:
-            self._check_property(prop)
 
         if len(prop) == 0:
             num_extra_particles = 0
