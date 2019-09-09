@@ -90,11 +90,18 @@ class Integrator(object):
             for pa in a_eval.particle_arrays:
                 if 'dt_adapt' in pa.properties:
                     if pa.gpu is not None:
-                        from compyle.array import minimum
-                        min_val = minimum(pa.gpu.dt_adapt)
+                        if pa.gpu.get_number_of_particles() > 0:
+                            from compyle.array import minimum
+                            min_val = minimum(pa.gpu.dt_adapt)
+                        else:
+                            min_val = 1e20
                     else:
-                        min_val = np.min(pa.dt_adapt)
+                        if pa.get_number_of_particles() > 0:
+                            min_val = np.min(pa.dt_adapt)
+                        else:
+                            min_val = 1e20
                     dt_min = min(dt_min, min_val)
+
             if dt_min > 0.0:
                 return dt_min
             else:
