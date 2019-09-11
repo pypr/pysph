@@ -65,6 +65,76 @@ basic examples.  Some of the formulations available are:
    et al. 2001, CMAME, Vol. 190, pp 6641--6662)
 -  `Compressible SPH <http://dx.doi.org/10.1016/j.jcp.2013.08.060>`_
    (Puri et al. 2014, JCP, Vol. 256, pp 308--333)
+-  `Generalized Transport Velocity Formulation (GTVF)
+   <https://doi.org/10.1016/j.jcp.2017.02.016>`_ (Zhang et al. 2017, JCP, 337,
+   pp. 216--232)
+-  `Entropically Damped Artificial Compressibility (EDAC)
+   <http://dx.doi.org/10.1016/j.compfluid.2018.11.023>`_ (Ramachandran et
+   al. 2019, Computers and Fluids, 179, pp. 579--594)
+-  `delta-SPH <http://dx.doi.org/10.1016/j.cma.2010.12.016>`_ (Marrone et
+   al. CMAME, 2011, 200, pp. 1526--1542)
+-  `Dual Time SPH (DTSPH) <https://arxiv.org/abs/1904.00861>`_ (Ramachandran et
+   al. arXiv preprint)
+-  `Incompressible (ISPH) <https://doi.org/10.1006/jcph.1999.6246>`_ (Cummins et
+   al. JCP, 1999, 152, pp. 584--607)
+-  `Simple Iterative SPH (SISPH) <https://arxiv.org/abs/1908.01762>`_ (Muta et
+   al. arXiv preprint)
+-  `Implicit Incompressibel SPH (IISPH)
+   <https://doi.org/10.1109/TVCG.2013.105>`_ (Ihmsen et al. 2014, IEEE
+   Trans. Vis. Comput. Graph., 20, pp 426--435)
+-  `Gudnov SPH (GSPH) <https://doi.org/10.1006/jcph.2002.7053>`_ (Inutsuka et
+   al. JCP, 2002, 179, pp. 238--267)
+-  `Conservative Reproducible Kernel SPH (CRKSPH)
+   <http://dx.doi.org/10.1016/j.jcp.2016.12.004>`_ (Frontiere et al. JCP, 2017,
+   332, pp. 160--209)
+-  `Approximate Gudnov SPH (AGSPH) <https://doi.org/10.1016/j.jcp.2014.03.055>`_
+   (Puri et al. JCP, 2014, pp. 432--458)
+-  `Adaptive Density Kernel Estimate (ADKE)
+   <https://doi.org/10.1016/j.jcp.2005.06.016>`_ (Sigalotti et al. JCP, 2006,
+   pp. 124--149)
+-  `Akinci <http://doi.acm.org/10.1145/2185520.2185558>`_ (Akinci et al. ACM
+   Trans. Graph., 2012, pp. 62:1--62:8)
+
+Boundary conditions from the following papers are implemented:
+
+-  `Generalized Wall BCs
+   <http://dx.doi.org/10.1016/j.jcp.2012.05.005>`_ (Adami et al. JCP,
+   2012, pp. 7057--7075)
+-  `Do nothing type outlet BC
+   <https://doi.org/10.1016/j.euromechflu.2012.02.002>`_ (Federico
+   et al. European Journal of Mechanics - B/Fluids, 2012, pp. 35--46)
+-  `Outlet Mirror BC
+   <http://dx.doi.org/10.1016/j.cma.2018.08.004>`_ (Tafuni et al. CMAME,
+   2018, pp. 604--624)
+-  `Method of Characteristics BC
+   <http://dx.doi.org/10.1002/fld.1971>`_ (Lastiwaka
+   et al. International Journal for Numerical Methods in Fluids, 2012,
+   pp. 35--46)
+-  `Hybrid  BC <https://arxiv.org/abs/1907.04034>`_ (Negi et
+   al. arXiv preprint)
+
+Corrections proposed in the following papers are also the part for PySPH:
+
+-  `Corrected SPH <http://dx.doi.org/10.1016/S0045-7825(99)00051-1>`_ (Bonet et
+   al. CMAME, 1999, pp. 97--115)
+-  `hg-correction <https://doi.org/10.1080/00221686.2010.9641251>`_ (Hughes et
+   al. Journal of Hydraulic Research, pp. 105--117)
+-  `Tensile instability correction' <https://doi.org/10.1006/jcph.2000.6439>`_
+   (Monaghan J. J. JCP, 2000, pp. 2990--311)
+-  Particle shift algorithms
+   (`Xu et al <http://dx.doi.org/10.1016/j.jcp.2009.05.032>`_. JCP, 2009, pp. 6703--6725),
+   (`Skillen et al <http://dx.doi.org/10.1016/j.cma.2013.05.017>`_. CMAME, 2013, pp. 163--173)
+
+Surface tension models are implemented from:
+
+-  `Morris surface tension`_ (Morris et al. Internaltional Journal for Numerical
+   Methods in Fluids, 2000, pp. 333--353)
+-  `Adami Surface tension formulation
+   <https://doi.org/10.1016/j.jcp.2010.03.022>`_ (Adami et al. JCP, 2010,
+   pp. 5011--5021)
+
+.. _Morris surface tension:
+   https://dx.doi.org/10.1002/1097-0363(20000615)33:3<333::AID-FLD11>3.0.CO;2-7
 
 Installation
 -------------
