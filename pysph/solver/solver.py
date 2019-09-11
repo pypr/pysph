@@ -560,6 +560,11 @@ class Solver(object):
         if self.parallel_output_mode == "collected" and self.in_parallel:
             comm = self.comm
 
+        # this will enable user to restart the simulation
+        # from the last dump output
+        if (self.tf - self.t) < self._epsilon:
+            self.detailed_output = True
+
         dump(fname, self.particles, self._get_solver_data(),
              detailed_output=self.detailed_output,
              only_real=self.output_only_real, mpi_comm=comm,
