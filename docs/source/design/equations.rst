@@ -447,10 +447,45 @@ equation in the list of equations to be passed to the application.  It is
 often easiest to look at the many existing equations in PySPH and learn the
 general patterns.
 
-If you wish to use adaptive time stepping, see the code
-:py:class:`pysph.sph.integrator.Integrator`. The integrator uses information
-from the arrays ``dt_cfl``, ``dt_force``, and ``dt_visc`` in each of the
-particle arrays to determine the most suitable time step.
+Adaptive timesteps
+--------------------
+
+There are a couple of ways to use adaptive timesteps. The first is to compute
+a required timestep directly per-particle in a particle array property called
+``dt_adapt``. The minimum value of this array across all particle arrays is
+used to set the timestep directly. This is the easiest way to set the adaptive
+timestep.
+
+If the ``dt_adapt`` parameter is not set one may also use standard velocity,
+force, and viscosity based parameters. The integrator uses information from
+the arrays ``dt_cfl``, ``dt_force``, and ``dt_visc`` in each of the particle
+arrays to determine the most suitable time step. This is done using the
+following approach. The minimum smoothing parameter ``h`` is found as
+``hmin``. Let the CFL number be given as ``cfl``. For the velocity criterion,
+the maximum value of ``dt_cfl`` is found and then a suitable timestep is found
+as::
+
+  dt_min_vel = hmin/max(dt_cfl)
+
+For the force based criterion we use the following::
+
+  dt_min_force = sqrt(hmin/sqrt(max(dt_force)))
+
+for the viscosity we have::
+
+  dt_min_visc = hmin/max(dt_visc_fac)
+
+Then the correct timestep is found as::
+
+  dt = cfl*min(dt_min_vel, dt_min_force, dt_min_visc)
+
+The ``cfl`` is set to 0.3 by default. One may pass ``--cfl`` to the
+application to change the CFL. Note that when the ``dt_adapt`` property is
+used the CFL has no effect as we assume that the user will compute a suitable
+value based on their requirements.
+
+The :py:class:`pysph.sph.integrator.Integrator` class code may be instructive
+to look at if you are wondering about any particular details.
 
 Illustration of the ``loop_all`` method
 ----------------------------------------

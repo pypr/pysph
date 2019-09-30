@@ -11,7 +11,7 @@ import os
 import numpy as np
 
 from pysph.base.kernels import WendlandQuintic, QuinticSpline
-from pysph.examples._db_geometry import DamBreak2DGeometry
+from pysph.base.utils import get_particle_array
 from pysph.solver.application import Application
 from pysph.sph.scheme import WCSPHScheme, SchemeChooser, AdamiHuAdamsScheme
 from pysph.sph.wc.edac import EDACScheme
@@ -22,6 +22,8 @@ from pysph.sph.wc.kernel_correction import (GradientCorrectionPreStep,
                                             MixedKernelCorrectionPreStep)
 from pysph.sph.wc.crksph import CRKSPHPreStep, CRKSPH
 from pysph.sph.wc.gtvf import GTVFScheme
+from pysph.sph.isph.sisph import SISPHScheme
+from pysph.tools.geometry import get_2d_tank, get_2d_block
 
 
 fluid_column_height = 2.0
@@ -33,7 +35,8 @@ nu = 0.0
 dx = 0.03
 g = 9.81
 ro = 1000.0
-co = 10.0 * np.sqrt(2 * 9.81 * fluid_column_height)
+vref = np.sqrt(2 * 9.81 * fluid_column_height)
+co = 10.0 * vref
 gamma = 7.0
 alpha = 0.1
 beta = 0.0
@@ -41,6 +44,7 @@ B = co * co * ro / gamma
 p0 = 1000.0
 hdx = 1.3
 h = hdx * dx
+m = dx**2 * ro
 
 
 class DamBreak2D(Application):
@@ -124,6 +128,14 @@ class DamBreak2D(Application):
             kw.update(dict(kernel=kernel, dt=dt))
             scheme.configure(pref=B*gamma, h0=self.h)
             print("dt = %f" % dt)
+        elif self.options.scheme == 'sisph':
+            dt = 0.125*self.h/vref
+            kernel = QuinticSpline(dim=2)
+            print("SISPH dt = %f" % dt)
+            kw.update(dict(kernel=kernel))
+            self.scheme.configure_solver(
+                dt=dt, tf=tf, adaptive_timestep=False, pfreq=10,
+            )
 
         self.scheme.configure_solver(**kw)
 
@@ -149,13 +161,18 @@ class DamBreak2D(Application):
             fluids=['fluid'], solids=['boundary'], dim=2, nu=nu,
             rho0=ro, gy=-g, h0=None, c0=co, pref=None
         )
+        sisph = SISPHScheme(
+            fluids=['fluid'], solids=['boundary'], dim=2, nu=nu,
+            c0=co, rho0=ro, alpha=0.05, gy=-g, pref=ro*co**2,
+            internal_flow=False, hg_correction=True, gtvf=True, symmetric=True
+        )
         s = SchemeChooser(default='wcsph', wcsph=wcsph, aha=aha, edac=edac,
-                          iisph=iisph, gtvf=gtvf)
+                          iisph=iisph, gtvf=gtvf, sisph=sisph)
         return s
 
     def create_equations(self):
         eqns = self.scheme.get_equations()
-        if self.options.scheme == 'iisph':
+        if self.options.scheme == 'iisph' or self.options.scheme == 'sisph':
             return eqns
         if self.options.scheme == 'gtvf':
             return eqns
@@ -198,17 +215,19 @@ class DamBreak2D(Application):
             nboundary_layers = 4
             nfluid_offset = 1
             wall_hex_pack = False
-        geom = DamBreak2DGeometry(
-            container_width=container_width, container_height=container_height,
-            fluid_column_height=fluid_column_height,
-            fluid_column_width=fluid_column_width, dx=self.dx, dy=self.dx,
-            nboundary_layers=1, ro=ro, co=co,
-            with_obstacle=False, wall_hex_pack=wall_hex_pack,
-            beta=1.0, nfluid_offset=1, hdx=self.hdx)
-        fluid, boundary = geom.create_particles(
-            nboundary_layers=nboundary_layers, hdx=self.hdx,
-            nfluid_offset=nfluid_offset,
-        )
+        xt, yt = get_2d_tank(dx=self.dx, length=container_width,
+                             height=container_height, base_center=[2, 0],
+                             num_layers=nboundary_layers)
+        xf, yf = get_2d_block(dx=self.dx, length=fluid_column_width,
+                              height=fluid_column_height, center=[0.5, 1])
+
+        xf += self.dx
+        yf += self.dx
+
+        fluid = get_particle_array(name='fluid', x=xf, y=yf, h=h, m=m, rho=ro)
+        boundary = get_particle_array(name='boundary', x=xt, y=yt, h=h, m=m,
+                                      rho=ro)
+
         self.scheme.setup_properties([fluid, boundary])
         if self.options.scheme == 'iisph':
             # the default position tends to cause the particles to be pushed
@@ -266,6 +285,12 @@ class DamBreak2D(Application):
         plt.legend(loc='upper left')
         plt.savefig(os.path.join(self.output_dir, 'x_vs_t.png'), dpi=300)
         plt.close()
+
+    def customize_output(self):
+        self._mayavi_config('''
+        b = particle_arrays['fluid']
+        b.scalar = 'vmag'
+        ''')
 
 
 if __name__ == '__main__':

@@ -108,13 +108,16 @@ class TestGeometry(unittest.TestCase):
         dx = 0.05
         length = 5.0
         height = 4.0
-        center = np.array([1.4, -0.5])
+        center = np.random.randn(2)
         num_layers = 4
-        x, y = G.get_2d_tank(dx, center, length, height, num_layers)
-        x_len = max(x) - min(x)
-        y_len = max(y) - min(y)
-        assert abs(x_len - length - (2.0 * num_layers - 1) * dx) <= 1.001 * dx
-        assert abs(y_len - height - num_layers * dx) <= 1.001 * dx
+        x, y = G.get_2d_tank(dx, center, length, height, num_layers, top=False,
+                             staggered=False, outside=True)
+        offset = (num_layers - 1)*dx
+        xmin, xmax, ymin, ymax = min(x), max(x), min(y), max(y)
+        lower_true = center[0] - 0.5*length, center[1]
+        upper_true = center[0] + 0.5*length, center[1] + height
+        assert (xmin + offset, ymin + offset) == pytest.approx((lower_true))
+        assert (xmax - offset, ymax - offset) == pytest.approx((upper_true))
 
     def test_get_2d_circle(self):
         dx = 0.05

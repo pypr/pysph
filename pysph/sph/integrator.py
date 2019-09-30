@@ -43,6 +43,8 @@ class Integrator(object):
         # This is set later when the underlying compiled integrator is created
         # by the SPHCompiler.
         self.c_integrator = None
+        self._has_dt_adapt = None
+        self.fixed_h = False
 
     def __repr__(self):
         name = self.__class__.__name__
@@ -70,6 +72,42 @@ class Integrator(object):
                         factors[i] = max(factors[i], max_val)
         cfl_f, force_f, visc_f = factors
         return cfl_f, force_f, visc_f
+
+    def _get_explicit_dt_adapt(self):
+        """Checks if the user is defining a 'dt_adapt' property where the
+        timestep is directly specified.
+
+        This returns None if no such parameter is found, else it returns the
+        allowed timestep.
+        """
+        a_eval = self.acceleration_evals[0]
+        if self._has_dt_adapt is None:
+            self._has_dt_adapt = any(
+                'dt_adapt' in pa.properties for pa in a_eval.particle_arrays
+            )
+        if self._has_dt_adapt:
+            dt_min = np.inf
+            for pa in a_eval.particle_arrays:
+                if 'dt_adapt' in pa.properties:
+                    if pa.gpu is not None:
+                        if pa.gpu.get_number_of_particles() > 0:
+                            from compyle.array import minimum
+                            min_val = minimum(pa.gpu.dt_adapt)
+                        else:
+                            min_val = np.inf
+                    else:
+                        if pa.get_number_of_particles() > 0:
+                            min_val = np.min(pa.dt_adapt)
+                        else:
+                            min_val = np.inf
+                    dt_min = min(dt_min, min_val)
+
+            if dt_min > 0.0:
+                return dt_min
+            else:
+                return None
+        else:
+            return None
 
     ##########################################################################
     # Public interface.
@@ -117,6 +155,10 @@ class Integrator(object):
         """If there are any adaptive timestep constraints, the appropriate
         timestep is returned, else None is returned.
         """
+        dt_adapt = self._get_explicit_dt_adapt()
+        if dt_adapt is not None:
+            return dt_adapt
+
         dt_cfl_fac, dt_force_fac, dt_visc_fac = self._get_dt_adapt_factors()
 
         # iterate over particles and find hmin if using variable h
@@ -126,7 +168,7 @@ class Integrator(object):
         hmin = self.h_minimum
 
         # default time steps set to some large value
-        dt_cfl = dt_force = dt_viscous = 1e10
+        dt_cfl = dt_force = dt_viscous = np.inf
 
         # stable time step based on courant condition
         if dt_cfl_fac > 0:
@@ -145,7 +187,7 @@ class Integrator(object):
 
         # return the computed time steps. If dt factors aren't
         # defined, the default dt is returned
-        if dt_min <= 0.0 or abs(dt_min - 1e10) < 1:
+        if dt_min <= 0.0 or np.isinf(dt_min):
             return None
         else:
             return cfl*dt_min

@@ -35,6 +35,16 @@ def run_tests(args):
     cmdline.main(args=argv)
 
 
+def make_binder(args):
+    from pysph.tools.binder import main
+    main(args)
+
+
+def cull_files(args):
+    from pysph.tools.cull import main
+    main(args)
+
+
 def main():
     parser = ArgumentParser(description=__doc__, add_help=False)
     parser.add_argument(
@@ -60,11 +70,27 @@ def main():
         add_help=False
     )
     vtk_out.set_defaults(func=output_vtk)
+
     tests = subparsers.add_parser(
         'test', help='Run entire PySPH test-suite',
         add_help=False
     )
     tests.set_defaults(func=run_tests)
+
+    binder = subparsers.add_parser(
+        'binder',
+        help='Make a mybinder.org compatible directory for upload to a ' +
+             'host repo',
+        add_help=False
+    )
+    binder.set_defaults(func=make_binder)
+
+    cull = subparsers.add_parser(
+        'cull',
+        help='Cull files in a given directory by a specified culling_factor',
+        add_help=False
+    )
+    cull.set_defaults(func=cull_files)
 
     if (len(sys.argv) == 1 or (len(sys.argv) > 1 and
                                sys.argv[1] in ['-h', '--help'])):

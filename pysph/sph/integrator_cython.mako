@@ -8,8 +8,11 @@ ${' '*4*level}${l}
 
 from libc.math cimport *
 
+from cython import address
 from pysph.base.nnps_base cimport NNPS
 
+
+${helper.get_helper_code()}
 
 ${helper.get_stepper_code()}
 

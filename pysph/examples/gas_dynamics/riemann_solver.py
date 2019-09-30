@@ -297,6 +297,7 @@ def right_shock(rho_r, u_r, p_r, c_r, p_star, u_star, s):
         rho, u, p = rho_1, u_star, p_star
     return rho, u, p
 
+
 if __name__ == '__main__':
     set_gamma(1.4)
     solve()

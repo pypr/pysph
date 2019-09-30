@@ -5,6 +5,7 @@ from IPython.display import display, Image, clear_output, HTML
 import ipywidgets as widgets
 import numpy as np
 import matplotlib as mpl
+from decimal import Decimal
 
 mpl.use('module://ipympl.backend_nbagg')
 # Now the user does not have to use the IPython magic command
@@ -92,7 +93,7 @@ class Viewer(object):
 
         imgs = tuple()
         for extension in ['png', 'jpg', 'jpeg', 'bmp']:
-            temppath = self.path + "*." + extension
+            temppath = self.path + "/*." + extension
             for paths in glob.glob(temppath):
                 imgs += (Image(paths),)
         if len(imgs) != 0:
@@ -210,7 +211,12 @@ class Viewer(object):
 
     def _create_widgets(self):
 
-        if self.viewer_type == 'Viewer2D':
+        if self.viewer_type == 'Viewer1D':
+            self._widgets = Viewer1DWidgets(
+                file_name=self.paths_list[0],
+                file_count=len(self.paths_list) - 1,
+            )
+        elif self.viewer_type == 'Viewer2D':
             self._widgets = Viewer2DWidgets(
                 file_name=self.paths_list[0],
                 file_count=len(self.paths_list) - 1,
@@ -250,7 +256,7 @@ class Viewer(object):
         self._widgets.print_config.on_click(
             self._print_present_config_dictionary
         )
-        if self.viewer_type == 'Viewer2D':
+        if self.viewer_type == 'Viewer2D' or self.viewer_type == 'Viewer1D':
             self._widgets.show_solver_time.observe(
                 self._show_solver_time_handler,
                 'value'
@@ -287,6 +293,9 @@ class Viewer(object):
                 if (widget_name == 'legend_lower_lim' or
                         widget_name == 'legend_upper_lim'):
                     widget_handler = self._legend_lim_handler
+                elif (widget_name == 'right_spine_lower_lim' or
+                        widget_name == 'right_spine_upper_lim'):
+                    widget_handler = self._right_spine_lim_handler
                 else:
                     widget_handler = getattr(
                         self,
@@ -572,7 +581,684 @@ class Viewer(object):
         return stride, component
 
 
-class ParticleArrayWidgets(object):
+class ParticleArrayWidgets1D(object):
+
+    def __init__(self, particlearray):
+
+        self.array_name = particlearray.name
+        self.scalar = widgets.Dropdown(
+            options=['None'] +
+            particlearray.output_property_arrays +
+            ['vmag'],
+            value='rho',
+            description="scalar",
+            disabled=False,
+            layout=widgets.Layout(width='240px', display='flex')
+        )
+        self.scalar.owner = self.array_name
+        self.is_visible = widgets.Checkbox(
+            value=True,
+            description='visible',
+            disabled=False,
+            layout=widgets.Layout(width='170px', display='flex')
+        )
+        self.is_visible.owner = self.array_name
+        self.masking_factor = widgets.IntText(
+            value=1,
+            description='masking',
+            disabled=False,
+            layout=widgets.Layout(width='160px', display='flex'),
+        )
+        self.masking_factor.owner = self.array_name
+        self.components = widgets.IntText(
+            value=1,
+            description='component',
+            disabled=True,
+            layout=widgets.Layout(width='160px', display='flex'),
+        )
+        self.components.owner = self.array_name
+        self.right_spine = widgets.Checkbox(
+            value=False,
+            description='scale',
+            disabled=False,
+            layout=widgets.Layout(width='170px', display='flex')
+        )
+        self.right_spine.owner = self.array_name
+        self.right_spine_lower_lim = widgets.Text(
+            value='',
+            placeholder='min',
+            description='lower limit',
+            disabled=False,
+            layout=widgets.Layout(width='160px', display='flex'),
+            continuous_update=False
+        )
+        self.right_spine_lower_lim.owner = self.array_name
+        self.right_spine_upper_lim = widgets.Text(
+            value='',
+            placeholder='max',
+            description='upper limit',
+            disabled=False,
+            layout=widgets.Layout(width='160px', display='flex'),
+            continuous_update=False
+        )
+        self.right_spine_upper_lim.owner = self.array_name
+
+    def _tab_config(self):
+
+        VBox1 = widgets.VBox(
+            [
+                self.scalar,
+                self.components,
+            ]
+        )
+        VBox2 = widgets.VBox(
+            [
+                self.masking_factor,
+                self.is_visible,
+            ]
+        )
+        VBox3 = widgets.VBox(
+            [
+                self.right_spine,
+                widgets.HBox(
+                    [
+                        self.right_spine_upper_lim,
+                        self.right_spine_lower_lim,
+                    ]
+                ),
+
+            ]
+        )
+        hbox = widgets.HBox([VBox1, VBox2, VBox3])
+        return hbox
+
+
+class Viewer1DWidgets(object):
+
+    def __init__(self, file_name, file_count):
+
+        self.temp_data = load(file_name)
+        self.time = str(self.temp_data['solver_data']['t'])
+        self.temp_data = self.temp_data['arrays']
+        self.frame = widgets.IntSlider(
+            min=0,
+            max=file_count,
+            step=1,
+            value=0,
+            description='frame',
+            layout=widgets.Layout(width='500px'),
+            continuous_update=False,
+        )
+        self.play_button = widgets.Play(
+            min=0,
+            max=file_count,
+            step=1,
+            disabled=False,
+        )
+        self.link = widgets.jslink(
+            (self.frame, 'value'),
+            (self.play_button, 'value'),
+        )
+        self.delay_box = widgets.FloatText(
+            value=0.2,
+            description='Delay',
+            disabled=False,
+            layout=widgets.Layout(width='160px', display='flex'),
+        )
+        self.save_figure = widgets.Text(
+                value='',
+                placeholder='example.pdf',
+                description='Save figure',
+                disabled=False,
+                layout=widgets.Layout(width='240px', display='flex'),
+        )
+        self.save_all_plots = widgets.ToggleButton(
+                value=False,
+                description='Save all plots!',
+                disabled=False,
+                tooltip='Saves the corresponding plots for all the' +
+                        ' frames in the presently set styling.',
+                icon='',
+                layout=widgets.Layout(display='flex'),
+        )
+        self.solver_time = widgets.HTML(
+            value=self.time,
+            description='Solver time:'
+        )
+        self.show_solver_time = widgets.Checkbox(
+            value=False,
+            description="Show solver time",
+            disabled=False,
+            layout=widgets.Layout(display='flex'),
+        )
+        self.print_config = widgets.Button(
+            description='print present config.',
+            tooltip='Prints the configuration dictionary ' +
+                    'for the current viewer state',
+            disabled=False,
+            layout=widgets.Layout(display='flex'),
+        )
+        self.particles = {}
+        for array_name in self.temp_data.keys():
+            self.particles[array_name] = ParticleArrayWidgets1D(
+                self.temp_data[array_name],
+            )
+
+    def _create_tabs(self):
+
+        children = []
+        for array_name in self.particles.keys():
+            children.append(self.particles[array_name]._tab_config())
+
+        tab = widgets.Tab(children=children)
+        for i in range(len(children)):
+            tab.set_title(i, list(self.particles.keys())[i])
+
+        return widgets.VBox(
+                [
+                    tab,
+                    widgets.HBox(
+                     [
+                        self.play_button,
+                        self.frame
+                     ]
+                    ),
+                    widgets.HBox(
+                     [
+                        self.delay_box,
+                        self.save_figure,
+                        self.save_all_plots,
+                     ]
+                    ),
+                    widgets.HBox(
+                     [
+                        self.print_config,
+                        self.show_solver_time,
+                        self.solver_time,
+                     ]
+                    )
+                ]
+            )
+
+
+class Viewer1D(Viewer):
+
+    '''
+    Example
+    -------
+
+    >>> from pysph.tools.ipy_viewer import Viewer1D
+    >>> sample = Viewer1D(
+        '/home/uname/pysph_files/blastwave_output'
+        )
+    >>> sample.interactive_plot()
+    >>> sample.show_log()
+    >>> sample.show_info()
+    '''
+
+    def _configure_plot(self):
+
+        '''
+        Set attributes for plotting.
+        '''
+
+        self.figure, temp = plt.subplots()
+        self.add_axes = False
+        self._scatters_ax = {'host': temp}
+        self._scatters = {}
+        self._solver_time_ax = {}
+
+        self.figure.show()
+
+    def interactive_plot(self, config={}):
+        '''
+        Set plotting attributes, create widgets and display them
+        along with the interactive plot.
+        '''
+
+        self.config = config  # The configuration dictionary.
+        self.viewer_type = 'Viewer1D'
+        self._configure_plot()
+        self._create_widgets()
+        display(self._widgets._create_tabs())
+        temp_data = self.get_frame(0)
+        self.time = str(temp_data['solver_data']['t'])
+        temp_data = temp_data['arrays']
+
+        self.xmin = None
+        self.xmax = None
+        for array_name in self._widgets.particles.keys():
+            pa_widgets = self._widgets.particles[array_name]
+            if (pa_widgets.scalar.value != 'None' and
+                    pa_widgets.is_visible.value is True):
+
+                n = pa_widgets.masking_factor.value
+                stride, component = self._stride_and_component(
+                    temp_data[array_name], pa_widgets
+                )
+                c = self._get_c(
+                    pa_widgets,
+                    temp_data[array_name],
+                    component,
+                    stride
+                )
+                if self.xmin is None:
+                    self.xmin = min(temp_data[array_name].x)
+                elif min(temp_data[array_name].x) < self.xmin:
+                    self.xmin = min(temp_data[array_name].x)
+                if self.xmax is None:
+                    self.xmax = max(temp_data[array_name].x)
+                elif max(temp_data[array_name].x) > self.xmax:
+                    self.xmax = max(temp_data[array_name].x)
+                min_c = min(c)
+                max_c = max(c)
+                llim = pa_widgets.right_spine_lower_lim.value
+                ulim = pa_widgets.right_spine_upper_lim.value
+                if llim != '':
+                    min_c = float(llim)
+                if ulim != '':
+                    max_c = float(ulim)
+                if max_c-min_c != 0:
+                    c_norm = (c - min_c)/(max_c - min_c)
+                elif max_c != 0:
+                    c_norm = c/max_c
+                else:
+                    c_norm = c
+
+                color = 'C' + str(
+                    list(
+                        self._widgets.particles.keys()
+                    ).index(array_name)
+                )
+                ax = self._scatters_ax['host'].twinx()
+                self._scatters[array_name] = ax.scatter(
+                    temp_data[array_name].x[component::stride][::n],
+                    c_norm[::n],
+                    color=color,
+                    label=array_name,
+                )
+                ax.set_ylim(-0.1, 1.1)
+                self._make_patch_spines_invisible(ax)
+                self._scatters_ax[array_name] = ax
+
+        self._scatters_ax['host'].set_xlim(self.xmin-0.1, self.xmax+0.1)
+        self._make_patch_spines_invisible(self._scatters_ax['host'])
+
+        self.solver_time_textbox = None
+        # So that _show_solver_time_handler does not glitch at intialization.
+        self._frame_handler(None)
+        self._show_solver_time_handler(None)
+        self._right_spine_handler(None)
+
+    def _make_patch_spines_invisible(self, ax, val=True):
+        '''
+        Helper function for making individual y-axes
+        for different particle arrays
+        '''
+        ax.set_frame_on(val)
+        ax.patch.set_visible(False)
+        for sp in ax.spines.values():
+            sp.set_visible(False)
+
+    def _frame_handler(self, change):
+
+        temp_data = self.get_frame(self._widgets.frame.value)
+        self.time = str(temp_data['solver_data']['t'])
+        self._widgets.solver_time.value = self.time
+        temp_data = temp_data['arrays']
+
+        for array_name in self._widgets.particles.keys():
+            pa_widgets = self._widgets.particles[array_name]
+            if (pa_widgets.scalar.value != 'None' and
+                    pa_widgets.is_visible.value is True):
+                n = pa_widgets.masking_factor.value
+                stride, component = self._stride_and_component(
+                    temp_data[array_name], pa_widgets
+                )
+                sct = self._scatters[array_name]
+                c = self._get_c(
+                    pa_widgets,
+                    temp_data[array_name],
+                    component,
+                    stride
+                )
+                if self.xmin is None:
+                    self.xmin = min(temp_data[array_name].x)
+                elif min(temp_data[array_name].x) < self.xmin:
+                    self.xmin = min(temp_data[array_name].x)
+                if self.xmax is None:
+                    self.xmax = max(temp_data[array_name].x)
+                if max(temp_data[array_name].x) > self.xmax:
+                    self.xmax = max(temp_data[array_name].x)
+                min_c = min(c)
+                max_c = max(c)
+                llim = pa_widgets.right_spine_lower_lim.value
+                ulim = pa_widgets.right_spine_upper_lim.value
+                if llim != '':
+                    min_c = float(llim)
+                if ulim != '':
+                    max_c = float(ulim)
+                if max_c-min_c != 0:
+                    c_norm = (c - min_c)/(max_c - min_c)
+                elif max_c != 0:
+                    c_norm = c/max_c
+                else:
+                    c_norm = c
+                sct.set_offsets(
+                    np.vstack(
+                        (
+                            temp_data[array_name].x[component::stride][::n],
+                            c_norm[::n]
+                        )
+                    ).T
+                )
+                self._scatters_ax[array_name].set_ylim(-0.1, 1.1)
+
+        self._scatters_ax['host'].set_xlim(self.xmin-0.1, self.xmax+0.1)
+        self._right_spine_handler(None)
+        self._show_solver_time_handler(None)
+        self.figure.show()
+
+    def _scalar_handler(self, change):
+
+        array_name = change['owner'].owner
+        pa_widgets = self._widgets.particles[array_name]
+        if pa_widgets.is_visible.value is True:
+            n = pa_widgets.masking_factor.value
+            temp_data = self.get_frame(
+                self._widgets.frame.value
+            )['arrays']
+            stride, component = self._stride_and_component(
+                    temp_data[array_name], pa_widgets
+            )
+            c = self._get_c(
+                pa_widgets,
+                temp_data[array_name],
+                component,
+                stride
+            )
+            if self.xmin is None:
+                self.xmin = min(temp_data[array_name].x)
+            elif min(temp_data[array_name].x) < self.xmin:
+                self.xmin = min(temp_data[array_name].x)
+            if self.xmax is None:
+                self.xmax = max(temp_data[array_name].x)
+            elif max(temp_data[array_name].x) > self.xmax:
+                self.xmax = max(temp_data[array_name].x)
+            min_c = min(c)
+            max_c = max(c)
+            llim = pa_widgets.right_spine_lower_lim.value
+            ulim = pa_widgets.right_spine_upper_lim.value
+            if llim != '':
+                min_c = float(llim)
+            if ulim != '':
+                max_c = float(ulim)
+            if max_c-min_c != 0:
+                c_norm = (c - min_c)/(max_c - min_c)
+            elif max_c != 0:
+                c_norm = c/max_c
+            else:
+                c_norm = c
+
+            new = change['new']
+            old = change['old']
+
+            if (new == 'None' and old == 'None'):
+                pass
+            elif (new == 'None' and old != 'None'):
+                sct = self._scatters[array_name]
+                copy = self._scatters_ax[array_name].collections.copy()
+                copy.remove(sct)
+                self._scatters_ax[array_name].collections = copy
+                del self._scatters[array_name]
+            elif (new != 'None' and old == 'None'):
+                color = 'C' + str(
+                    list(
+                        self._widgets.particles.keys()
+                    ).index(array_name)
+                )
+                self._scatters[array_name] = self._scatters_ax[
+                    array_name
+                ].scatter(
+                    temp_data[array_name].x[component::stride][::n],
+                    c_norm[::n],
+                    color=color
+                )
+                self._scatters_ax[array_name].set_ylim(-0.1, 1.1)
+            elif (new != 'None' and old != 'None'):
+                sct = self._scatters[array_name]
+                sct.set_offsets(
+                    np.vstack(
+                        (
+                            temp_data[array_name].x[component::stride][::n],
+                            c_norm[::n]
+                        )
+                    ).T
+                )
+                self._scatters_ax[array_name].set_ylim(-0.1, 1.1)
+
+            self._scatters_ax['host'].set_xlim(self.xmin-0.1, self.xmax+0.1)
+            self._right_spine_handler(None)
+            self.figure.show()
+
+    def _save_figure_handler(self, change):
+
+        file_was_saved = False
+        for extension in [
+            '.eps', '.pdf', '.pgf',
+            '.png', '.ps', '.raw',
+            '.rgba', '.svg', '.svgz'
+        ]:
+            if self._widgets.save_figure.value.endswith(extension):
+                self.figure.savefig(self._widgets.save_figure.value)
+                print(
+                    "Saved figure as {} in the present working directory"
+                    .format(
+                        self._widgets.save_figure.value
+                    )
+                )
+                file_was_saved = True
+                break
+        self._widgets.save_figure.value = ""
+        if file_was_saved is False:
+            print(
+                "Please use a valid extension, that is, one of the following" +
+                ": '.eps', '.pdf', '.pgf', '.png', '.ps', '.raw', '.rgba'," +
+                " '.svg' or '.svgz'."
+            )
+
+    def _is_visible_handler(self, change):
+
+        array_name = change['owner'].owner
+        pa_widgets = self._widgets.particles[array_name]
+        temp_data = self.get_frame(self._widgets.frame.value)['arrays']
+
+        if pa_widgets.scalar.value != 'None':
+            if change['new'] is False:
+                sct = self._scatters[array_name]
+                copy = self._scatters_ax[array_name].collections.copy()
+                copy.remove(sct)
+                self._scatters_ax[array_name].collections = copy
+                del self._scatters[array_name]
+            elif change['new'] is True:
+                n = pa_widgets.masking_factor.value
+                stride, component = self._stride_and_component(
+                    temp_data[array_name], pa_widgets
+                )
+                c = self._get_c(
+                    pa_widgets,
+                    temp_data[array_name],
+                    component,
+                    stride
+                )
+                if self.xmin is None:
+                    self.xmin = min(temp_data[array_name].x)
+                elif min(temp_data[array_name].x) < self.xmin:
+                    self.xmin = min(temp_data[array_name].x)
+                if self.xmax is None:
+                    self.xmax = max(temp_data[array_name].x)
+                elif max(temp_data[array_name].x) > self.xmax:
+                    self.xmax = max(temp_data[array_name].x)
+                min_c = min(c)
+                max_c = max(c)
+                llim = pa_widgets.right_spine_lower_lim.value
+                ulim = pa_widgets.right_spine_upper_lim.value
+                if llim != '':
+                    min_c = float(llim)
+                if ulim != '':
+                    max_c = float(ulim)
+                if max_c-min_c != 0:
+                    c_norm = (c - min_c)/(max_c - min_c)
+                elif max_c != 0:
+                    c_norm = c/max_c
+                else:
+                    c_norm = c
+                color = 'C' + str(
+                    list(
+                        self._widgets.particles.keys()
+                    ).index(array_name)
+                )
+                self._scatters[array_name] = self._scatters_ax[
+                    array_name
+                ].scatter(
+                    temp_data[array_name].x[component::stride][::n],
+                    c_norm[::n],
+                    color=color
+                )
+                self._scatters_ax[array_name].set_ylim(-0.1, 1.1)
+        self._scatters_ax['host'].set_xlim(self.xmin-0.1, self.xmax+0.1)
+        self._right_spine_handler(None)
+        self.figure.show()
+
+    def _show_solver_time_handler(self, change):
+
+        if self._widgets.show_solver_time.value is True:
+            if self.solver_time_textbox is not None:
+                self.solver_time_textbox.remove()
+            self.solver_time_textbox = self._scatters_ax['host'].text(
+                x=0.02,
+                y=0.02,
+                s='Solver time: ' + self.time,
+                verticalalignment='bottom',
+                horizontalalignment='left',
+                transform=self._scatters_ax['host'].transAxes,
+                fontsize=12,
+                bbox={'facecolor': 'white', 'alpha': 0.7, 'pad': 3},
+            )
+        elif self._widgets.show_solver_time.value is False:
+            if self.solver_time_textbox is not None:
+                self.solver_time_textbox.remove()
+            self.solver_time_textbox = None
+        if change is not None:
+            self.figure.show()
+
+    def _right_spine_handler(self, change):
+
+        temp_data = self.get_frame(
+            self._widgets.frame.value
+        )['arrays']
+
+        number_of_spines = 0
+
+        self._make_patch_spines_invisible(
+            self._scatters_ax['host'],
+            False
+        )
+
+        for array_name in self._widgets.particles.keys():
+            pa_widgets = self._widgets.particles[array_name]
+            ax = self._scatters_ax[array_name]
+            self._make_patch_spines_invisible(ax, False)
+            if (pa_widgets.right_spine.value is True and
+                    pa_widgets.is_visible.value is True and
+                    pa_widgets.scalar.value != 'None'):
+
+                number_of_spines += 1
+                stride, component = self._stride_and_component(
+                    temp_data[array_name], pa_widgets
+                )
+                c = self._get_c(
+                    pa_widgets,
+                    temp_data[array_name],
+                    component,
+                    stride
+                )
+                self._scatters_ax['host'].set_position(
+                    [0, 0, 1. - 0.2*number_of_spines, 1]
+                )
+
+                min_c = min(c)
+                max_c = max(c)
+                llim = pa_widgets.right_spine_lower_lim.value
+                ulim = pa_widgets.right_spine_upper_lim.value
+                if llim != '':
+                    min_c = float(llim)
+                if ulim != '':
+                    max_c = float(ulim)
+                locs = np.linspace(0, 1, 20)
+
+                if min_c - max_c != 0:
+                    labels = [
+                        '%.2E' % Decimal(str(val)) for val in np.linspace(
+                            min_c,
+                            max_c,
+                            20
+                        )
+                    ]
+                elif max_c == 0:
+                    labels = ['%.2E' % Decimal(str(val)) for val in locs]
+                else:
+                    labels = [
+                        '%.2E' % Decimal(str(val)) for val in np.linspace(
+                            0,
+                            max_c,
+                            20
+                        )
+                    ]
+
+                color = 'C' + str(
+                    list(
+                        self._widgets.particles.keys()
+                    ).index(array_name)
+                )
+
+                ax.set_frame_on(True)
+
+                ax.spines["right"].set_position(
+                    (
+                        "axes",
+                        1.+0.2*(number_of_spines-1)/(1.-0.2*number_of_spines)
+                    )
+                )
+                ax.spines["right"].set_visible(True)
+
+                ax.set_ylabel(
+                    array_name + " : " +
+                    pa_widgets.scalar.value
+                )
+                ax.set_yticks(ticks=locs)
+                ax.set_yticklabels(labels=labels)
+                ax.tick_params(axis='y', colors=color)
+                ax.yaxis.label.set_color(color)
+                ax.spines["right"].set_color(color)
+            else:
+                ax.spines["right"].set_color('none')
+                ax.yaxis.set_ticks([])
+                ax.set_ylabel('')
+
+        if number_of_spines == 0:
+            self._scatters_ax['host'].set_frame_on(True)
+            self._scatters_ax['host'].set_position(
+                [0, 0, 1, 1]
+            )
+        if change is not None:
+            self.figure.show()
+
+    def _right_spine_lim_handler(self, change):
+        self._frame_handler(None)
+
+
+class ParticleArrayWidgets2D(object):
 
     def __init__(self, particlearray):
 
@@ -793,7 +1479,7 @@ class Viewer2DWidgets(object):
         )
         self.particles = {}
         for array_name in self.temp_data.keys():
-            self.particles[array_name] = ParticleArrayWidgets(
+            self.particles[array_name] = ParticleArrayWidgets2D(
                 self.temp_data[array_name],
             )
 
@@ -1729,7 +2415,7 @@ class Viewer3D(Viewer):
                     c = self._get_c(
                         pa_widgets,
                         temp_data[array_name],
-                        component,
+                        comp,
                         stride
                     )
                     scatters = self._scatters[array_name]

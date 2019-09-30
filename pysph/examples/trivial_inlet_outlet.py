@@ -42,9 +42,10 @@ from pysph.base.utils import get_particle_array
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
 from pysph.sph.integrator import PECIntegrator
-from pysph.sph.bc.simple_inlet_outlet import (
-    InletOutletStepEDAC, SimpleInletOutlet)
-from pysph.sph.bc.inlet_outlet_manager import InletInfo, OutletInfo
+from pysph.sph.bc.donothing.simple_inlet_outlet import (
+    SimpleInletOutlet)
+from pysph.sph.bc.inlet_outlet_manager import (
+    InletInfo, OutletInfo, OutletStep, InletStep)
 from pysph.sph.basic_equations import SummationDensity
 
 
@@ -78,7 +79,9 @@ class InletOutletApp(Application):
         x += 2.0
         outlet = get_particle_array(name='outlet', x=x, y=y, m=m, h=h, u=u,
                                     rho=rho)
+
         particles = [inlet, fluid, outlet]
+
         props = ['ioid', 'disp', 'x0']
         for p in props:
             for pa in particles:
@@ -87,14 +90,21 @@ class InletOutletApp(Application):
         return particles
 
     def _create_inlet_outlet_manager(self):
+        from pysph.sph.bc.donothing.inlet import Inlet
+        from pysph.sph.bc.donothing.outlet import Outlet
+
+        props_to_copy = ['x', 'y', 'z', 'u', 'v', 'w', 'm',
+                         'h', 'rho', 'p', 'ioid']
         inlet_info = InletInfo(
             pa_name='inlet', normal=[-1.0, 0.0, 0.0],
-            refpoint=[0.0, 0.0, 0.0]
+            refpoint=[0.0, 0.0, 0.0], has_ghost=False,
+            update_cls=Inlet
         )
 
         outlet_info = OutletInfo(
             pa_name='outlet', normal=[1.0, 0.0, 0.0],
-            refpoint=[1.0, 0.0, 0.0]
+            refpoint=[1.0, 0.0, 0.0], update_cls=Outlet,
+            props_to_copy=props_to_copy
         )
 
         iom = SimpleInletOutlet(
@@ -121,8 +131,8 @@ class InletOutletApp(Application):
         self.iom = self._create_inlet_outlet_manager()
         kernel = CubicSpline(dim=2)
         integrator = PECIntegrator(
-            fluid=InletOutletStepEDAC(), inlet=InletOutletStepEDAC(),
-            outlet=InletOutletStepEDAC()
+            fluid=InletStep(), inlet=InletStep(),
+            outlet=OutletStep()
         )
         self.iom.active_stages = [2]
         self.iom.setup_iom(dim=2, kernel=kernel)

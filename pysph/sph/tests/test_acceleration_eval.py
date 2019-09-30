@@ -721,6 +721,9 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
                     self.conv = 1
 
             def converged(self):
+                if hasattr(self, '_pull'):
+                    # _pull is not available on CPU.
+                    self._pull('conv')
                 return self.conv
 
         equations = [Group(

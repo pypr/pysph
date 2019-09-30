@@ -11,6 +11,11 @@ try:
 except ImportError:
     import mock
 
+import os
+import shutil
+import sys
+from tempfile import mkdtemp
+
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
 
@@ -54,10 +59,22 @@ class MockApp(Application):
 
 class TestApplication(TestCase):
 
-    # Test When testarg is  notpassed
-    def test_user_options_false(self):
+    def setUp(self):
+        self.output_dir = mkdtemp()
+        self.app = MockApp(output_dir=self.output_dir)
+
+    def tearDown(self):
+        if sys.platform.startswith('win'):
+            try:
+                shutil.rmtree(self.output_dir)
+            except WindowsError:
+                pass
+        else:
+            shutil.rmtree(self.output_dir)
+
+    def test_user_options_when_args_are_not_passed(self):
         # Given
-        app = MockApp()
+        app = self.app
 
         # When
         args = []
@@ -69,10 +86,9 @@ class TestApplication(TestCase):
         error_message = "Expected %f, got %f" % (expected, app.testarg)
         self.assertEqual(expected, app.testarg, error_message)
 
-    # Test When testarg is passed
-    def test_user_options_true(self):
+    def test_user_options_when_args_are_passed(self):
         # Given
-        app = MockApp()
+        app = self.app
 
         # When
         args = ['--testarg', '20']
@@ -82,3 +98,26 @@ class TestApplication(TestCase):
         expected = 20.0
         error_message = "Expected %f, got %f" % (expected, app.testarg)
         self.assertEqual(expected, app.testarg, error_message)
+
+    def test_output_dir_when_moved_and_read_info_called(self):
+        # Given
+        app = self.app
+
+        args = ['-d', app.output_dir]
+        app.run(args)
+
+        copy_root = mkdtemp()
+        copy_dir = os.path.join(copy_root, 'new')
+        shutil.copytree(app.output_dir, copy_dir)
+        self.addCleanup(shutil.rmtree, copy_root)
+        orig_fname = app.fname
+
+        # When
+        app = MockApp()
+        app.read_info(copy_dir)
+
+        # Then
+        realpath = os.path.realpath
+        assert realpath(app.output_dir) != realpath(self.output_dir)
+        assert realpath(app.output_dir) == realpath(copy_dir)
+        assert app.fname == orig_fname

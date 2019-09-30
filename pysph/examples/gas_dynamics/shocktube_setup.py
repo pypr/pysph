@@ -157,3 +157,6 @@ class ShockTubeSetup(Application):
         elif self.options.scheme == 'gsph':
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=50)
+        elif self.options.scheme == 'crk':
+            s.configure_solver(dt=self.dt, tf=self.tf,
+                               adaptive_timestep=False, pfreq=1)
