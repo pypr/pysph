@@ -554,12 +554,6 @@ cdef class ParticleArray:
         prop = ''
         for prop in particle_props:
             self._check_property(prop)
-            if prop in self.stride.keys():
-                stride = self.stride[prop]
-                prop_len = len(particle_props[prop])
-                base_len = self.get_number_of_particles()
-                msg = 'Property %s length should be %d' % (prop, base_len * stride)
-                assert prop_len == base_len * stride, msg
 
         if self.gpu is not None and self.backend is not 'cython':
             gpu_particle_props = {}
