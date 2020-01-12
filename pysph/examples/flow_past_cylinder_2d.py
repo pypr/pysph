@@ -120,8 +120,8 @@ class WindTunnel(Application):
 
     def consume_user_options(self):
         self.dc = dc = self.options.dc
-        self.Lt = 15. * dc
-        self.Wt = 7.5 * dc
+        self.Lt = self.options.Lt/2 * dc
+        self.Wt = self.options.Wt/2 * dc
         self.io_method = self.options.io_method
         nx = self.options.nx
         re = self.options.re
