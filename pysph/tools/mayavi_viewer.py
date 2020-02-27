@@ -454,6 +454,8 @@ class ParticleArrayHelper(HasTraits):
 
         self._eval_ns = {k: v.get_npy_array()
                          for k, v in pa.properties.items()}
+        self._eval_ns.update({k: v.get_npy_array()
+                              for k, v in pa.constants.items()})
         self._eval_ns.update(dict(np=numpy, numpy=numpy))
         self._list_all_scalars_changed(self.list_all_scalars)
 
