@@ -1,8 +1,6 @@
 environment:
 
   matrix:
-    - PYTHON: "C:\\Python36-x64"
-    - PYTHON: "C:\\Python37-x64"
     - PYTHON: "C:\\Python38-x64"
 
 install:
@@ -16,11 +14,4 @@ cache:
   - C:\Users\appveyor\.cache
 
 test_script:
-  # Put your test command here.
-  # If you don't need to build C extensions on 64-bit Python 3.3 or 3.4,
-  # you can remove "build.cmd" from the front of the command, as it's
-  # only needed to support those cases.
-  # Note that you must use the environment variable %PYTHON% to refer to
-  # the interpreter you're using - Appveyor does not do anything special
-  # to put the Python version you want to use on PATH.
   - "%PYTHON%\\python.exe -m pytest -v -m \"not slow or slow\" --junit-xml=pytest.xml"

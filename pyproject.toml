@@ -7,6 +7,6 @@ requires = [
     "mako",
     "oldest-supported-numpy",
     "pytools",
-    "setuptools",
-    "wheel"
+    "setuptools>=42.0.0",
+    "wheel>=0.29.0"
 ]
