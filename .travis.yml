@@ -20,10 +20,13 @@ install:
     - conda info -a
     - conda config --add channels conda-forge
     - conda config --add channels defaults
+
+    - conda create -q -n testenv python=$TRAVIS_PYTHON_VERSION numpy cython h5py
+    - conda activate testenv
     - conda install -c conda-forge pocl==1.2 pyopencl
-    - conda install -c defaults virtualenv cython
     - python -c 'import pyopencl as cl'
-    - pip install beaker tox tox-travis
+    - pip install -r requirements.txt
+    - pip install -e ".[dev]"
 
 script:
-    - tox
+    - python -m pytest -v -m 'not slow or slow'
