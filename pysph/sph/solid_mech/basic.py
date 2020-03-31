@@ -472,7 +472,7 @@ class HookesDeviatoricStressRate(Equation):
         omega22 = 0.0
 
         tmp = 2.0 * d_G[0]
-        trace = 1.0 / 3.0 * (eps00 + eps11)
+        trace = 1.0 / 3.0 * (eps00 + eps11 + eps22)
 
         # S_00
         d_as00[d_idx] = tmp*( eps00 - trace ) + \
