@@ -101,9 +101,6 @@ class LidDrivenCavity(Application):
 
         print("Lid driven cavity :: Re = %d, dt = %g" % (self.re, self.dt))
 
-        # add requisite properties to the arrays:
-        self.scheme.setup_properties([fluid, solid])
-
         # setup the particle properties
         volume = dx * dx
 
@@ -115,10 +112,6 @@ class LidDrivenCavity(Application):
         fluid.rho[:] = rho0
         solid.rho[:] = rho0
 
-        # volume is set as dx^2
-        fluid.V[:] = 1. / volume
-        solid.V[:] = 1. / volume
-
         # smoothing lengths
         fluid.h[:] = hdx * dx
         solid.h[:] = hdx * dx
@@ -126,9 +119,17 @@ class LidDrivenCavity(Application):
         # imposed horizontal velocity on the lid
         solid.u[:] = 0.0
         solid.v[:] = 0.0
+
         for i in range(solid.get_number_of_particles()):
             if solid.y[i] > L:
                 solid.u[i] = Umax
+
+        # add requisite properties to the arrays:
+        self.scheme.setup_properties([fluid, solid])
+
+        # volume is set as dx^2
+        fluid.V[:] = 1. / volume
+        solid.V[:] = 1. / volume
 
         return [fluid, solid]
 
