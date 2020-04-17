@@ -4,7 +4,6 @@
 from libc.stdlib cimport malloc, free
 from libcpp.vector cimport vector
 from libcpp.map cimport map
-from libcpp.algorithm cimport lower_bound
 from libc.stdlib cimport bsearch
 from libc.stdio cimport printf
 

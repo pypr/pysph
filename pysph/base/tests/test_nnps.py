@@ -183,8 +183,7 @@ class NNPS2DTestCase(unittest.TestCase):
         _nbrs2 = nbrs_brute_force.get_npy_array()
 
         # sort the neighbors
-        nbrs1 = _nbrs1[:nnbrs]
-        nbrs1.sort()
+        nbrs1 = sorted(_nbrs1[:nnbrs])
         nbrs2 = _nbrs2
         nbrs2.sort()
 
@@ -386,8 +385,7 @@ class NNPSTestCase(unittest.TestCase):
         _nbrs2 = nbrs_brute_force.get_npy_array()
 
         # sort the neighbors
-        nbrs1 = _nbrs1[:nnbrs]
-        nbrs1.sort()
+        nbrs1 = sorted(_nbrs1[:nnbrs])
         nbrs2 = _nbrs2
         nbrs2.sort()
 
@@ -576,8 +574,10 @@ class ZOrderNNPSTestCase(DictBoxSortNNPSTestCase):
             dim=3, particles=self.particles, radius_scale=2.0
         )
 
-class ExtendedZOrderNNPSTestCase(DictBoxSortNNPSTestCase):
-    """Test for Z-Order SFC based algorithm"""
+
+class ExtendedZOrderNNPSAsymmetricTestCase(DictBoxSortNNPSTestCase):
+    """Test for asymmetric Extended Z-Order SFC based algorithm"""
+
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.ExtendedZOrderNNPS(
@@ -585,8 +585,22 @@ class ExtendedZOrderNNPSTestCase(DictBoxSortNNPSTestCase):
             asymmetric=True
         )
 
-class ExtendedZOrderNNPSSubdividedTestCase(DictBoxSortNNPSTestCase):
-    """Test for Z-Order SFC based algorithm"""
+
+class ExtendedZOrderNNPSSymmetricTestCase(DictBoxSortNNPSTestCase):
+    """Test for symmetric Extended Z-Order SFC based algorithm"""
+
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.ExtendedZOrderNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0, H=1,
+            asymmetric=False
+        )
+
+
+class ExtendedZOrderNNPSSubdividedAsymTestCase(DictBoxSortNNPSTestCase):
+    """Test for asymmetric Extended Z-Order SFC based algorithm with
+    subdivision"""
+
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.ExtendedZOrderNNPS(
@@ -615,6 +629,20 @@ class ExtendedZOrderNNPSSubdividedTestCase(DictBoxSortNNPSTestCase):
         self.test_neighbors_bb()
         self.test_neighbors_cc()
         self.test_neighbors_dd()
+
+
+class ExtendedZOrderNNPSSubdividedSymTestCase(
+        ExtendedZOrderNNPSSubdividedAsymTestCase):
+    """Test for symmetric Extended Z-Order SFC based algorithm with
+    subdivision"""
+
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.ExtendedZOrderNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0, H=3,
+            asymmetric=False
+        )
+
 
 class ZOrderGPUNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Z-Order SFC based OpenCL algorithm"""
@@ -1050,8 +1078,7 @@ class TestLinkedListNNPSWithSorting(unittest.TestCase):
         for i in range(pa.get_number_of_particles()):
             nps.get_nearest_particles(0, 0, i, nbrs)
             nb = nbrs.get_npy_array()
-            sorted_nbrs = nb.copy()
-            sorted_nbrs.sort()
+            sorted_nbrs = sorted(nb.copy())
             self.assertTrue(numpy.all(nb == sorted_nbrs))
 
     def test_nnps_sorts_with_valid_gids(self):
@@ -1071,8 +1098,7 @@ class TestLinkedListNNPSWithSorting(unittest.TestCase):
         for i in range(pa.get_number_of_particles()):
             nps.get_nearest_particles(0, 0, i, nbrs)
             nb = nbrs.get_npy_array()
-            sorted_nbrs = nb.copy()
-            sorted_nbrs.sort()
+            sorted_nbrs = sorted(nb.copy())
             self.assertTrue(numpy.all(nb == sorted_nbrs))
 
 
