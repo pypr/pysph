@@ -585,6 +585,37 @@ class ExtendedZOrderNNPSTestCase(DictBoxSortNNPSTestCase):
             asymmetric=True
         )
 
+class ExtendedZOrderNNPSSubdividedTestCase(DictBoxSortNNPSTestCase):
+    """Test for Z-Order SFC based algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.ExtendedZOrderNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0, H=3,
+            asymmetric=True
+        )
+
+    @pytest.mark.xfail(reason="ExtendedZOrderNNPS failing for \
+                       different dest and src index")
+    def test_neighbors_ab(self):
+        self._test_neighbors_by_particle(src_index=0, dst_index=1,
+                                         dst_numPoints=self.numPoints2)
+
+    @pytest.mark.xfail(reason="ExtendedZOrderNNPS failing for \
+                       different dest and src index")
+    def test_neighbors_ba(self):
+        self._test_neighbors_by_particle(src_index=1, dst_index=0,
+                                         dst_numPoints=self.numPoints1)
+
+    @pytest.mark.xfail(reason="ExtendedZOrderNNPS failing for \
+                       different dest and src index")
+    def test_repeated(self):
+        self.test_neighbors_aa()
+        self.test_neighbors_ab()
+        self.test_neighbors_ba()
+        self.test_neighbors_bb()
+        self.test_neighbors_cc()
+        self.test_neighbors_dd()
+
 class ZOrderGPUNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Z-Order SFC based OpenCL algorithm"""
 

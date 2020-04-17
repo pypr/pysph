@@ -6,28 +6,27 @@ dist:
 
 language: python
 python:
-    - 2.7
     - 3.7
+    - 3.8
 
 install:
     - sudo apt-get update
-    - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
-        wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
-      else
-        wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
-      fi
+    - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
     - bash miniconda.sh -b -p $HOME/miniconda
-    - export PATH="$HOME/miniconda/bin:$PATH"
+    - source "$HOME/miniconda/etc/profile.d/conda.sh"
     - hash -r
     - conda config --set always_yes yes --set changeps1 no
     - conda update -q conda
     - conda info -a
     - conda config --add channels conda-forge
     - conda config --add channels defaults
-    - conda install -c conda-forge pocl==1.2 pyopencl
-    - conda install -c defaults virtualenv cython
+
+    - conda create -q -n testenv python=$TRAVIS_PYTHON_VERSION numpy cython h5py
+    - conda activate testenv
+    - conda install -c conda-forge pocl pyopencl
     - python -c 'import pyopencl as cl'
-    - pip install beaker tox tox-travis
+    - pip install -r requirements.txt
+    - pip install -e ".[dev]"
 
 script:
-    - tox
+    - python -m pytest -v -m 'not slow or slow'

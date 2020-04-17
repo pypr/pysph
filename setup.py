@@ -1,6 +1,3 @@
-import Cython.Compiler.Options
-Cython.Compiler.Options.annotate = True
-
 import os
 from os import path
 try:
@@ -627,7 +624,7 @@ def setup_package():
     # The requirements.
     install_requires = [
         'numpy', 'mako', 'cyarray', 'compyle', 'Cython>=0.20',
-        'setuptools>=6.0', 'pytools', 'Beaker'
+        'setuptools>=42.0.0', 'pytools', 'Beaker'
     ]
     tests_require = ['pytest>=3.0', 'numpy-stl']
     if sys.version_info[:2] == (2, 6):
