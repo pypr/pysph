@@ -1,6 +1,6 @@
 cimport numpy as np
 
-from pyzoltan.core.carray cimport BaseArray, UIntArray, IntArray, LongArray
+from cyarray.carray cimport BaseArray, UIntArray, IntArray, LongArray
 
 # ParticleTag
 # Declares various tags for particles, and functions to check them.
@@ -34,9 +34,12 @@ cdef class ParticleArray:
     """
     Maintains various properties for particles.
     """
+    cdef public str backend
     # dictionary to hold the properties held per particle
     cdef public dict properties
     cdef public list property_arrays
+
+    cdef public dict stride
 
     # list of output property arrays
     cdef public list output_property_arrays
@@ -50,12 +53,6 @@ cdef class ParticleArray:
     # name associated with this particle array
     cdef public str name
 
-    # indicates if coordinates of particles has changed.
-    cdef public bint is_dirty
-
-    # indicate if the particle configuration has changed.
-    cdef public bint indices_invalid
-
     # the number of real particles.
     cdef public long num_real_particles
 
@@ -63,15 +60,10 @@ cdef class ParticleArray:
     cdef list lb_props
 
     ########################################
-    # OpenCL related attributes.
+    # OpenCL/accelerator related attributes.
 
-
-
-    # dictionary to hold the OpenCL properties for a particle
-    cdef public dict cl_properties
-
-    # bool indicating CL is setup
-    cdef public bint cl_setup_done
+    # Object that manages the device properties.
+    cdef public object gpu
 
     # time for the particle array
     cdef public double time
@@ -89,18 +81,17 @@ cdef class ParticleArray:
 
     cpdef get_lb_props(self)
 
-    cpdef set_dirty(self, bint val)
-    cpdef set_indices_invalid(self, bint val)
+    cpdef set_num_real_particles(self, long value)
 
     cpdef BaseArray get_carray(self, str prop)
 
     cpdef int get_number_of_particles(self, bint real=*)
-    cpdef remove_particles(self, indices)
-    cpdef remove_tagged_particles(self, int tag)
+    cpdef remove_particles(self, indices, align=*)
+    cpdef remove_tagged_particles(self, int tag, bint align=*)
 
     # function to add any property
     cpdef add_constant(self, str name, data)
-    cpdef add_property(self, str name, str type=*, default=*, data=*)
+    cpdef add_property(self, str name, str type=*, default=*, data=*, stride=*)
     cpdef remove_property(self, str prop_name)
 
     # increase the number of particles by num_particles
@@ -112,11 +103,17 @@ cdef class ParticleArray:
     cpdef int align_particles(self) except -1
 
     # add particles from the parray to self.
-    cpdef int append_parray(self, ParticleArray parray) except -1
+    cpdef int append_parray(self, ParticleArray parray, bint align=*,
+            bint update_constants=*) except -1
+
+    cpdef ParticleArray empty_clone(self, props=*)
+
+    cpdef ensure_properties(self, ParticleArray src, list props=*)
 
     # create a new particle array with the given particles indices and the
     # properties.
-    cpdef ParticleArray extract_particles(self, indices, list props=*)
+    cpdef ParticleArray extract_particles(self, indices, ParticleArray dest_array=*,
+                            bint align=*, list props=*)
 
     # set the tag value for the particles
     cpdef set_tag(self, long tag_value, LongArray indices)
@@ -132,10 +129,6 @@ cdef class ParticleArray:
 
     # set the specified properties to zero
     cpdef set_to_zero(self, list props)
-
-    # perform an update on a particle
-    cpdef update_property(self, BaseArray a, BaseArray a0,
-                          BaseArray acc, double dt)
 
     # resize all arrays to a new size
     cpdef resize(self, long size)

@@ -1,8 +1,8 @@
 numpy
 setuptools>=6.0
 Cython>=0.20
+https://github.com/pypr/cyarray/zipball/master
+https://github.com/pypr/compyle/zipball/master
 mako
-pytest>=3.0
-mock>=1.0
-execnet
-psutil
+pytools
+Beaker

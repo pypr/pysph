@@ -18,6 +18,8 @@ cdef extern from "z_order.h":
                 int length) nogil except +
         inline void compare_sort() nogil
 
+ctypedef map[uint64_t, pair[uint32_t, uint32_t]] key_to_idx_t
+
 cdef class ZOrderNNPS(NNPS):
     ############################################################################
     # Data Attributes

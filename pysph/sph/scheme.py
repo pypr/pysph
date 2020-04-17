@@ -108,19 +108,34 @@ class Scheme(object):
         pa : ParticleArray
             Desired particle array.
         desired_props : sequence
-            Desired properties to have in the array.
+            Desired properties to have in the array, can be a list of strings
+            or dicts with stride info or both.
         clean : bool
             Remove undesirable properties.
         """
-        all_props = set(desired_props)
+        all_props = {}
+        for p in desired_props:
+            if isinstance(p, dict):
+                all_props.update({p['name']: p})
+            elif p not in all_props:
+                all_props.update({p: {'name': p}})
+
+        pa_props = set(pa.properties.keys())
         if clean:
-            to_remove = set(pa.properties.keys()) - all_props
+            to_remove = pa_props - set(all_props.keys())
             for prop in to_remove:
                 pa.remove_property(prop)
 
-        to_add = all_props - set(pa.properties.keys())
+        to_add = set(all_props.keys()) - pa_props
         for prop in to_add:
-            pa.add_property(prop)
+            pa.add_property(**all_props[prop])
+
+    def _smart_getattr(self, obj, var):
+        res = getattr(obj, var)
+        if res is None:
+            return getattr(self, var)
+        else:
+            return res
 
 
 class SchemeChooser(Scheme):
@@ -160,11 +175,10 @@ class SchemeChooser(Scheme):
 
     def configure_solver(self, kernel=None, integrator_cls=None,
                          extra_steppers=None, **kw):
-        for scheme in self.schemes.values():
-            self.scheme.configure_solver(
-                kernel=kernel, integrator_cls=integrator_cls,
-                extra_steppers=extra_steppers, **kw
-            )
+        self.scheme.configure_solver(
+            kernel=kernel, integrator_cls=integrator_cls,
+            extra_steppers=extra_steppers, **kw
+        )
 
     def get_equations(self):
         return self.scheme.get_equations()
@@ -287,55 +301,57 @@ class WCSPHScheme(Scheme):
     def add_user_options(self, group):
         group.add_argument(
             "--alpha", action="store", type=float, dest="alpha",
-            default=self.alpha,
+            default=None,
             help="Alpha for the artificial viscosity."
         )
         group.add_argument(
             "--beta", action="store", type=float, dest="beta",
-            default=self.beta,
+            default=None,
             help="Beta for the artificial viscosity."
         )
         group.add_argument(
             "--delta", action="store", type=float, dest="delta",
-            default=self.delta,
+            default=None,
             help="Delta for the delta-SPH."
         )
         group.add_argument(
             "--gamma", action="store", type=float, dest="gamma",
-            default=self.gamma,
+            default=None,
             help="Gamma for the state equation."
         )
         add_bool_argument(
             group, 'tensile-correction', dest='tensile_correction',
             help="Use tensile instability correction.",
-            default=self.tensile_correction
+            default=None
         )
         add_bool_argument(
             group, "hg-correction", dest="hg_correction",
             help="Use the Hughes Graham correction.",
-            default=self.hg_correction
+            default=None
         )
         add_bool_argument(
             group, "update-h", dest="update_h",
             help="Update the smoothing length as per Ferrari et al.",
-            default=self.update_h
+            default=None
         )
         add_bool_argument(
             group, "delta-sph", dest="delta_sph",
             help="Use the delta-SPH correction terms.",
-            default=self.delta_sph
+            default=None
         )
         add_bool_argument(
             group, "summation-density", dest="summation_density",
             help="Use summation density instead of continuity.",
-            default=self.summation_density
+            default=None
         )
 
     def consume_user_options(self, options):
         vars = ['gamma', 'tensile_correction', 'hg_correction',
                 'update_h', 'delta_sph', 'alpha', 'beta',
                 'summation_density']
-        data = dict((var, getattr(options, var)) for var in vars)
+
+        data = dict((var, self._smart_getattr(options, var))
+                    for var in vars)
         self.configure(**data)
 
     def get_timestep(self, cfl=0.5):
@@ -376,10 +392,14 @@ class WCSPHScheme(Scheme):
             UpdateSmoothingLengthFerrari
         )
         from pysph.sph.wc.basic import (ContinuityEquationDeltaSPH,
+                                        ContinuityEquationDeltaSPHPreStep,
                                         MomentumEquationDeltaSPH)
         from pysph.sph.basic_equations import \
             (ContinuityEquation, SummationDensity, XSPHCorrection)
-        from pysph.sph.wc.viscosity import LaminarViscosity
+        from pysph.sph.wc.viscosity import (LaminarViscosity,
+                                            LaminarViscosityDeltaSPH)
+        from pysph.sph.wc.kernel_correction import (GradientCorrectionPreStep,
+                                                    GradientCorrection)
 
         equations = []
         g1 = []
@@ -397,65 +417,81 @@ class WCSPHScheme(Scheme):
                 gamma=self.gamma
             ))
 
-        if self.hg_correction:
-            # This correction applies only to solids.
-            for name in self.solids:
+        # This correction applies only to solids.
+        for name in self.solids:
+            if self.hg_correction:
                 g1.append(TaitEOSHGCorrection(
                     dest=name, sources=None, rho0=self.rho0, c0=self.c0,
                     gamma=self.gamma
                 ))
-
+            else:
+                g1.append(TaitEOS(
+                    dest=name, sources=None, rho0=self.rho0, c0=self.c0,
+                    gamma=self.gamma
+                ))
         equations.append(Group(equations=g1, real=False))
+
+        if self.delta_sph and not self.summation_density:
+            eq2_pre = []
+            for name in self.fluids:
+                eq2_pre.append(
+                    GradientCorrectionPreStep(dest=name, sources=[name],
+                                              dim=self.dim)
+                )
+            equations.append(Group(equations=eq2_pre, real=False))
+
+            eq2 = []
+            for name in self.fluids:
+                eq2.extend([
+                    GradientCorrection(dest=name, sources=[name]),
+                    ContinuityEquationDeltaSPHPreStep(
+                        dest=name, sources=[name]
+                    )])
+            equations.append(Group(equations=eq2))
 
         g2 = []
         for name in self.solids:
             g2.append(ContinuityEquation(dest=name, sources=self.fluids))
 
         for name in self.fluids:
-            if self.delta_sph:
-                other = all[:]
-                other.remove(name)
+            if not self.summation_density:
+                g2.append(
+                    ContinuityEquation(dest=name, sources=all)
+                )
+            if self.delta_sph and not self.summation_density:
                 g2.append(
                     ContinuityEquationDeltaSPH(
                         dest=name, sources=[name], c0=self.c0,
                         delta=self.delta
-                    )
-                )
-                if len(other) > 0:
-                    g2.append(ContinuityEquation(dest=name, sources=other))
+                    ))
+            # This is required since MomentumEquation (ME) adds artificial
+            # viscosity (AV), so make alpha 0.0 for ME and enable delta sph AV.
+            alpha = 0.0 if self.delta_sph else self.alpha
+            g2.append(
+                MomentumEquation(
+                    dest=name, sources=all, c0=self.c0,
+                    alpha=alpha, beta=self.beta,
+                    gx=self.gx, gy=self.gy, gz=self.gz,
+                    tensile_correction=self.tensile_correction
+                ))
+            if self.delta_sph:
                 g2.append(
                     MomentumEquationDeltaSPH(
                         dest=name, sources=[name], rho0=self.rho0, c0=self.c0,
-                        alpha=self.alpha, gx=self.gx, gy=self.gy, gz=self.gz,
-                    )
-                )
-                if len(other) > 0:
-                    g2.append(
-                        MomentumEquation(
-                            dest=name, sources=other, c0=self.c0,
-                            alpha=self.alpha, beta=self.beta,
-                            gx=self.gx, gy=self.gy, gz=self.gz,
-                            tensile_correction=self.tensile_correction
-                        )
-                    )
-
-                g2.append(XSPHCorrection(dest=name, sources=[name]))
-            else:
-                if not self.summation_density:
-                    g2.append(ContinuityEquation(dest=name, sources=all))
-                g2.extend([
-                    MomentumEquation(
-                        dest=name, sources=all, alpha=self.alpha,
-                        beta=self.beta, gx=self.gx, gy=self.gy, gz=self.gz,
-                        c0=self.c0, tensile_correction=self.tensile_correction
-                    ),
-                    XSPHCorrection(dest=name, sources=[name])
-                ])
+                        alpha=self.alpha
+                    ))
+            g2.append(XSPHCorrection(dest=name, sources=[name]))
 
             if abs(self.nu) > 1e-14:
-                eq = LaminarViscosity(
-                    dest=name, sources=self.fluids, nu=self.nu
-                )
+                if self.delta_sph:
+                    eq = LaminarViscosityDeltaSPH(
+                        dest=name, sources=all, dim=self.dim, rho0=self.rho0,
+                        nu=self.nu
+                    )
+                else:
+                    eq = LaminarViscosity(
+                        dest=name, sources=all, nu=self.nu
+                    )
                 g2.insert(-1, eq)
         equations.append(Group(equations=g2))
 
@@ -475,6 +511,12 @@ class WCSPHScheme(Scheme):
         props = list(dummy.properties.keys())
         output_props = ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'm', 'h',
                         'pid', 'gid', 'tag', 'p']
+        if self.delta_sph:
+            delta_sph_props = [
+                {'name': 'm_mat', 'stride': 9},
+                {'name': 'gradrho', 'stride': 3},
+            ]
+            props += delta_sph_props
         for pa in particles:
             self._ensure_properties(pa, props, clean)
             pa.set_output_arrays(output_props)
@@ -502,18 +544,19 @@ class TVFScheme(Scheme):
     def add_user_options(self, group):
         group.add_argument(
             "--alpha", action="store", type=float, dest="alpha",
-            default=self.alpha,
+            default=None,
             help="Alpha for the artificial viscosity."
         )
         group.add_argument(
             "--tdamp", action="store", type=float, dest="tdamp",
-            default=self.tdamp,
+            default=None,
             help="Time for which the accelerations are damped."
         )
 
     def consume_user_options(self, options):
         vars = ['alpha', 'tdamp']
-        data = dict((var, getattr(options, var)) for var in vars)
+        data = dict((var, self._smart_getattr(options, var))
+                    for var in vars)
         self.configure(**data)
 
     def get_timestep(self, cfl=0.25):
@@ -589,7 +632,8 @@ class TVFScheme(Scheme):
         for solid in self.solids:
             g2.append(SetWallVelocity(dest=solid, sources=self.fluids))
 
-        equations.append(Group(equations=g2, real=False))
+        if len(g2) > 0:
+            equations.append(Group(equations=g2, real=False))
 
         g3 = []
         for solid in self.solids:
@@ -598,7 +642,8 @@ class TVFScheme(Scheme):
                 p0=self.p0, gx=self.gx, gy=self.gy, gz=self.gz
             ))
 
-        equations.append(Group(equations=g3, real=False))
+        if len(g3) > 0:
+            equations.append(Group(equations=g3, real=False))
 
         g4 = []
         for fluid in self.fluids:
@@ -692,7 +737,7 @@ class AdamiHuAdamsScheme(TVFScheme):
         super(AdamiHuAdamsScheme, self).add_user_options(group)
         group.add_argument(
             "--gamma", action="store", type=float, dest="gamma",
-            default=self.gamma,
+            default=None,
             help="Gamma for the state equation."
         )
 
@@ -701,7 +746,8 @@ class AdamiHuAdamsScheme(TVFScheme):
 
     def consume_user_options(self, options):
         vars = ['alpha', 'tdamp', 'gamma']
-        data = dict((var, getattr(options, var)) for var in vars)
+        data = dict((var, self._smart_getattr(options, var))
+                    for var in vars)
         self.configure(**data)
 
     def configure_solver(self, kernel=None, integrator_cls=None,
@@ -748,7 +794,7 @@ class AdamiHuAdamsScheme(TVFScheme):
         from pysph.sph.wc.basic import TaitEOS
         from pysph.sph.basic_equations import XSPHCorrection
         from pysph.sph.wc.transport_velocity import (
-            ContinuityEquation,
+            ContinuityEquation, ContinuitySolid,
             MomentumEquationPressureGradient,
             MomentumEquationViscosity, MomentumEquationArtificialViscosity,
             SolidWallPressureBC, SolidWallNoSlipBC, SetWallVelocity,
@@ -783,8 +829,12 @@ class AdamiHuAdamsScheme(TVFScheme):
         g4 = []
         for fluid in self.fluids:
             g4.append(
-                ContinuityEquation(dest=fluid, sources=all)
+                ContinuityEquation(dest=fluid, sources=self.fluids)
             )
+            if self.solids:
+                g4.append(
+                    ContinuitySolid(dest=fluid, sources=self.solids)
+                )
             g4.append(
                 MomentumEquationPressureGradient(
                     dest=fluid, sources=all, pb=0.0, gx=self.gx,
@@ -829,7 +879,9 @@ class AdamiHuAdamsScheme(TVFScheme):
 class GasDScheme(Scheme):
     def __init__(self, fluids, solids, dim, gamma, kernel_factor, alpha1=1.0,
                  alpha2=0.1, beta=2.0, adaptive_h_scheme='mpm',
-                 update_alpha1=False, update_alpha2=False):
+                 update_alpha1=False, update_alpha2=False,
+                 max_density_iterations=250,
+                 density_iteration_tolerance=1e-3, has_ghosts=False):
         """
         Parameters
         ----------
@@ -857,6 +909,12 @@ class GasDScheme(Scheme):
             Update the alpha1 parameter dynamically.
         update_alpha2: bool
             Update the alpha2 parameter dynamically.
+        max_density_iterations: int
+            Maximum number of iterations to run for one density step
+        density_iteration_tolerance: float
+            Maximum difference allowed in two successive density iterations
+        has_ghosts: bool
+            if ghost particles (either mirror or periodic) is used
         """
         self.fluids = fluids
         self.solids = solids
@@ -870,51 +928,53 @@ class GasDScheme(Scheme):
         self.beta = beta
         self.kernel_factor = kernel_factor
         self.adaptive_h_scheme = adaptive_h_scheme
+        self.density_iteration_tolerance = density_iteration_tolerance
+        self.max_density_iterations = max_density_iterations
+        self.has_ghosts = has_ghosts
 
     def add_user_options(self, group):
         choices = ['gsph', 'mpm']
-        default = self.adaptive_h_scheme
         group.add_argument(
             "--adaptive-h", action="store", dest="adaptive_h_scheme",
-            default=default, choices=choices,
+            default=None, choices=choices,
             help="Specify scheme for adaptive smoothing lengths %s" % choices
         )
         group.add_argument(
             "--alpha1", action="store", type=float, dest="alpha1",
-            default=self.alpha1,
+            default=None,
             help="Alpha1 for the artificial viscosity."
         )
         group.add_argument(
             "--beta", action="store", type=float, dest="beta",
-            default=self.beta,
+            default=None,
             help="Beta for the artificial viscosity."
         )
         group.add_argument(
             "--alpha2", action="store", type=float, dest="alpha2",
-            default=self.alpha2,
+            default=None,
             help="Alpha2 for artificial viscosity"
         )
         group.add_argument(
             "--gamma", action="store", type=float, dest="gamma",
-            default=self.gamma,
+            default=None,
             help="Gamma for the state equation."
         )
         add_bool_argument(
             group, "update-alpha1", dest="update_alpha1",
             help="Update the alpha1 parameter.",
-            default=self.update_alpha1
+            default=None
         )
         add_bool_argument(
             group, "update-alpha2", dest="update_alpha2",
             help="Update the alpha2 parameter.",
-            default=self.update_alpha2
+            default=None
         )
 
     def consume_user_options(self, options):
-        self.adaptive_h_scheme = options.adaptive_h_scheme
         vars = ['gamma', 'alpha2', 'alpha1', 'beta', 'update_alpha1',
-                'update_alpha2']
-        data = dict((var, getattr(options, var)) for var in vars)
+                'update_alpha2', 'adaptive_h_scheme']
+        data = dict((var, self._smart_getattr(options, var))
+                    for var in vars)
         self.configure(**data)
 
     def configure_solver(self, kernel=None, integrator_cls=None,
@@ -962,8 +1022,10 @@ class GasDScheme(Scheme):
         from pysph.sph.equation import Group
         from pysph.sph.gas_dynamics.basic import (
             ScaleSmoothingLength, UpdateSmoothingLengthFromVolume,
-            SummationDensity, IdealGasEOS, MPMAccelerations
+            SummationDensity, IdealGasEOS, MPMAccelerations,
+            MPMUpdateGhostProps
         )
+        from pysph.sph.gas_dynamics.boundary_equations import WallBoundary
 
         equations = []
         # Find the optimal 'h'
@@ -973,13 +1035,14 @@ class GasDScheme(Scheme):
                 g1.append(
                     SummationDensity(
                         dest=fluid, sources=self.fluids, k=self.kernel_factor,
-                        density_iterations=True, dim=self.dim, htol=1e-3
+                        density_iterations=True, dim=self.dim,
+                        htol=self.density_iteration_tolerance
                     )
                 )
 
             equations.append(Group(
                 equations=g1, update_nnps=True, iterate=True,
-                max_iterations=50
+                max_iterations=self.max_density_iterations
             ))
 
         elif self.adaptive_h_scheme == 'gsph':
@@ -1026,18 +1089,34 @@ class GasDScheme(Scheme):
         equations.append(Group(equations=g2))
 
         g3 = []
+        for solid in self.solids:
+            g3.append(WallBoundary(solid, sources=self.fluids))
+        equations.append(Group(equations=g3))
+
+        if self.has_ghosts:
+            gh = []
+            for fluid in self.fluids:
+                gh.append(
+                    MPMUpdateGhostProps(dest=fluid, sources=None)
+                )
+            equations.append(Group(equations=gh, real=False))
+
+        g4 = []
         for fluid in self.fluids:
-            g3.append(MPMAccelerations(
-                dest=fluid, sources=self.fluids, alpha1_min=self.alpha1,
+            g4.append(MPMAccelerations(
+                dest=fluid, sources=self.fluids + self.solids,
+                alpha1_min=self.alpha1,
                 alpha2_min=self.alpha2, beta=self.beta,
                 update_alpha1=self.update_alpha1,
                 update_alpha2=self.update_alpha2
             ))
-        equations.append(Group(equations=g3))
+        equations.append(Group(equations=g4))
+
         return equations
 
     def setup_properties(self, particles, clean=True):
         from pysph.base.utils import get_particle_array_gasd
+        import numpy
         particle_arrays = dict([(p.name, p) for p in particles])
         dummy = get_particle_array_gasd(name='junk')
         props = list(dummy.properties.keys())
@@ -1045,12 +1124,331 @@ class GasDScheme(Scheme):
         for fluid in self.fluids:
             pa = particle_arrays[fluid]
             self._ensure_properties(pa, props, clean)
+            pa.add_property('orig_idx', type='int')
+            nfp = pa.get_number_of_particles()
+            pa.orig_idx[:] = numpy.arange(nfp)
+            pa.set_output_arrays(output_props)
+
+        solid_props = set(props) | set('div cs wij htmp'.split(' '))
+        for solid in self.solids:
+            pa = particle_arrays[solid]
+            self._ensure_properties(pa, solid_props, clean)
+            pa.set_output_arrays(output_props)
+
+
+class GSPHScheme(Scheme):
+    def __init__(self, fluids, solids, dim, gamma, kernel_factor, g1=0.0,
+                 g2=0.0, rsolver=2, interpolation=1, monotonicity=1,
+                 interface_zero=True, hybrid=False, blend_alpha=5.0, tf=1.0,
+                 niter=20, tol=1e-6, has_ghosts=False):
+        """
+        Parameters
+        ----------
+
+        fluids: list
+            List of names of fluid particle arrays.
+        solids: list
+            List of names of solid particle arrays (or boundaries), currently
+            not supported
+        dim: int
+            Dimensionality of the problem.
+        gamma: float
+            Gamma for Equation of state.
+        kernel_factor: float
+            Kernel scaling factor.
+        g1, g2 : double
+            ADKE style thermal conduction parameters
+        rsolver: int
+            Riemann solver to use.  See pysph.sph.gas_dynamics.gsph for
+            valid options.
+        interpolation: int
+            Kind of interpolation for the specific volume integrals.
+        monotonicity : int
+            Type of monotonicity algorithm to use:
+            0 : First order GSPH
+            1 : I02 algorithm
+            2 : IwIn algorithm
+        interface_zero : bool
+            Set Interface position s^*_{ij} = 0 for the Riemann problem.
+        hybrid, blend_alpha : bool, double
+            Hybrid scheme and blending alpha value
+        tf: double
+            Final time used for blending.
+        niter: int
+            Max number of iterations for iterative Riemann solvers.
+        tol: double
+            Tolerance for iterative Riemann solvers.
+        has_ghosts: bool
+            if ghost particles (either mirror or periodic) is used
+        """
+        self.fluids = fluids
+        self.solids = solids
+        self.dim = dim
+        self.solver = None
+        self.gamma = gamma
+        self.kernel_factor = kernel_factor
+        self.g1 = g1
+        self.g2 = g2
+        self.rsolver = rsolver
+        self.interpolation = interpolation
+        self.monotonicity = monotonicity
+        self.interface_zero = interface_zero
+        self.hybrid = hybrid
+        self.blend_alpha = blend_alpha
+        self.tf = tf
+        self.niter = niter
+        self.tol = tol
+        self.has_ghosts = has_ghosts
+
+    def add_user_options(self, group):
+        group.add_argument(
+            "--rsolver", action="store", type=int, dest="rsolver",
+            default=None,
+            help="Riemann solver to use."
+        )
+        group.add_argument(
+            "--interpolation", action="store", type=int, dest="interpolation",
+            default=None,
+            help="Interpolation algorithm to use."
+        )
+        group.add_argument(
+            "--monotonicity", action="store", type=int, dest="monotonicity",
+            default=None,
+            help="Monotonicity algorithm to use."
+        )
+        group.add_argument(
+            "--g1", action="store", type=float, dest="g1",
+            default=None,
+            help="ADKE style thermal conduction parameter."
+        )
+        group.add_argument(
+            "--g2", action="store", type=float, dest="g2",
+            default=None,
+            help="ADKE style thermal conduction parameter."
+        )
+        group.add_argument(
+            "--gamma", action="store", type=float, dest="gamma",
+            default=None,
+            help="Gamma for the state equation."
+        )
+        group.add_argument(
+            "--blend-alpha", action="store", type=float, dest="blend_alpha",
+            default=None,
+            help="Blending factor for hybrid scheme."
+        )
+        add_bool_argument(
+            group, "interface-zero", dest="interface_zero",
+            help="Set interface position to zero for Riemann problem.",
+            default=None
+        )
+        add_bool_argument(
+            group, "hybrid", dest="hybrid",
+            help="Use the hybrid scheme.",
+            default=None
+        )
+
+    def consume_user_options(self, options):
+        vars = ['gamma', 'g1', 'g2', 'rsolver', 'interpolation',
+                'monotonicity', 'interface_zero', 'hybrid',
+                'blend_alpha']
+        data = dict((var, self._smart_getattr(options, var))
+                    for var in vars)
+        self.configure(**data)
+
+    def configure_solver(self, kernel=None, integrator_cls=None,
+                         extra_steppers=None, **kw):
+        """Configure the solver to be generated.
+
+        Parameters
+        ----------
+
+        kernel : Kernel instance.
+            Kernel to use, if none is passed a default one is used.
+        integrator_cls : pysph.sph.integrator.Integrator
+            Integrator class to use, use sensible default if none is
+            passed.
+        extra_steppers : dict
+            Additional integration stepper instances as a dict.
+        **kw : extra arguments
+            Any additional keyword args are passed to the solver instance.
+        """
+        from pysph.base.kernels import Gaussian
+        if kernel is None:
+            kernel = Gaussian(dim=self.dim)
+
+        steppers = {}
+        if extra_steppers is not None:
+            steppers.update(extra_steppers)
+
+        from pysph.sph.integrator import EulerIntegrator
+        from pysph.sph.integrator_step import GSPHStep
+
+        cls = integrator_cls if integrator_cls is not None else EulerIntegrator
+        step_cls = GSPHStep
+        for name in self.fluids:
+            if name not in steppers:
+                steppers[name] = step_cls()
+
+        integrator = cls(**steppers)
+
+        from pysph.solver.solver import Solver
+        self.solver = Solver(
+            dim=self.dim, integrator=integrator, kernel=kernel, **kw
+        )
+        if 'tf' in kw:
+            self.tf = kw['tf']
+
+    def get_equations(self):
+        from pysph.sph.equation import Group
+        from pysph.sph.gas_dynamics.basic import (
+            ScaleSmoothingLength, UpdateSmoothingLengthFromVolume,
+            SummationDensity, IdealGasEOS
+        )
+        from pysph.sph.gas_dynamics.boundary_equations import WallBoundary
+        from pysph.sph.gas_dynamics.gsph import (
+            GSPHGradients, GSPHAcceleration, GSPHUpdateGhostProps
+        )
+        equations = []
+        # Find the optimal 'h'
+        group = []
+        for fluid in self.fluids:
+            group.append(
+                ScaleSmoothingLength(dest=fluid, sources=None, factor=2.0)
+            )
+        equations.append(Group(equations=group, update_nnps=True))
+
+        group = []
+        for solid in self.solids:
+            group.append(WallBoundary(solid, sources=self.fluids))
+        equations.append(Group(equations=group))
+
+        all_pa = self.fluids + self.solids
+        group = []
+        for fluid in self.fluids:
+            group.append(
+                SummationDensity(
+                    dest=fluid, sources=all_pa, dim=self.dim
+                )
+            )
+        equations.append(Group(equations=group, update_nnps=False))
+
+        group = []
+        for solid in self.solids:
+            group.append(WallBoundary(solid, sources=self.fluids))
+        equations.append(Group(equations=group))
+
+        group = []
+        for fluid in self.fluids:
+            group.append(
+                UpdateSmoothingLengthFromVolume(
+                    dest=fluid, sources=None, k=self.kernel_factor,
+                    dim=self.dim
+                )
+            )
+        equations.append(Group(equations=group, update_nnps=True))
+
+        group = []
+        for fluid in self.fluids:
+            group.append(
+                SummationDensity(
+                    dest=fluid, sources=all_pa, dim=self.dim
+                )
+            )
+        equations.append(Group(equations=group, update_nnps=False))
+        # Done with finding the optimal 'h'
+
+        group = []
+        for fluid in self.fluids:
+            group.append(IdealGasEOS(dest=fluid, sources=None,
+                                     gamma=self.gamma))
+        equations.append(Group(equations=group))
+
+        group = []
+        for solid in self.solids:
+            group.append(WallBoundary(solid, sources=self.fluids))
+        equations.append(Group(equations=group))
+
+        g2 = []
+        for fluid in self.fluids:
+            g2.append(GSPHGradients(dest=fluid, sources=all_pa))
+
+        equations.append(Group(equations=g2))
+
+        if self.has_ghosts:
+            g3 = []
+            for fluid in self.fluids:
+                g3.append(GSPHUpdateGhostProps(dest=fluid, sources=None))
+            equations.append(Group(
+                equations=g3, update_nnps=False, real=False
+                ))
+
+        g4 = []
+        for fluid in self.fluids:
+            g4.append(GSPHAcceleration(
+                dest=fluid, sources=all_pa, g1=self.g1,
+                g2=self.g2, monotonicity=self.monotonicity,
+                rsolver=self.rsolver, interpolation=self.interpolation,
+                interface_zero=self.interface_zero,
+                hybrid=self.hybrid, blend_alpha=self.blend_alpha,
+                gamma=self.gamma, niter=self.niter, tol=self.tol
+            ))
+        equations.append(Group(equations=g4))
+        return equations
+
+    def setup_properties(self, particles, clean=True):
+        from pysph.base.utils import get_particle_array_gasd
+        import numpy
+        particle_arrays = dict([(p.name, p) for p in particles])
+        dummy = get_particle_array_gasd(name='junk')
+        props = (list(dummy.properties.keys()) +
+                 'px py pz ux uy uz vx vy vz wx wy wz'.split())
+
+        output_props = dummy.output_property_arrays
+        for fluid in self.fluids:
+            pa = particle_arrays[fluid]
+            self._ensure_properties(pa, props, clean)
+            pa.add_property('orig_idx', type='int')
+            nfp = pa.get_number_of_particles()
+            pa.orig_idx[:] = numpy.arange(nfp)
+            pa.set_output_arrays(output_props)
+
+        solid_props = set(props) | set(('wij', 'htmp'))
+        for solid in self.solids:
+            pa = particle_arrays[solid]
+            self._ensure_properties(pa, solid_props, clean)
             pa.set_output_arrays(output_props)
 
 
 class ADKEScheme(Scheme):
     def __init__(self, fluids, solids, dim, gamma=1.4, alpha=1.0, beta=2.0,
-                 k=1.0, eps=0.0, g1=0, g2=0):
+                 k=1.0, eps=0.0, g1=0, g2=0, has_ghosts=False):
+        """
+        Parameters
+        ----------
+
+        fluids: list
+            a list with names of fluid particle arrays
+        solids: list
+            a list with names of solid (or boundary) particle arrays
+        dim: int
+            dimensionality of the problem
+        gamma: double
+            Gamma for equation of state
+        alpha: double
+            artificial viscosity parameter
+        beta: double
+            artificial viscosity parameter
+        k: double
+            kernel scaling parameter
+        eps: double
+            kernel scaling parameter
+        g1: double
+            artificial heat conduction parameter
+        g2: double
+            artificial heat conduction parameter
+        has_ghosts: bool
+            if problem uses ghost particles (periodic or mirror)
+        """
         self.fluids = fluids
         self.solids = solids
         self.dim = dim
@@ -1062,12 +1460,14 @@ class ADKEScheme(Scheme):
         self.eps = eps
         self.g1 = g1
         self.g2 = g2
+        self.has_ghosts = has_ghosts
 
     def get_equations(self):
         from pysph.sph.equation import Group
         from pysph.sph.basic_equations import SummationDensity
         from pysph.sph.gas_dynamics.basic import (
-            IdealGasEOS, ADKEAccelerations, SummationDensityADKE
+            IdealGasEOS, ADKEAccelerations, SummationDensityADKE,
+            ADKEUpdateGhostProps
         )
         from pysph.sph.gas_dynamics.boundary_equations import WallBoundary
 
@@ -1106,6 +1506,14 @@ class ADKEScheme(Scheme):
         for elem in self.fluids+self.solids:
             g6.append(IdealGasEOS(elem, sources=None, gamma=self.gamma))
         equations.append(Group(equations=g6))
+
+        if self.has_ghosts:
+            gh = []
+            for fluid in self.fluids:
+                gh.append(
+                    ADKEUpdateGhostProps(dest=fluid, sources=None)
+                )
+            equations.append(Group(equations=gh, real=False))
 
         g7 = []
         for fluid in self.fluids:
@@ -1163,6 +1571,7 @@ class ADKEScheme(Scheme):
 
     def setup_properties(self, particles, clean=True):
         from pysph.base.utils import get_particle_array
+        import numpy
         particle_arrays = dict([(p.name, p) for p in particles])
         required_props = [
                 'x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm', 'cs', 'p',
@@ -1187,4 +1596,7 @@ class ADKEScheme(Scheme):
         for fluid in self.fluids:
             pa = particle_arrays[fluid]
             self._ensure_properties(pa, props, clean)
+            pa.add_property('orig_idx', type='int')
+            nfp = pa.get_number_of_particles()
+            pa.orig_idx[:] = numpy.arange(nfp)
             pa.set_output_arrays(output_props)

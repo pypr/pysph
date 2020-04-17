@@ -13,21 +13,28 @@ cdef extern from "math.h":
 cdef class ZOrderGPUNNPS(GPUNNPS):
     cdef NNPSParticleArrayWrapper src, dst # Current source and destination.
 
-    cdef list pids
-    cdef list pid_keys
-    cdef list cids
-    cdef list cid_to_idx
-    cdef list max_cid
-    cdef object dst_to_src
+    cdef public list pids
+    cdef public list pid_keys
+    cdef public list cids
+    cdef public list cid_to_idx
+    cdef public list max_cid
+    cdef public object dst_to_src
     cdef object overflow_cid_to_idx
+    cdef object curr_cid
+    cdef object max_cid_src
+    cdef object allocator
 
     cdef object helper
+    cdef object radix_sort
+    cdef object make_vec
 
-    cdef public bint use_double
-    cdef bint _sorted
+    cdef public bint sorted
     cdef bint dst_src
 
-    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
+    cdef object z_order_nbrs
+    cdef object z_order_nbr_lengths
+
+    #cpdef get_spatially_ordered_indices(self, int pa_index)
 
     cpdef _bin(self, int pa_index)
 
@@ -36,4 +43,3 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
     cdef void find_neighbor_lengths(self, nbr_lengths)
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices)
-

@@ -3,7 +3,7 @@ import numpy as np
 import copy
 from pysph.base.nnps import LinkedListNNPS
 from pysph.base.utils import get_particle_array, get_particle_array_wcsph
-from pyzoltan.core.carray import UIntArray
+from cyarray.api import UIntArray
 from numpy.linalg import norm
 
 
@@ -186,7 +186,8 @@ def rotate(x, y, z, axis=np.array([0.0, 0.0, 1.0]), angle=90.0):
     return x_new, y_new, z_new
 
 
-def get_2d_wall(dx=0.01, center=np.array([0.0, 0.0]), length=1.0):
+def get_2d_wall(dx=0.01, center=np.array([0.0, 0.0]), length=1.0,
+                num_layers=1, up=True):
     """
     Generates a 2d wall which is parallel to x-axis. The wall can be
     rotated parallel to any axis using the rotate function. 3d wall
@@ -207,6 +208,8 @@ def get_2d_wall(dx=0.01, center=np.array([0.0, 0.0]), length=1.0):
     dx : a number which is the spacing required
     center : 1d array like object which is the center of wall
     length : a number which is the length of the wall
+    num_layers : Number of layers for the wall
+    up : True if the layers have to created on top of base wall
 
     Returns
     -------
@@ -214,13 +217,18 @@ def get_2d_wall(dx=0.01, center=np.array([0.0, 0.0]), length=1.0):
     y : 1d numpy array with y coordinates of the wall
     """
 
-    x = np.arange(-length / 2., length / 2. + dx, dx)
+    x = np.arange(-length / 2., length / 2. + dx, dx) + center[0]
     y = np.ones_like(x) * center[1]
-    return x + center[0], y
+    value = 1 if up else -1
+    for i in range(1, num_layers):
+        y1 = np.ones_like(x) * center[1] + value * i * dx
+        y = np.concatenate([y, y1])
+    return np.tile(x, num_layers), y
 
 
-def get_2d_tank(dx=0.001, base_center=np.array([0.0, 0.0]), length=1.0,
-                height=1.0):
+def get_2d_tank(dx=0.05, base_center=np.array([0.0, 0.0]), length=1.0,
+                height=1.0, num_layers=1, outside=True, staggered=False,
+                top=False):
     """
     Generates an open 2d tank with the base parallel to x-axis and the side
     walls parallel to y-axis. The tank can be rotated to any direction using
@@ -242,6 +250,10 @@ def get_2d_tank(dx=0.001, base_center=np.array([0.0, 0.0]), length=1.0,
     base_center : 1d array like object which is the center of base wall
     length : a number which is the length of the base
     height : a number which is the length of the side wall
+    num_layers : Number of layers for the tank
+    outside : A boolean value which decides if the layers are inside or outside
+    staggered : A boolean value which decides if the layers are staggered or not
+    top : A boolean value which decides if the top is present or not
 
     Returns
     -------
@@ -249,13 +261,24 @@ def get_2d_tank(dx=0.001, base_center=np.array([0.0, 0.0]), length=1.0,
     y : 1d numpy array with y coordinates of the tank
     """
 
-    base = np.arange(-length / 2., length / 2. + dx, dx) * (1.0 + 0.0j)
-    left_wall = np.arange(0.0, height + dx, dx) * (1.0j) - length / 2.
-    right_wall = np.arange(0.0, height + dx, dx) * (1.0j) + length / 2.
-    particles = np.concatenate([left_wall, base, right_wall])
-    x = particles.real + base_center[0]
-    y = particles.imag + base_center[1]
-    return x, y
+    dy = dx
+    fac = 1 if outside else 0
+    if staggered:
+        dx = dx/2
+
+    start = fac*(1 - num_layers)*dx
+    end = fac*num_layers*dx + (1 - fac) * dx
+    x, y = np.mgrid[start:length+end:dx, start:height+end:dy]
+
+    topset = 0 if top else 10*height
+    if staggered:
+        topset += dx
+        y[1::2] += dx
+
+    offset = 0 if outside else (num_layers-1)*dx
+    cond = ~((x > offset) & (x < length-offset) &
+             (y > offset) & (y < height+topset-offset))
+    return x[cond] + base_center[0] - length/2, y[cond] + base_center[1]
 
 
 def get_2d_circle(dx=0.01, r=0.5, center=np.array([0.0, 0.0])):
@@ -276,18 +299,10 @@ def get_2d_circle(dx=0.01, r=0.5, center=np.array([0.0, 0.0])):
 
     N = int(2.0 * r / dx) + 1
     x, y = np.mgrid[-r:r:N * 1j, -r:r:N * 1j]
-    x = np.ravel(x)
-    y = np.ravel(y)
-    circle = []
-    points = np.array([x, y])
-    for i in range(len(points[0])):
-        dist = distance_2d(points[:, i])
-        if dist <= r * (1.0 + dx * 1.0e-04):
-            circle.append(points[:, i] + np.asarray(center))
-    circle = np.array(circle)
-    x_pa = circle[:, 0]
-    y_pa = circle[:, 1]
-    return x_pa, y_pa
+    x, y = np.ravel(x), np.ravel(y)
+    condition = (x * x + y * y <= r * r)
+    x, y = x[condition], y[condition]
+    return x + center[0], y + center[1]
 
 
 def get_2d_hollow_circle(dx=0.01, r=1.0, center=np.array([0.0, 0.0]),
@@ -314,24 +329,16 @@ def get_2d_hollow_circle(dx=0.01, r=1.0, center=np.array([0.0, 0.0]),
     r_grid = r + dx * num_layers
     N = int(2.0 * r_grid / dx) + 1
     x, y = np.mgrid[-r_grid:r_grid:N * 1j, -r_grid:r_grid:N * 1j]
-    x = np.ravel(x)
-    y = np.ravel(y)
-    circle = []
-    for i in range(len(x)):
-        point = np.array([x[i], y[i]])
-        distance = distance_2d(point)
-        if inside:
-            if (r - num_layers * dx - dx * 1.0e-07 <= distance <=
-                    r + dx * 1.0e-07):
-                circle.append(point)
-        else:
-            if (r - dx * 1.0e-07 <= distance <= r + num_layers * dx
-                    + dx * 1.0e-07):
-                circle.append(point)
-    circle = np.array(circle)
-    x_circle = circle[:, 0] + center[0]
-    y_circle = circle[:, 1] + center[1]
-    return x_circle, y_circle
+    x, y = np.ravel(x), np.ravel(y)
+    if inside:
+        cond1 = (x * x + y * y <= r * r)
+        cond2 = (x * x + y * y >= (r - num_layers * dx)**2)
+    else:
+        cond1 = (x * x + y * y >= r * r)
+        cond2 = (x * x + y * y <= (r + num_layers * dx)**2)
+    cond = cond1 & cond2
+    x, y = x[cond], y[cond]
+    return x + center[0], y + center[0]
 
 
 def get_3d_hollow_cylinder(dx=0.01, r=0.5, length=1.0,
@@ -403,9 +410,8 @@ def get_2d_block(dx=0.01, length=1.0, height=1.0, center=np.array([0., 0.])):
     n2 = int(height / dx) + 1
     x, y = np.mgrid[-length / 2.:length / 2.:n1 *
                     1j, -height / 2.:height / 2.:n2 * 1j]
-    x = np.ravel(x) + center[0]
-    y = np.ravel(y) + center[1]
-    return x, y
+    x, y = np.ravel(x), np.ravel(y)
+    return x + center[0], y + center[1]
 
 
 def get_3d_sphere(dx=0.01, r=0.5, center=np.array([0.0, 0.0, 0.0])):
@@ -427,20 +433,10 @@ def get_3d_sphere(dx=0.01, r=0.5, center=np.array([0.0, 0.0, 0.0])):
 
     N = int(2.0 * r / dx) + 1
     x, y, z = np.mgrid[-r:r:N * 1j, -r:r:N * 1j, -r:r:N * 1j]
-    x = np.ravel(x)
-    y = np.ravel(y)
-    z = np.ravel(z)
-    points = np.array([x, y, z])
-    sphere = []
-    for i in range(len(points[0])):
-        dist = distance(points[:, i])
-        if dist <= r * (1.0 + dx * 1.0e-05):
-            sphere.append(points[:, i] + np.asarray(center))
-    sphere = np.array(sphere)
-    x_pa = sphere[:, 0]
-    y_pa = sphere[:, 1]
-    z_pa = sphere[:, 2]
-    return x_pa, y_pa, z_pa
+    x, y, z = np.ravel(x), np.ravel(y), np.ravel(z)
+    cond = (x * x + y * y + z * z <= r * r)
+    x, y, z = x[cond], y[cond], z[cond]
+    return x + center[0], y + center[1], z + center[2]
 
 
 def get_3d_block(dx=0.01, length=1.0, height=1.0, depth=1.0,
@@ -469,10 +465,8 @@ def get_3d_block(dx=0.01, length=1.0, height=1.0, depth=1.0,
     n3 = int(depth / dx) + 1
     x, y, z = np.mgrid[-length / 2.:length / 2.:n1 * 1j, -height /
                        2.:height / 2.:n2 * 1j, -depth / 2.:depth / 2.:n3 * 1j]
-    x = np.ravel(x) + center[0]
-    y = np.ravel(y) + center[1]
-    z = np.ravel(z) + center[2]
-    return x, y, z
+    x, y, z = np.ravel(x), np.ravel(y), np.ravel(z)
+    return x + center[0], y + center[1], z + center[2]
 
 
 def get_4digit_naca_airfoil(dx=0.01, airfoil='0012', c=1.0):
@@ -756,5 +750,5 @@ def show_3d(points, **kw):
 
     """
     from mayavi import mlab
-    mlab.points3d(element[0], element[1], element[2], **kw)
+    mlab.points3d(points[0], points[1], points[2], **kw)
     mlab.axes(xlabel='X', ylabel='Y', zlabel='Z')

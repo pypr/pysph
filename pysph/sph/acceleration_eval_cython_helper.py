@@ -1,30 +1,39 @@
 from collections import defaultdict
-from mako.template import Template
-from os.path import dirname, join
+from os.path import dirname, join, expanduser, realpath
 
-from pyzoltan.core import carray
-from pysph.base.config import get_config
-from pysph.base.cython_generator import CythonGenerator, KnownType
+from mako.template import Template
+from cyarray import carray
+
+from compyle.config import get_config
+from compyle.cython_generator import (CythonGenerator, KnownType,
+                                      get_parallel_range)
+from compyle.ext_module import ExtModule, get_platform_dir
 
 
 ###############################################################################
-def get_code(obj):
+def get_cython_code(obj):
     """This function looks at the object and gets any additional code to
     wrap from either the `_cython_code_` method or the `_get_helpers_` method.
     """
     result = []
     if hasattr(obj, '_cython_code_'):
         code = obj._cython_code_()
-        doc = '# From %s'%obj.__class__.__name__
+        doc = '# From %s' % obj.__class__.__name__
         result.extend([doc, code] if len(code) > 0 else [])
-    if hasattr(obj, '_get_helpers_'):
-        cg = CythonGenerator()
-        doc = '# From %s'%obj.__class__.__name__
-        result.append(doc)
-        for helper in obj._get_helpers_():
-            cg.parse(helper)
-            result.append(cg.get_code())
     return result
+
+
+def get_helper_code(helpers):
+    """Given a list of helpers, return the helper code suitably wrapped.
+    """
+    result = []
+    result.append('# Helpers')
+    cg = CythonGenerator()
+    for helper in helpers:
+        cg.parse(helper)
+        result.append(cg.get_code())
+    return result
+
 
 ###############################################################################
 def get_all_array_names(particle_arrays):
@@ -36,7 +45,7 @@ def get_all_array_names(particle_arrays):
     Parameters
     ----------
 
-    particle_arrays : list
+    particle_array : list
         A list of particle arrays.
 
     Examples
@@ -44,10 +53,10 @@ def get_all_array_names(particle_arrays):
 
     A simple example would be::
 
-        >>> x = np.linspace(0, 1, 10)
-        >>> pa = ParticleArray(name='f', x=x)
-        >>> get_all_array_names([pa])
-        {'DoubleArray': {'x'}, 'IntArray': {'pid', 'tag'}, 'UIntArray': {'gid'}}
+       >>> x = np.linspace(0, 1, 10)
+       >>> pa = ParticleArray(name='f', x=x)
+       >>> get_all_array_names([pa])
+       {'DoubleArray': {'x'}, 'IntArray': {'pid', 'tag'}, 'UIntArray': {'gid'}}
     """
     props = defaultdict(set)
     for array in particle_arrays:
@@ -56,6 +65,7 @@ def get_all_array_names(particle_arrays):
                 a_type = arr.__class__.__name__
                 props[a_type].add(name)
     return dict(props)
+
 
 def get_known_types_for_arrays(array_names):
     """Given all the array names from `get_all_array_names` this creates known
@@ -108,6 +118,26 @@ class AccelerationEvalCythonHelper(object):
         self.known_types = get_known_types_for_arrays(
             self.all_array_names
         )
+        self._ext_mod = None
+        self._module = None
+        self._compute_group_map()
+
+    ##########################################################################
+    # Private interface.
+    ##########################################################################
+    def _compute_group_map(self):
+        # Given all the groups, create a mapping from the group to an index of
+        # sorts that can be used when adding the pre/post callback code.
+        mapping = {}
+        for g_idx, group in enumerate(self.object.mega_groups):
+            mapping[group] = 'self.groups[%d]' % g_idx
+            if group.has_subgroups:
+                for sg_idx, sub_group in enumerate(group.data):
+                    code = 'self.groups[{gid}].data[{sgid}]'.format(
+                        gid=g_idx, sgid=sg_idx
+                    )
+                    mapping[sub_group] = code
+        self._group_map = mapping
 
     ##########################################################################
     # Public interface.
@@ -123,9 +153,24 @@ class AccelerationEvalCythonHelper(object):
         object = self.object
         acceleration_eval = module.AccelerationEval(
             object.kernel, object.all_group.equations,
-            object.particle_arrays
+            object.particle_arrays, object.mega_groups
         )
         object.set_compiled_object(acceleration_eval)
+
+    def compile(self, code):
+        # Note, we do not add carray or particle_array as nnps_base would
+        # have been rebuilt anyway if they changed.
+        root = expanduser(join('~', '.pysph', 'source', get_platform_dir()))
+        depends = ["pysph.base.nnps_base"]
+        # Add pysph/base directory to inc_dirs for including spatial_hash.h
+        # for SpatialHashNNPS
+        extra_inc_dirs = [join(dirname(dirname(realpath(__file__))), 'base')]
+        self._ext_mod = ExtModule(
+            code, verbose=False, root=root, depends=depends,
+            extra_inc_dirs=extra_inc_dirs
+        )
+        self._module = self._ext_mod.load()
+        return self._module
 
     ##########################################################################
     # Mako interface.
@@ -144,12 +189,21 @@ class AccelerationEvalCythonHelper(object):
 
     def get_header(self):
         object = self.object
+        helpers = []
         headers = []
-        headers.extend(get_code(object.kernel))
+        headers.extend(get_cython_code(object.kernel))
+        if hasattr(object.kernel, '_get_helpers_'):
+            helpers.extend(object.kernel._get_helpers_())
 
         # get headers from the Equations
         for equation in object.all_group.equations:
-            headers.extend(get_code(equation))
+            headers.extend(get_cython_code(equation))
+            if hasattr(equation, '_get_helpers_'):
+                for helper in equation._get_helpers_():
+                    if helper not in helpers:
+                        helpers.append(helper)
+
+        headers.extend(get_helper_code(helpers))
 
         # Kernel wrappers.
         cg = CythonGenerator(known_types=self.known_types)
@@ -157,6 +211,9 @@ class AccelerationEvalCythonHelper(object):
         headers.append(cg.get_code())
 
         # Equation wrappers.
+        self.known_types['SPH_KERNEL'] = KnownType(
+            object.kernel.__class__.__name__
+        )
         headers.append(object.all_group.get_equation_wrappers(
             self.known_types
         ))
@@ -170,11 +227,15 @@ class AccelerationEvalCythonHelper(object):
         return self.object.all_group.get_equation_init()
 
     def get_kernel_defs(self):
-        return 'cdef public %s kernel'%(self.object.kernel.__class__.__name__)
+        return 'cdef public %s kernel' % (
+            self.object.kernel.__class__.__name__
+        )
 
     def get_kernel_init(self):
         object = self.object
-        return 'self.kernel = %s(**kernel.__dict__)'%(object.kernel.__class__.__name__)
+        return 'self.kernel = %s(**kernel.__dict__)' % (
+            object.kernel.__class__.__name__
+        )
 
     def get_variable_declarations(self):
         group = self.object.all_group
@@ -187,21 +248,22 @@ class AccelerationEvalCythonHelper(object):
         src.update(dest)
         return group.get_array_declarations(src, self.known_types)
 
-    def get_dest_array_setup(self, dest_name, eqs_with_no_source, sources, real):
+    def get_dest_array_setup(self, dest_name, eqs_with_no_source, sources,
+                             real):
         src, dest_arrays = eqs_with_no_source.get_array_names()
         for g in sources.values():
             s, d = g.get_array_names()
             dest_arrays.update(d)
-        lines = ['NP_DEST = self.%s.size(real=%s)'%(dest_name, real)]
-        lines += ['%s = dst.%s.data'%(n, n[2:])
+        lines = ['NP_DEST = self.%s.size(real=%s)' % (dest_name, real)]
+        lines += ['%s = dst.%s.data' % (n, n[2:])
                   for n in sorted(dest_arrays)]
         return '\n'.join(lines)
 
     def get_src_array_setup(self, src_name, eq_group):
         src_arrays, dest = eq_group.get_array_names()
-        lines = ['NP_SRC = self.%s.size()'%src_name]
-        lines += ['%s = src.%s.data'%(n, n[2:])
-                 for n in sorted(src_arrays)]
+        lines = ['NP_SRC = self.%s.size()' % src_name]
+        lines += ['%s = src.%s.data' % (n, n[2:])
+                  for n in sorted(src_arrays)]
         return '\n'.join(lines)
 
     def get_parallel_block(self):
@@ -210,6 +272,15 @@ class AccelerationEvalCythonHelper(object):
         else:
             return "if True: # Placeholder used for OpenMP."
 
+    def get_parallel_range(self, start, stop=None, step=1):
+        return get_parallel_range(start, stop, step)
+
     def get_particle_array_names(self):
         parrays = [pa.name for pa in self.object.particle_arrays]
         return ', '.join(parrays)
+
+    def get_pre_call(self, group):
+        return self._group_map[group] + '.pre()'
+
+    def get_post_call(self, group):
+        return self._group_map[group] + '.post()'

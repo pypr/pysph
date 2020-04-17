@@ -34,6 +34,19 @@ points.  SPH interpolation is performed with a simple Shepard filtering.
     :members:
     :undoc-members:
 
+
+SPH Evaluator
+-------------
+
+This module provides a class that allows one to evaluate a set of equations on
+a collection of particle arrays. This is very handy for non-trivial
+post-processing that needs to be quick.
+
+.. automodule:: pysph.tools.sph_evaluator
+    :members:
+    :undoc-members:
+
+
 GMsh input/output
 ------------------
 
@@ -48,3 +61,13 @@ Mayavi Viewer
 .. automodule:: pysph.tools.mayavi_viewer
    :members:
    :undoc-members:
+
+STL Converter
+-------------
+
+The following function can be used to convert an STL file to a set of grid
+points.
+
+.. autofunction:: pysph.tools.geometry_stl.get_stl_surface
+
+

@@ -64,6 +64,14 @@ def solve(x_min=-0.5, x_max=0.5, x_0=0.0, t=0.1, p_l=1.0, p_r=0.1, rho_l=1.0,
         p_star, u_star = star_pu_newton_raphson(rho_l, u_l, p_l, c_l,
                                                 rho_r, u_r, p_r, c_r)
 
+    # check if the discontinuity is inside the domain
+    msg = "discontinuity not in domain"
+    assert x_0 >= x_min and x_0 <= x_max, msg
+
+    # transform domain according to initial discontinuity
+    x_min = x_min - x_0
+    x_max = x_max - x_0
+
     print('p_star=' + str(p_star))
     print('u_star=' + str(u_star))
     x = numpy.linspace(x_min, x_max, N)
@@ -79,6 +87,8 @@ def solve(x_min=-0.5, x_max=0.5, x_0=0.0, t=0.1, p_l=1.0, p_r=0.1, rho_l=1.0,
         velocity.append(u)
         pressure.append(p)
         energy.append(p / (gm1 * rho))
+    # transform the domain back to original coordinates
+    x = x + x_0
     return tuple(map(numpy.asarray, [density, velocity, pressure, energy, x]))
 
 
@@ -286,6 +296,7 @@ def right_shock(rho_r, u_r, p_r, c_r, p_star, u_star, s):
             ((p_star / p_r) * gm1_gp1 + 1.0)
         rho, u, p = rho_1, u_star, p_star
     return rho, u, p
+
 
 if __name__ == '__main__':
     set_gamma(1.4)

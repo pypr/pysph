@@ -34,10 +34,9 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
 
     cdef object helper
 
-    cdef public bint use_double
     cdef bint _sorted
 
-    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
+    cpdef get_spatially_ordered_indices(self, int pa_index)
 
     cpdef _bin(self, int pa_index)
 
@@ -46,4 +45,3 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
     cdef void find_neighbor_lengths(self, nbr_lengths)
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices)
-

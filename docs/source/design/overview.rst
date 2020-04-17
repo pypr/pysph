@@ -349,7 +349,7 @@ Now that we have a hypothetical implementation outlined, we can proceed to
 describe the abstractions that PySPH introduces, enabling a highly user
 friendly and flexible way to define pairwise particle interactions.  To see a
 working example, see `dam_break_2d.py
-<https://github.com/pypr/pysph/src/master/pysph/examples/dam_break_2d.py>`_.
+<https://github.com/pypr/pysph/tree/master/pysph/examples/dam_break_2d.py>`_.
 
 We assume that we have the same **ParticleArrays** (*fluid* and
 *solid*) and **NNPS** objects as before.
@@ -570,12 +570,6 @@ precomputed quantites are available and may be passed into any equation:
 
     - ``EPS = 0.01 * HIJ * HIJ``
 
-    - ``DT_ADAPT``: is an array of three doubles that stores an adaptive
-      time-step, the first element is the CFL based time-step limit, the
-      second is the force-based limit and the third a viscosity based limit.
-      See :py:class:`pysph.sph.wc.basic.MomentumEquation` for an example of
-      how this is used.
-
 
 In addition if one requires the current time or the timestep in an equation,
 the following may be passed into any of the methods of an equation:
@@ -588,11 +582,28 @@ the following may be passed into any of the methods of an equation:
 .. note::
 
    Note that all standard functions and constants in ``math.h`` are available
-   for use in the equations. ``pi`` is defined. Please avoid using functions
-   from ``numpy`` as these are Python functions and are slow. They also will
-   not allow PySPH to be run with OpenMP. Similarly, do not use functions or
-   constants from ``sympy`` and other libraries inside the equation methods as
-   these will significantly slow down your code.
+   for use in the equations. The value of :math:`\pi` is available in
+   ``M_PI``. Please avoid using functions from ``numpy`` as these are Python
+   functions and are slow. They also will not allow PySPH to be run with
+   OpenMP. Similarly, do not use functions or constants from ``sympy`` and
+   other libraries inside the equation methods as these will significantly
+   slow down your code.
+
+In addition, these constants from the math library are available:
+
+  - ``M_E``: value of e
+  - ``M_LOG2E``: value of log2e
+  - ``M_LOG10E``: value of log10e
+  - ``M_LN2``: value of loge2
+  - ``M_LN10``: value of loge10
+  - ``M_PI``: value of pi
+  - ``M_PI_2``: value of pi / 2
+  - ``M_PI_4``: value of pi / 4
+  - ``M_1_PI``: value of 1 / pi
+  - ``M_2_PI``: value of 2 / pi
+  - ``M_2_SQRTPI``: value of 2 / (square root of pi)
+  - ``M_SQRT2``: value of square root of 2
+  - ``M_SQRT1_2``: value of square root of 1/2
 
 In an equation, any undeclared variables are automatically declared to be
 doubles in the high-performance Cython code that is generated.  In addition
@@ -621,17 +632,17 @@ equation:
 .. code-block:: python
 
     class FindMaxU(Equation):
-        def reduce(self, dst):
-            m = serial_reduce_array(dst.array.m, 'sum')
-            max_u = serial_reduce_array(dst.array.u, 'max')
+        def reduce(self, dst, t, dt):
+            m = serial_reduce_array(dst.m, 'sum')
+            max_u = serial_reduce_array(dst.u, 'max')
             dst.total_mass[0] = parallel_reduce_array(m, 'sum')
             dst.max_u[0] = parallel_reduce_array(u, 'max')
 
 where:
 
-    - ``dst``: refers to a destination ``ParticleArrayWrapper``.
+    - ``dst``: refers to a destination ``ParticleArray``.
 
-    - ``src``: refers to a the source ``ParticleArrayWrapper``.
+    - ``t, dt``: are the current time and timestep respectively.
 
     - ``serial_reduce_array``: is a special function provided that performs
       reductions correctly in serial. It currently supports ``sum, prod, max``
@@ -643,23 +654,10 @@ where:
       communication.  One can reduce these by using a single array and use
       that to reduce the communication.
 
-The ``ParticleArrayWrapper``, wraps a ``ParticleArray`` into a
-high-performance Cython object.  It has an ``array`` attribute which is a
-reference the the underlying ``ParticleArray`` and also attributes
-corresponding to each property that are ``DoubleArrays``.  For example in the
-Cython code one may access ``dst.x`` to get the raw arrays used by the
-particle array.  This is mainly done for performance reasons.
-
-Note that in the above example,
-:py:func:`pysph.base.reduce_array.serial_reduce_array` is passed a
-``dst.array.m``, this is important as in parallel the ``dst.m`` will contain
-all particle properties including ghost properties.  On the other hand
-``dst.array.m`` will be a numpy array of only the real particles.
-
 We recommend that for any kind of reductions one always use the
 ``serial_reduce_array`` function and the ``parallel_reduce_array`` inside a
-``reduce`` method.  One should not worry about parallel/serial modes in this
-case as this is automatically taken care of by the code generator.  In serial,
+``reduce`` method. One should not worry about parallel/serial modes in this
+case as this is automatically taken care of by the code generator. In serial,
 the parallel reduction does nothing.
 
 With this machinery, we are able to write complex equations to solve almost
@@ -667,6 +665,14 @@ any SPH problem.  A user can easily define a new equation and instantiate the
 equation in the list of equations to be passed to the application.  It is
 often easiest to look at the many existing equations in PySPH and learn the
 general patterns.
+
+If you wish to use adaptive time stepping, see the code
+:py:class:`pysph.sph.integrator.Integrator`. The integrator uses information
+from the arrays ``dt_cfl``, ``dt_force``, and ``dt_visc`` in each of the
+particle arrays to determine the most suitable time step.
+
+For a more focused discussion on how you should write equations, please see
+:ref:`writing_equations`.
 
 
 Writing the Integrator
@@ -714,6 +720,8 @@ in addition to these standard ones, you must write your own stepper.
 Currently, only certain steppers are supported by the framework. Take a look
 at the :doc:`../reference/integrator` for more examples.
 
+
+.. _simulating_periodicity:
 
 Simulating periodicity
 ^^^^^^^^^^^^^^^^^^^^^^

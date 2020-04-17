@@ -1,7 +1,5 @@
-include MANIFEST.in Makefile *.bat *.py *.rst *.sh *.txt *.yml
+include MANIFEST.in Makefile *.bat *.py *.rst *.sh *.txt *.yml *.toml
 recursive-include docs *.*
 recursive-include pysph *.pxd *.pyx *.mako *.txt.gz *.h
 recursive-exclude pysph *.cpp
-recursive-exclude pyzoltan *.cpp
 recursive-include pysph/examples *.py *.gz ndspmhd*.npz *.rst
-recursive-include pyzoltan *.pxd *.h *.mako *.txt

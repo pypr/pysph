@@ -122,6 +122,13 @@ class TaylorBar(Application):
                      'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0', 'e0'):
             bar.add_property(name)
 
+        bar.add_constant('G', G)
+        bar.add_constant('n', 4)
+
+        kernel = WendlandQuintic(dim=2)
+        wdeltap = kernel.kernel(rij=dx, h=hdx*dx)
+        bar.add_constant('wdeltap', wdeltap)
+
         return [bar, plate]
 
     def create_solver(self):
@@ -165,7 +172,7 @@ class TaylorBar(Application):
 
                     # au, av
                     MomentumEquationWithStress(
-                        dest='bar', sources=['bar'], n=4, wdeltap=self.wdeltap),
+                        dest='bar', sources=['bar']),
 
                     # au, av
                     MonaghanArtificialViscosity(
@@ -177,11 +184,11 @@ class TaylorBar(Application):
 
                     # ae
                     EnergyEquationWithStress(dest='bar', sources=['bar'],
-                                               alpha=0.5, beta=0.5, eta=0.01),
+                                             alpha=0.5, beta=0.5, eta=0.01),
 
                     # a_s00, a_s01, a_s11
                     HookesDeviatoricStressRate(
-                        dest='bar', sources=None, shear_mod=G),
+                        dest='bar', sources=None),
 
                     # ax, ay, az
                     XSPHCorrection(

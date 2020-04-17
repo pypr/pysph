@@ -53,17 +53,17 @@ class MonaghanBoundaryForce(Equation):
 
         xabs = fabs(x)
 
-        if 0 <= xabs <= self.deltap:
+        if (0 <= xabs) and (xabs <= self.deltap):
             beta = 0.02 * cs * cs/y
             tforce = 1.0 - xabs/self.deltap
 
-            if 0 < q <= 2.0/3.0:
+            if (0 < q) and (q <= 2.0/3.0):
                 nforce =  2.0/3.0
 
-            elif 2.0/3.0 < q <= 1.0:
+            elif (2.0/3.0 < q) and (q <= 1.0):
                 nforce = 2*q*(1.0 - 0.75*q)
 
-            elif 1.0 < q <= 2.0:
+            elif (1.0 < q) and (q <= 2.0):
                 nforce = 0.5 * (2-q)*(2-q)
 
             else:

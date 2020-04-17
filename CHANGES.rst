@@ -1,8 +1,92 @@
+1.0b1
+-----
+
+* Release date: Still under development.
+* Remove pyzoltan, cyarray into their own packages on pypi.
+
+1.0a6
+-----
+
+90 pull requests were merged for this release. Thanks to the following who
+contributed to this release (in alphabetical order): A Dinesh, Abhinav Muta,
+Aditya Bhosale, Ananyo Sen, Deep Tavker, Prabhu Ramachandran, Vikas Kurapati,
+nilsmeyerkit, Rahul Govind, Sanka Suraj.
+
+
+* Release date: 26th November, 2018.
+
+* Enhancements:
+
+  * Initial support for transparently running PySPH on a GPU via OpenCL.
+  * Changed the API for how adaptive DT is computed, this is now to be set in
+    the particle array properties called ``dt_cfl, dt_force, dt_visc``.
+  * Support for non-pairwise particle interactions via the ``loop_all``
+    method. This is useful for MD simulations.
+  * Add support for ``py_stage1, py_stage2 ...``, methods in the integrator.
+  * Add support for ``py_initialize`` and ``initialize_pair`` in equations.
+  * Support for using different sets of equations for different stages of the
+    integration.
+  * Support to call arbitrary Python code from a ``Group`` via the
+    ``pre/post`` callback arguments.
+  * Pass ``t, dt`` to the reduce method.
+  * Allow particle array properties to have strides, this allows us to define
+    properties with multiple components. For example if you need 3 values per
+    particle, you can set the stride to 3.
+  * Mayavi viewer can now show non-real particles also if saved in the output.
+  * Some improvements to the simple remesher of particles.
+  * Add simple STL importer to import geometries.
+  * Allow user to specify openmp schedule.
+  * Better documentation on equations and using a different compiler.
+  * Print convenient warning when particles are diverging or if ``h, m`` are
+    zero.
+  * Abstract the code generation into a common core which supports Cython,
+    OpenCL and CUDA. This will be pulled into a separate package in the next
+    release.
+  * New GPU NNPS algorithms including a very fast oct-tree.
+  * Added several sphysics test cases to the examples.
+
+
+* Schemes:
+
+  * Add a working Implicit Incompressible SPH scheme (of Ihmsen et al., 2014)
+  * Add GSPH scheme from SPH2D and all the approximate Riemann solvers from there.
+  * Add code for Shepard and MLS-based density corrections.
+  * Add kernel corrections proposed by Bonet and Lok (1999)
+  * Add corrections from the CRKSPH paper (2017).
+  * Add basic equations of Parshikov (2002) and Zhang, Hu, Adams (2017)
+
+* Bug fixes:
+
+  * Ensure that the order of equations is preserved.
+  * Fix bug with dumping VTK files.
+  * Fix bug in Adami, Hu, Adams scheme in the continuity equation.
+  * Fix mistake in WCSPH scheme for solid bodies.
+  * Fix bug with periodicity along the z-axis.
+
+
 1.0a5
 -----
 
-* Release date:  Still under development.
-* Improve the reference documentation a little.
+* Release date:  17th September, 2017
+* Mayavi viewer now supports empty particle arrays.
+* Fix error in scheme chooser which caused problems with default scheme
+  property values.
+* Add starcluster support/documentation so PySPH can be easily used on EC2.
+* Improve the particle array so it automatically ravel's the passed arrays and
+  also accepts constant values without needing an array each time.
+* Add a few new examples.
+* Added 2D and 3D viewers for Jupyter notebooks.
+* Add several new Wendland Quintic kernels.
+* Add option to measure coverage of Cython code.
+* Add EDAC scheme.
+* Move project to github.
+* Improve documentation and reference section.
+* Fix various bugs.
+* Switch to using pytest instead of nosetests.
+* Add a convenient geometry creation module in ``pysph.tools.geometry``
+* Add support to script the viewer with a Python file, see ``pysph view -h``.
+* Add several new NNPS schemes like extended spatial hashing, SFC, oct-trees
+  etc.
 * Improve Mayavi viewer so one can view the velocity vectors and any other
   vectors.
 * Viewer now has a button to edit the visualization properties easily.
@@ -54,7 +138,6 @@
 .. _h5py: http://www.h5py.org
 .. _PyVisfile: http://github.com/inducer/pyvisfile
 .. _Mayavi: http://code.enthought.com/projects/mayavi/
-.. _mpi4py: https://pypi.python.org/pypi/mpi4py
 
 1.0a3
 ------

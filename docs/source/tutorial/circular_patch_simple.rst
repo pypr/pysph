@@ -24,7 +24,7 @@ with increasing complexity.
 
 The first example we consider is a "patch" test for SPH formulations for
 incompressible fluids in `elliptical_drop_simple.py
-<https://github.com/pypr/pysph/src/master/pysph/examples/elliptical_drop_simple.py>`_.
+<https://github.com/pypr/pysph/tree/master/pysph/examples/elliptical_drop_simple.py>`_.
 This problem simulates the evolution of a 2D circular patch of fluid under the
 influence of an initial velocity field given by:
 
@@ -42,7 +42,7 @@ Imports
 ~~~~~~~~~~~~~
 
 Taking a look at the example (see `elliptical_drop_simple.py
-<https://github.com/pypr/pysph/src/master/pysph/examples/elliptical_drop_simple.py>`_),
+<https://github.com/pypr/pysph/tree/master/pysph/examples/elliptical_drop_simple.py>`_),
 the first several lines are imports of various modules:
 
 .. code-block:: python
@@ -194,11 +194,21 @@ outside a circular region:
 
    pa.remove_particles(indices)
 
-.. py:currentmodule:: pyzoltan.core.carray
 
-where, a list of indices is provided.  One could also provide the indices in
-the form of a :py:class:`LongArray` which, as the name suggests, is an array
-of 64 bit integers.
+where, a list of indices is provided. One could also provide the indices in the
+form of a :py:class:`cyarray.carray.LongArray` which, as the name suggests, is
+an array of 64 bit integers.
+
+The particle array also supports what we call strided properties where you may
+associate multiple values per particle. Normally the stride length is 1. This
+feature is convenient if you wish to associate a matrix or vector of values
+per particle. You must still access the individual values as a "flattened"
+array but one can resize, remove, and add particles and the strided properties
+will be honored. For example::
+
+    >>> pa.add_property(name='A', data=2.0, default=-1.0, stride=2)
+
+Will create a new property called ``'A'`` with a stride length of 2.
 
 .. note::
 
@@ -360,22 +370,22 @@ interpreter with a few useful objects available.  These are::
     >>> dir()
     ['__builtins__', '__doc__', '__name__', 'interpolator', 'mlab',
      'particle_arrays', 'scene', 'self', 'viewer']
-    >>> len(particle_arrays)
-    1
-    >>> particle_arrays[0].name
+    >>> particle_arrays['fluid'].name
     'fluid'
 
-The ``particle_arrays`` object is a list of **ParticleArrayHelpers** which is
-available in :py:class:`pysph.tools.mayavi_viewer.ParticleArrayHelper`. The
+The ``particle_arrays`` object is a dictionary of **ParticleArrayHelpers**
+which is available in
+:py:class:`pysph.tools.mayavi_viewer.ParticleArrayHelper`. The
 ``interpolator`` is an instance of
 :py:class:`pysph.tools.mayavi_viewer.InterpolatorView` that is used by the
 viewer. The other objects can be used to script the user interface if desired.
+Note that the ``particle_arrays`` can be indexed by array name or index.
 
 Here is an example of scripting the viewer. Let us say we have two particle
 arrays, `'boundary'` and `'fluid'` in that order. Let us say, we wish to make
 the boundary translucent, then we can write the following::
 
-   b = particle_arrays[0]
+   b = particle_arrays['boundary']
    b.plot.actor.property.opacity = 0.2
 
 This does require some knowledge of Mayavi_ and scripting with it. The `plot`
@@ -383,6 +393,14 @@ attribute of the :py:class:`pysph.tools.mayavi_viewer.ParticleArrayHelper` is
 a `Glyph` instance from Mayavi_. It is useful to use the `record feature
 <http://docs.enthought.com/mayavi/mayavi/mlab_changing_object_looks.html#changing-object-properties-interactively>`_
 of Mayavi to learn more about how best to script the view.
+
+The viewer will always look for a ``mayavi_config.py`` script inside the
+output directory to setup the visualization parameters. This file can be
+created by overriding the :py:class:`pysph.solver.application.Application`
+object's ``customize_output`` method. See the `dam break 3d
+<https://github.com/pypr/pysph/blob/master/pysph/examples/dam_break_3d.py>`_
+example to see this being used. Of course, this file can also be created
+manually.
 
 
 Loading output data files
@@ -464,6 +482,23 @@ the interpolation is desired.  This can also be done with the constructor as::
 
     interp = Interpolator(list(parrays.values()), x=x, y=y, z=z)
 
+There are some cases, where one may require a higher order interpolation or
+gradient approximation of the property. This can be done by passing a
+``method`` for interpolation to the interplator as::
+
+    interp = Interpolator(list(parrays.values()), num_points=10000, method='order1')
+
+Currently, PySPH has three method of interpolation namely ``shepard``,
+``sph`` and ``order1``. When ``order1`` is set as method then one can get the
+higher order interpolation or it's derivative by just passing an extra
+argument to the interpolate method suggesting the component. To get
+derivative in `x` we can do as::
+
+    px = interp.interpolate('p', comp=1)
+
+Here for `comp=0`, the interpolated property is returned and `1`, `2`, `3`
+will return gradient in `x`, `y` and `z` directions respectively.
+
 For more details on the class and the available methods, see
 :py:class:`pysph.tools.interpolator.Interpolator`.
 
@@ -475,11 +510,12 @@ Viewing the data in an IPython notebook
 
 PySPH makes it relatively easy to view the data inside an IPython notebook
 with minimal additional dependencies. A simple UI is provided to view the
-saved data using this interface. It requires jupyter_ and ipywidgets_.
-Currently, a 2D viewer is provided for the data. Here is a simple example of
-how one may use this in a notebook.  Inside a notebook, one needs the following::
+saved data using this interface. It requires jupyter_,  ipywidgets_ and ipympl_.
+Currently, a 2D and 3D viewer are provided for the data. Here is a simple
+example of how one may use this in a notebook. Inside a notebook, one needs
+the following::
 
-    %matplotlib notebook
+    %matplotlib ipympl
     from pysph.tools.ipy_viewer import Viewer2D
     viewer = Viewer2D('dam_break_2d_output')
 
@@ -498,13 +534,18 @@ on the browser. The different saved snapshots can be viewed using a convenient
 slider. The viewer shows both the particles as well as simple vector plots.
 This is convenient when one wishes to share and show the data without
 requiring Mayavi. It does require pysph to be installed in order to be able to
-load the files. It is useful although not mandatory to have the first line
-that sets the matplotlib backend to the ``notebook``. What this does is to
-allow you to zoom and interact with the interactive plots.
+load the files. It is mandatory to have the first line that sets the matplotlib
+backend to ``ipympl``.
+
+There is also a 3D viewer which may be used using ``Viewer3D`` instead of the
+``Viewer2D`` above.  This viewer requires ipyvolume_ to be installed.
 
 
 .. _jupyter: https://jupyter.org
 .. _ipywidgets: https://github.com/jupyter-widgets/ipywidgets
+.. _ipyvolume: https://pypi.python.org/pypi/ipyvolume
+.. _ipympl: https://pypi.python.org/pypi/ipympl
+
 
 A slightly more complex example
 -------------------------------
@@ -514,7 +555,7 @@ of the results. Many pysph examples also include post processing code in the
 example. This makes it easy to reproduce results and also easily compare
 different schemes. A complete version of the elliptical drop example is
 available at `elliptical_drop.py
-<https://github.com/pypr/pysph/src/master/pysph/examples/elliptical_drop.py>`_.
+<https://github.com/pypr/pysph/tree/master/pysph/examples/elliptical_drop.py>`_.
 
 There are a few things that this example does a bit differently:
 
@@ -563,7 +604,7 @@ documentation to see these. The order of invocation of the various methods is
 also documented there.
 
 There are several `examples
-<https://github.com/pypr/pysph/src/master/pysph/examples/>`_ that
+<https://github.com/pypr/pysph/tree/master/pysph/examples/>`_ that
 ship with PySPH, explore these to get a better idea of what is possible.
 
 
@@ -577,7 +618,10 @@ this is a Python related error you should get a traceback and debug it as you
 would debug any Python program.
 
 PySPH writes out a log file in the output directory, looking at that is
-sometimes useful.
+sometimes useful. The log file will usually tell you the kernel, integrator,
+NNPS, and the exact equations and groups used for a simulation. This can be
+often be very useful when sorting out subtle issues with the equations and
+groups.
 
 Things get harder to debug when you get a segmentation fault or your code just
 crashes. Even though PySPH is implemented in Python you can get one of these

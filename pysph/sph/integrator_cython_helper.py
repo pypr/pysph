@@ -13,7 +13,13 @@ from mako.template import Template
 
 # Local imports.
 from pysph.sph.equation import get_array_names
-from pysph.base.cython_generator import CythonGenerator, get_func_definition
+from .acceleration_eval_cython_helper import get_helper_code
+from compyle.api import CythonGenerator, get_func_definition
+
+
+getfullargspec = getattr(
+    inspect, 'getfullargspec', inspect.getargspec
+)
 
 
 class IntegratorCythonHelper(object):
@@ -38,7 +44,7 @@ class IntegratorCythonHelper(object):
     def setup_compiled_module(self, module, acceleration_eval):
         # Create the compiled module.
         cython_integrator = module.Integrator(
-            acceleration_eval, self.object.steppers
+            self.object, acceleration_eval, self.object.steppers
         )
         # Setup the integrator to use this compiled module.
         self.object.set_compiled_object(cython_integrator)
@@ -48,6 +54,17 @@ class IntegratorCythonHelper(object):
     ##########################################################################
     def get_particle_array_names(self):
         return ', '.join(sorted(self.object.steppers.keys()))
+
+    def get_helper_code(self):
+        helpers = []
+        for stepper in self.object.steppers.values():
+            if hasattr(stepper, '_get_helpers_'):
+                for helper in stepper._get_helpers_():
+                    if helper not in helpers:
+                        helpers.append(helper)
+
+        code = get_helper_code(helpers)
+        return '\n'.join(code)
 
     def get_stepper_code(self):
         classes = {}
@@ -78,22 +95,26 @@ class IntegratorCythonHelper(object):
         lines = []
         for dest, stepper in self.object.steppers.items():
             cls_name = stepper.__class__.__name__
-            code = 'self.{name} = {cls}(**steppers["{dest}"].__dict__)'\
-                        .format(name=dest+'_stepper', cls=cls_name,
-                                dest=dest)
+            code = (
+                'self.{name} = {cls}(**steppers["{dest}"].__dict__)'
+                .format(name=dest+'_stepper', cls=cls_name, dest=dest)
+            )
             lines.append(code)
         return '\n'.join(lines)
 
     def get_args(self, dest, method):
         stepper = self.object.steppers[dest]
-        meth = getattr(stepper, method)
-        return inspect.getargspec(meth).args
+        meth = getattr(stepper, method, None)
+        if meth is None:
+            return []
+        else:
+            return getfullargspec(meth).args
 
     def get_array_declarations(self, method):
         arrays = set()
         for dest in self.object.steppers:
             s, d = get_array_names(self.get_args(dest, method))
-            self._check_arrays_for_properties(dest, s|d)
+            self._check_arrays_for_properties(dest, s | d)
             arrays.update(s | d)
 
         known_types = self.acceleration_eval_helper.known_types
@@ -107,7 +128,7 @@ class IntegratorCythonHelper(object):
 
     def get_array_setup(self, dest, method):
         s, d = get_array_names(self.get_args(dest, method))
-        lines = ['%s = dst.%s.data'%(n, n[2:]) for n in sorted(s|d)]
+        lines = ['%s = dst.%s.data' % (n, n[2:]) for n in sorted(s | d)]
         return '\n'.join(lines)
 
     def get_stepper_loop(self, dest, method):
@@ -115,9 +136,23 @@ class IntegratorCythonHelper(object):
         if 'self' in args:
             args.remove('self')
         call_args = ', '.join(args)
-        c = 'self.{obj}.{method}({args})'\
-                .format(obj=dest+'_stepper', method=method, args=call_args)
+        c = 'self.{obj}.{method}({args})'.format(
+            obj=dest+'_stepper', method=method, args=call_args
+        )
         return c
+
+    def get_py_stage_code(self, dest, method):
+        stepper = self.object.steppers[dest]
+        method = 'py_' + method
+        if hasattr(stepper, method):
+            return 'self.steppers["{dest}"].{method}(dst.array, t, dt)'.format(
+                dest=dest, method=method
+            )
+        else:
+            return ''
+
+    def has_stepper_loop(self, dest, method):
+        return hasattr(self.object.steppers[dest], method)
 
     def get_stepper_method_wrapper_names(self):
         """Returns the names of the methods we should wrap.  For a 2 stage
@@ -125,8 +160,12 @@ class IntegratorCythonHelper(object):
         """
         methods = set()
         for stepper in self.object.steppers.values():
-            stages = [x for x in dir(stepper)
-                      if x.startswith('stage') or x == 'initialize']
+            stages = []
+            for x in dir(stepper):
+                if x.startswith('py_stage'):
+                    stages.append(x[3:])
+                elif x.startswith('stage') or x == 'initialize':
+                    stages.append(x)
             methods.update(stages)
         return list(sorted(methods))
 
@@ -154,8 +193,8 @@ class IntegratorCythonHelper(object):
             diff = props.difference(available_props)
             integrator_name = self.object.steppers[dest].__class__.__name__
             names = ', '.join([x for x in sorted(diff)])
-            msg = "ERROR: {integrator_name} requires the following properties:"\
-                  "\n\t{names}\n"\
+            msg = "ERROR: {integrator_name} requires the following "\
+                  "properties:\n\t{names}\n"\
                   "Please add them to the particle array '{dest}'.".format(
                       integrator_name=integrator_name, names=names, dest=dest
                   )

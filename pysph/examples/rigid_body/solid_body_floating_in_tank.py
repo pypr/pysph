@@ -4,7 +4,6 @@ Check basic equations of SPH to throw a ball inside the vessel
 """
 from __future__ import print_function
 import numpy as np
-import matplotlib.pyplot as plt
 
 # PySPH base and carray imports
 from pysph.base.utils import (get_particle_array_wcsph,
@@ -98,6 +97,7 @@ def get_density(y):
 def geometry():
     # please run this function to know how
     # geometry looks like
+    import matplotlib.pyplot as plt
     x_tank, y_tank = create_boundary()
     x_fluid, y_fluid = create_fluid()
     x_cube, y_cube = create_sphere()

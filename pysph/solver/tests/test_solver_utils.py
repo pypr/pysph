@@ -117,7 +117,8 @@ class TestOutputNumpy(TestCase):
         y = x*2.0
         pa = get_particle_array_wcsph(name='fluid', x=x, y=y,
                                       constants={'c1': 1.0, 'c2': [2.0, 3.0]})
-        pa.set_output_arrays(['x', 'y'])
+        pa.add_property('A', data=2.0, stride=2)
+        pa.set_output_arrays(['x', 'y', 'A'])
         fname = self._get_filename('simple')
         dump(fname, [pa], solver_data={})
         data = load(fname)
@@ -129,6 +130,7 @@ class TestOutputNumpy(TestCase):
                              list(sorted(pa1.constants.keys())))
         self.assertTrue(np.allclose(pa.x, pa1.x, atol=1e-14))
         self.assertTrue(np.allclose(pa.y, pa1.y, atol=1e-14))
+        self.assertTrue(np.allclose(pa.A, pa1.A, atol=1e-14))
         self.assertTrue(np.allclose(pa.c1, pa1.c1, atol=1e-14))
         self.assertTrue(np.allclose(pa.c2, pa1.c2, atol=1e-14))
 
