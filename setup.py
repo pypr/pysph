@@ -82,13 +82,28 @@ def get_deps(*args):
     return result
 
 
+def _get_openmp_flags():
+    """Return the OpenMP flags for the platform.
+
+    This returns two lists, [extra_compile_args], [extra_link_args]
+    """
+    # Copied from compyle.ext_module
+    if sys.platform == 'win32':
+        return ['/openmp'], []
+    elif sys.platform == 'darwin':
+        if (os.environ.get('CC') is not None and
+           os.environ.get('CXX') is not None):
+            return ['-fopenmp'], ['-fopenmp']
+        else:
+            return ['-Xpreprocessor', '-fopenmp'], ['-lomp']
+    else:
+        return ['-fopenmp'], ['-fopenmp']
+
+
 def get_openmp_flags():
     """Returns any OpenMP related flags if OpenMP is avaiable on the system.
     """
-    if sys.platform == 'win32':
-        omp_compile_flags, omp_link_flags = ['/openmp'], []
-    else:
-        omp_compile_flags, omp_link_flags = ['-fopenmp'], ['-fopenmp']
+    omp_compile_flags, omp_link_flags = _get_openmp_flags()
 
     env_var = os.environ.get('USE_OPENMP', '')
     if env_var.lower() in ("0", 'false', 'n'):
