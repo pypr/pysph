@@ -3,8 +3,8 @@
 It takes a hdf or npz file as an input and output vtu file.
 """
 from pysph import has_tvtk, has_pyvisfile
-from pysph.solver.output import Output, load, output_formats
-from pysph.solver.utils import remove_irrelevant_files
+from pysph.solver.output import Output, load
+from pysph.solver.utils import get_files
 
 import numpy as np
 import argparse
@@ -152,9 +152,7 @@ def dump_vtk(filename, particles, scalars=None, **vectors):
 def run(options):
     for fname in options.inputfile:
         if os.path.isdir(fname):
-            files = [os.path.join(fname, file) for file in os.listdir(fname)
-                     if file.endswith(output_formats)]
-            files = remove_irrelevant_files(files)
+            files = get_files(fname)
             options.inputfile.extend(files)
             continue
         data = load(fname)
@@ -162,8 +160,11 @@ def run(options):
         for ptype, pdata in data['arrays'].items():
             particles.append(pdata)
         filename = os.path.splitext(fname)[0]
-        if options.outdir is not None:
-            filename = options.outdir + os.path.split(filename)[1]
+        outdir = options.outdir
+        if outdir is not None:
+            if not os.path.exists(outdir):
+                os.makedirs(outdir)
+            filename = os.path.join(outdir, os.path.basename(filename))
         dump_vtk(filename, particles, scalars=options.scalars,
                  velocity=['u', 'v', 'w'])
 
@@ -205,6 +206,7 @@ def main(argv=None):
     if options.scalars is not None:
         options.scalars = options.scalars.split(',')
     run(options)
+
 
 if __name__ == '__main__':
     main()
