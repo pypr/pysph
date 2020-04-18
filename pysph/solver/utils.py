@@ -3,6 +3,7 @@ Module contains some common functions.
 """
 
 # standard imports
+from glob import glob
 import os
 import sys
 import time
@@ -312,21 +313,19 @@ def get_files(dirname=None, fname=None, endswith=output_formats):
         return []
 
     path = os.path.abspath(dirname)
-    files = os.listdir(path)
 
     if fname is None:
-        fname = os.path.split(path)[1].split('_output')[0]
+        infos = glob(os.path.join(path, "*.info"))
+        if infos:
+            fname = os.path.splitext(os.path.basename(infos[0]))[0]
+        else:
+            fname = os.path.basename(path).split('_output')[0]
 
-    # get all the output files in the directory
-    files = [f for f in files if f.startswith(fname) and f.endswith(endswith)]
-    files = [os.path.join(path, f) for f in files]
+    files = glob(os.path.join(path, "%s*.*" % fname))
+    files = [f for f in files if f.endswith(endswith)]
 
     # sort the files
-    def _key_func(arg):
-        a = os.path.splitext(arg)[0]
-        return int(a[a.rfind('_') + 1:])
-
-    files.sort(key=_key_func)
+    files.sort(key=_sort_key)
 
     return files
 
