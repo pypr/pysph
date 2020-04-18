@@ -1064,7 +1064,7 @@ class QuinticSpline(object):
     .. math::
              \sigma_5  = \ & \frac{1}{120 h^1}, & \textrm{for dim=1}, \\
              \sigma_5  = \ & \frac{7}{478\pi h^2}, \ & \textrm{for dim=2}, \\
-             \sigma_5  = \ & \frac{3}{359\pi h^3}, & \textrm{for dim=3}. \\
+             \sigma_5  = \ & \frac{1}{120\pi h^3}, & \textrm{for dim=3}. \\
 
     """
 
@@ -1077,7 +1077,7 @@ class QuinticSpline(object):
         elif dim == 2:
             self.fac = M_1_PI * 7.0 / 478.0
         elif dim == 3:
-            self.fac = M_1_PI * 3.0 / 359.0
+            self.fac = M_1_PI * 1.0 / 120.0
 
     def get_deltap(self):
         # The inflection points for the polynomial are obtained as
