@@ -354,7 +354,7 @@ class TestQuinticSpline3D(TestGaussian3D):
     kernel_factory = staticmethod(lambda: QuinticSpline(dim=3))
 
     def test_simple(self):
-        self.check_kernel_at_origin(66.0 * 3.0 / (359.0 * np.pi))
+        self.check_kernel_at_origin(66.0 * 1.0 / (120.0 * np.pi))
 
 
 ###############################################################################
