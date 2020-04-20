@@ -12,6 +12,7 @@ from pysph.sph.wc.linalg import gj_solve, augmented_matrix
 from numpy import sqrt, cos, sin, zeros, pi, exp
 import numpy as np
 import numpy
+M_PI = pi
 
 
 class CheckForParticlesToSplit(Equation):
@@ -427,7 +428,7 @@ class FindMergeable(Equation):
                     const1 = d_m[d_idx] * SPH_KERNEL.kernel(xma, rma,
                                                             d_h[d_idx])
                     const2 = d_m[idx] * SPH_KERNEL.kernel(xmb, rmb, d_h[idx])
-                    d_h[d_idx] = sqrt((7*pi/10.) * (m_merged/(const1+const2)))
+                    d_h[d_idx] = sqrt((7*M_PI/10.) * (m_merged/(const1+const2)))
                     d_m[d_idx] = m_merged
                     # Tags the newly formed particle after merging
                     d_is_merged_pa[d_idx] = 1
