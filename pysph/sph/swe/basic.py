@@ -7,7 +7,7 @@ from pysph.sph.equation import Equation
 from pysph.sph.integrator_step import IntegratorStep
 from pysph.sph.integrator import Integrator
 from compyle.api import declare
-from pysph.sph.wc.density_correction import gj_solve
+from pysph.sph.wc.linalg import gj_solve, augmented_matrix
 
 from numpy import sqrt, cos, sin, zeros, pi, exp
 import numpy as np
@@ -1700,7 +1700,7 @@ class GradientCorrection(Equation):
 
     """
     def _get_helpers_(self):
-        return [gj_solve]
+        return [gj_solve, augmented_matrix]
 
     def __init__(self, dest, sources, dim=2, tol=0.5):
         r"""
@@ -1720,12 +1720,14 @@ class GradientCorrection(Equation):
         i, j, n = declare('int', 3)
         n = self.dim
         temp = declare('matrix(9)')
+        aug_m = declare('matrix(12)')
         res = declare('matrix(3)')
         eps = 1.0e-04 * s_h[s_idx]
         for i in range(n):
             for j in range(n):
                 temp[n*i + j] = d_m_mat[9*d_idx + 3*i + j]
-        gj_solve(temp, DWJ, n, res)
+        augmented_matrix(temp, DWJ, n, 1, n, aug_m)
+        gj_solve(aug_m, n, 1, res)
         change = 0.0
         for i in range(n):
             change += abs(DWJ[i]-res[i]) / (abs(DWJ[i])+eps)
