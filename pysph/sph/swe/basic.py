@@ -6,7 +6,7 @@ Basic Equations for solving shallow water problems
 from pysph.sph.equation import Equation
 from pysph.sph.integrator_step import IntegratorStep
 from pysph.sph.integrator import Integrator
-from pysph.cpy.api import declare
+from compyle.api import declare
 from pysph.sph.wc.density_correction import gj_solve
 
 from numpy import sqrt, cos, sin, zeros, pi, exp
