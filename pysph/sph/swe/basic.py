@@ -1974,7 +1974,7 @@ class SWEInlet(object):
             inlet_props[prop] = new_array
         self.inlet_pa.add_particles(**inlet_props)
 
-    def update(self, solver=None):
+    def update(self, t, dt, stage):
         """This is called by the solver after each timestep and is passed
         the solver instance.
         """

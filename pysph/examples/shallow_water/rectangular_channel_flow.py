@@ -34,9 +34,10 @@ from pysph.sph.swe.basic import (
 from pysph.tools.sph_evaluator import SPHEvaluator
 
 # PySPH Inlet_Outlet
-from pysph.sph.simple_inlet_outlet import SimpleInlet, SimpleOutlet
-from pysph.sph.integrator_step import InletOutletStep
-
+from pysph.sph.bc.donothing.simple_inlet_outlet import (
+    SimpleInletOutlet)
+from pysph.sph.bc.inlet_outlet_manager import (
+    InletInfo, OutletInfo, OutletStep, InletStep)
 
 # Constants
 rho_w = 1000.0
@@ -120,6 +121,7 @@ class RectangularOpenChannelFlow(Application):
         boundary_props = ['dw_inner_reimann', 'u_inner_reimann',
                           'v_inner_reimann', 'shep_corr']
         inlet.add_output_arrays(boundary_props)
+        inlet.add_property('x0')
 
         # Fluid Properties
         xf, yf = np.mgrid[0.5*dx:self.x_max_inlet+le:dx, dx/2:w-(dx/4.):dx]
@@ -150,6 +152,7 @@ class RectangularOpenChannelFlow(Application):
         outlet = gpa_swe(name='outlet', x=xo, y=yo, dw=dw, m=m, rho0=rho0,
                          alpha=alpha, rho=rho, h=h, h0=h0, cs=cs)
         outlet.add_output_arrays(boundary_props)
+        outlet.add_property('x0')
 
         # Bed Properties
         xb, yb = np.mgrid[-5*dx:le+5*dx:dx, 0:w+dx/2.:dx]
@@ -190,30 +193,42 @@ class RectangularOpenChannelFlow(Application):
                            is_wall_boun_pa=is_wall_boun_pa)
         return [inlet, fluid, outlet, bed, boundary]
 
+    def _create_inlet_outlet_manager(self):
+        from pysph.sph.bc.donothing.inlet import Inlet
+        from pysph.sph.bc.donothing.outlet import Outlet
+
+        props_to_copy = ['x', 'y', 'u', 'v', 'w', 'm',
+                         'h', 'rho', 'rho0', 'bx', 'h0', 'uh']
+        inlet_info = InletInfo(
+            pa_name='inlet', normal=[-1.0, 0.0, 0.0],
+            refpoint=[self.x_min_inlet, 0.0, 0.0], has_ghost=False,
+            update_cls=Inlet
+        )
+
+        outlet_info = OutletInfo(
+            pa_name='outlet', normal=[1.0, 0.0, 0.0],
+            refpoint=[self.x_max_outlet, 0.0, 0.0], update_cls=Outlet,
+            props_to_copy=props_to_copy
+        )
+
+        iom = SimpleInletOutlet(
+            fluid_arrays=['fluid'], inletinfo=[inlet_info],
+            outletinfo=[outlet_info]
+        )
+
+        return iom
+
     def create_inlet_outlet(self, particle_arrays):
-        f_pa = particle_arrays['fluid']
-        i_pa = particle_arrays['inlet']
-        o_pa = particle_arrays['outlet']
-        b_pa = particle_arrays['bed']
-        cb_pa = particle_arrays['boundary']
-
-        inlet = SimpleInlet(
-            i_pa, f_pa, spacing=self.dx, n=self.num_inlet_pa, axis='x',
-            xmin=self.x_min_inlet, xmax=self.x_max_inlet, ymin=0, ymax=self.w
-        )
-        outlet = SimpleOutlet(
-            o_pa, f_pa, xmin=self.x_min_outlet, xmax=self.x_max_outlet, ymin=0,
-            ymax=self.w
-        )
-
-        compute_initial_props([i_pa, f_pa, o_pa, b_pa, cb_pa])
-
-        return [inlet, outlet]
+        iom = self.iom
+        compute_initial_props(list(particle_arrays.values()))
+        io = iom.get_inlet_outlet(particle_arrays)
+        return io
 
     def create_solver(self):
+        self.iom = self._create_inlet_outlet_manager()
         kernel = CubicSpline(dim=2)
-        integrator = SWEIntegrator(inlet=InletOutletStep(), fluid=SWEStep(),
-                                   outlet=InletOutletStep())
+        integrator = SWEIntegrator(inlet=InletStep(), fluid=SWEStep(),
+                                   outlet=OutletStep())
         tf = 50
         solver = Solver(
             kernel=kernel,
