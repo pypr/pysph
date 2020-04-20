@@ -696,7 +696,8 @@ def setup_package():
           keywords="SPH simulation computational fluid dynamics",
           packages=find_packages(),
           package_data={
-              '': ['*.pxd', '*.mako', '*.txt.gz', '*.txt', '*.vtk.gz', '*.gz',
+              '': ['*.pxd', '*.mako', '*.txt.gz', '*.txt', '*.txt.bz2',
+                   '*.vtk.gz', '*.gz', '*.csv',
                    '*.rst', 'ndspmhd-sedov-initial-conditions.npz']
           },
           # exclude package data in installation.
