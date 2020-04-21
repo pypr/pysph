@@ -16,7 +16,7 @@ from copy import deepcopy
 import inspect
 import itertools
 import numpy
-from textwrap import dedent
+from textwrap import dedent, wrap
 
 from compyle.api import (CythonGenerator, KnownType,
                          OpenCLConverter, get_symbols)
@@ -411,7 +411,8 @@ class Equation(object):
     def __repr__(self):
         name = self.__class__.__name__
         args = get_init_args(self, self.__init__, [])
-        return '%s(%s)' % (name, ', '.join(args))
+        res = '%s(%s)' % (name, ', '.join(args))
+        return '\n'.join(wrap(res, width=70, break_long_words=False))
 
     def converged(self):
         """Return > 0 to indicate converged iterations and < 0 otherwise.
@@ -528,7 +529,9 @@ class Group(object):
         eqs = ', \n'.join(repr(eq) for eq in self.equations)
         ignore = ['equations']
         kws = ', '.join(get_init_args(self, self.__init__, ignore))
-        return '%s(equations=[\n%s\n],\n    %s)' % (
+        kws = '\n'.join(wrap(kws, width=74, subsequent_indent=' '*2,
+                             break_long_words=False))
+        return '%s(equations=[\n%s\n  ],\n  %s)' % (
             cls, indent(eqs), kws
         )
 
@@ -935,9 +938,15 @@ class MultiStageEquations(object):
         name = self.__class__.__name__
         groups = [', \n'.join(str(stg_grps) for stg_grps in stg)
                   for stg in self.groups]
-        kw = indent('\n], [\n'.join(groups))
-        s = '%s(groups=[\n[\n%s\n    ]\n])' % (
-            name, kw,
+        kw = ""
+        for i, group in enumerate(groups):
+            stage = i
+            kw += '[\n# Stage %d\n' % stage
+            kw += group
+            kw += '\n# End Stage %d\n],\n' % stage
+
+        s = '%s(groups=[\n%s])' % (
+            name, indent(kw, '  '),
         )
         return s
 

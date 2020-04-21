@@ -863,8 +863,13 @@ class Application(object):
             ip = socket.gethostbyname(host)
         except socket.gaierror:
             ip = host
+        cmd = ' '.join(sys.argv)
         logger.info(
-            'Running on {host} with address {ip}'.format(host=host, ip=ip))
+            'Started as:\n{command}'.format(command=cmd)
+        )
+        logger.info(
+            'Running on {host} with address {ip}'.format(host=host, ip=ip)
+        )
 
     def _create_inlet_outlet(self, inlet_outlet_factory):
         """Create the inlets and outlets if needed.
