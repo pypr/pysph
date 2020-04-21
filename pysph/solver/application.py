@@ -1223,7 +1223,6 @@ class Application(object):
             nnps=nnps,
             kernel=kernel,
             fixed_h=fixed_h)
-        self._log_solver_info(solver)
 
         # add solver interfaces
         self.command_manager = CommandManager(solver, self.comm)
@@ -1431,6 +1430,18 @@ class Application(object):
             eqn_info = equations
         logger.info('Using equations:\n%s\n%s\n%s', sep, eqn_info, sep)
 
+        logger.info("Callbacks:\n%s\n", sep)
+        logger.info(
+            "Pre-step callbacks:\n%s\n", repr(self.solver.pre_step_callbacks)
+        )
+        logger.info(
+            "Post-step callbacks:\n%s\n", repr(self.solver.post_step_callbacks)
+        )
+        logger.info(
+            "Post-stage callbacks:\n%s\n%s\n",
+            repr(self.solver.post_stage_callbacks), sep
+        )
+
     def _mayavi_config(self, code):
         """Write out the given code to a `mayavi_config.py` in the output
         directory.
@@ -1536,6 +1547,8 @@ class Application(object):
             self._setup_solver_callbacks(self)
             for tool in self.create_tools():
                 self.add_tool(tool)
+
+            self._log_solver_info(self.solver)
 
             end_time = time.time()
             setup_duration = end_time - start_time
