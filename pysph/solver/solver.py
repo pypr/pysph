@@ -716,8 +716,13 @@ class Solver(object):
             # timestep.
             timestep_too_big = (tdiff > 0.0) & (tdiff < dt)
             if numpy.any(timestep_too_big):
-                index = numpy.where(timestep_too_big)[0]
+                indices = numpy.where(timestep_too_big)[0]
+                index = indices[0]
                 output_time = output_at_times[index]
+                if ((abs(output_time - self.t) < self._epsilon) and
+                   (len(indices) > 1)):
+                    index = indices[1]
+                    output_time = output_at_times[index]
                 if abs(output_time - self.t) > self._epsilon:
                     # It sometimes happens that the current time is just
                     # shy of the requested output time which results in a
