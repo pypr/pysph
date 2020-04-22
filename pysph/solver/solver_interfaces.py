@@ -33,7 +33,7 @@ class MultiprocessingInterface(BaseManager):
         self._server = None
 
     def stop(self):
-        if self._server is not None:
+        if self._server:
             conn = self._Client(self._address, authkey=self._authkey)
             try:
                 self._server.shutdown(conn)

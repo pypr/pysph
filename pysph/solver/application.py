@@ -741,12 +741,17 @@ class Application(object):
             help=("Add an XML-RPC interface to the solver;"
                   "HOST=0.0.0.0 by default"))
 
+        if sys.platform == 'win32':
+            default = "pysph@127.0.0.1:8800+"
+        else:
+            default = "pysph@0.0.0.0:8800+"
+
         interfaces.add_argument(
             "--multiproc",
             action="store",
             dest="multiproc",
             metavar='[[AUTHKEY@] HOST:] PORT[+] ',
-            default="pysph@0.0.0.0:8800+",
+            default=default,
             help=("Add a python multiprocessing interface "
                   "to the solver; "
                   "AUTHKEY=pysph, HOST=0.0.0.0, PORT=8800+ by"
@@ -1243,7 +1248,7 @@ class Application(object):
 
         if self.rank == 0:
             if sys.platform == 'win32':
-                default_host = "localhost"
+                default_host = "127.0.0.1"
             else:
                 default_host = "0.0.0.0"
             # commandline interface
