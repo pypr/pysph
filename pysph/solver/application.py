@@ -25,7 +25,7 @@ from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
 from pysph.base import kernels
 from compyle.config import get_config
 from pysph.solver.controller import CommandManager
-from pysph.solver.utils import mkdir, load, get_files
+from pysph.solver.utils import mkdir, load, get_files, get_free_port
 
 # conditional parallel imports
 from pysph import has_mpi, has_zoltan, in_parallel
@@ -231,6 +231,8 @@ class Application(object):
         self.cache_nnps = False
         self.iom = None
 
+        # The solver interface in use.
+        self._interfaces = []
         self.initialize()
         self.scheme = self.create_scheme()
         self._setup_argparse()
@@ -849,6 +851,7 @@ class Application(object):
             # This is needed if the application is launched twice,
             # as in that case, the old handlers must be removed.
             for handler in logging.root.handlers[:]:
+                handler.close()
                 logging.root.removeHandler(handler)
             lfn = os.path.join(self.output_dir, filename)
             mkdir(self.output_dir)
@@ -1233,12 +1236,15 @@ class Application(object):
         self.command_manager = CommandManager(solver, self.comm)
         solver.set_command_handler(self.command_manager.execute_commands)
 
+        _used_ports = []
         if self.rank == 0:
             # commandline interface
             if options.cmd_line:
                 from pysph.solver.solver_interfaces import CommandlineInterface
-                self.command_manager.add_interface(
-                    CommandlineInterface().start)
+                interface = CommandlineInterface()
+                self._interfaces.append(interface)
+                self.command_manager.add_interface(interface.start)
+                logger.info('Started Commandline interface')
 
             # XML-RPC interface
             if options.xml_rpc:
@@ -1247,8 +1253,13 @@ class Application(object):
                 idx = addr.find(':')
                 host = "0.0.0.0" if idx == -1 else addr[:idx]
                 port = int(addr[idx + 1:])
-                self.command_manager.add_interface(
-                    XMLRPCInterface((host, port)).start)
+                interface = XMLRPCInterface((host, port))
+                self._interfaces.append(interface)
+                self.command_manager.add_interface(interface.start)
+                _used_ports.append(port)
+                logger.info(
+                    'Started XML-RPC interface on %s:%d' % (host, port)
+                )
 
             # python MultiProcessing interface
             if options.multiproc:
@@ -1263,20 +1274,19 @@ class Application(object):
                 host = "0.0.0.0" if idx == -1 else addr[:idx]
                 port = addr[idx + 1:]
                 if port[-1] == '+':
-                    try_next_port = True
-                    port = port[:-1]
+                    port = get_free_port(int(port[:-1]), skip=_used_ports)
                 else:
-                    try_next_port = False
-                port = int(port)
+                    port = int(port)
 
-                interface = MultiprocessingInterface((host, port),
-                                                     authkey.encode(),
-                                                     try_next_port)
-
+                interface = MultiprocessingInterface(
+                    (host, port), authkey.encode()
+                )
+                self._interfaces.append(interface)
                 self.command_manager.add_interface(interface.start)
+                _used_ports.append(port)
 
-                logger.info('started multiprocessing interface on %s' %
-                            (interface.address, ))
+                logger.info('Started multiprocessing interface on %s:%d' %
+                            (host, port))
 
     def _configure(self):
         """Configures the application using the options from the
@@ -1400,7 +1410,8 @@ class Application(object):
         info = dict(
             fname=self.fname, output_dir=self.output_dir, args=self.args)
         info.update(kw)
-        json.dump(info, open(filename, 'w'))
+        with open(filename, 'w') as f:
+            json.dump(info, f)
 
     def _log_solver_info(self, solver):
         sep = '-'*70
@@ -1572,6 +1583,9 @@ class Application(object):
             print_profile()
         self._write_info(
             self.info_filename, completed=True, cpu_time=run_duration)
+
+        for interface in self._interfaces:
+            interface.stop()
 
     def set_args(self, args):
         self.args = args

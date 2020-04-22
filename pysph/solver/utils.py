@@ -3,8 +3,10 @@ Module contains some common functions.
 """
 
 # standard imports
+import errno
 from glob import glob
 import os
+import socket
 import sys
 import time
 
@@ -34,11 +36,34 @@ def _supports_unicode(fp):
             return False
         except Exception:
             try:
-                return encoding.lower().startswith('utf-') or ('U8' == encoding)
+                return (encoding.lower().startswith('utf-')
+                        or ('U8' == encoding))
             except:
                 return False
         else:
             return True
+
+
+def get_free_port(start, skip=None):
+    """Return an integer that is an available port for a service. Start at the
+    given `start` value and `skip` any specified values.
+    """
+    skip = () if skip is None else skip
+    x = start
+    while x < 65536:
+        if x in skip:
+            x += 1
+        else:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                try:
+                    s.bind(('', x))
+                    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    return x
+                except socket.error as e:
+                    if e.errno == errno.EADDRINUSE:
+                        x += 1
+                    else:
+                        raise
 
 
 def check_array(x, y):
