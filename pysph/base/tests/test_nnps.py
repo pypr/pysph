@@ -183,8 +183,7 @@ class NNPS2DTestCase(unittest.TestCase):
         _nbrs2 = nbrs_brute_force.get_npy_array()
 
         # sort the neighbors
-        nbrs1 = _nbrs1[:nnbrs]
-        nbrs1.sort()
+        nbrs1 = sorted(_nbrs1[:nnbrs])
         nbrs2 = _nbrs2
         nbrs2.sort()
 
@@ -386,8 +385,7 @@ class NNPSTestCase(unittest.TestCase):
         _nbrs2 = nbrs_brute_force.get_npy_array()
 
         # sort the neighbors
-        nbrs1 = _nbrs1[:nnbrs]
-        nbrs1.sort()
+        nbrs1 = sorted(_nbrs1[:nnbrs])
         nbrs2 = _nbrs2
         nbrs2.sort()
 
@@ -574,6 +572,75 @@ class ZOrderNNPSTestCase(DictBoxSortNNPSTestCase):
         NNPSTestCase.setUp(self)
         self.nps = nnps.ZOrderNNPS(
             dim=3, particles=self.particles, radius_scale=2.0
+        )
+
+
+class ExtendedZOrderNNPSAsymmetricTestCase(DictBoxSortNNPSTestCase):
+    """Test for asymmetric Extended Z-Order SFC based algorithm"""
+
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.ExtendedZOrderNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0, H=1,
+            asymmetric=True
+        )
+
+
+class ExtendedZOrderNNPSSymmetricTestCase(DictBoxSortNNPSTestCase):
+    """Test for symmetric Extended Z-Order SFC based algorithm"""
+
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.ExtendedZOrderNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0, H=1,
+            asymmetric=False
+        )
+
+
+class ExtendedZOrderNNPSSubdividedAsymTestCase(DictBoxSortNNPSTestCase):
+    """Test for asymmetric Extended Z-Order SFC based algorithm with
+    subdivision"""
+
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.ExtendedZOrderNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0, H=3,
+            asymmetric=True
+        )
+
+    @pytest.mark.xfail(reason="ExtendedZOrderNNPS failing for \
+                       different dest and src index")
+    def test_neighbors_ab(self):
+        self._test_neighbors_by_particle(src_index=0, dst_index=1,
+                                         dst_numPoints=self.numPoints2)
+
+    @pytest.mark.xfail(reason="ExtendedZOrderNNPS failing for \
+                       different dest and src index")
+    def test_neighbors_ba(self):
+        self._test_neighbors_by_particle(src_index=1, dst_index=0,
+                                         dst_numPoints=self.numPoints1)
+
+    @pytest.mark.xfail(reason="ExtendedZOrderNNPS failing for \
+                       different dest and src index")
+    def test_repeated(self):
+        self.test_neighbors_aa()
+        self.test_neighbors_ab()
+        self.test_neighbors_ba()
+        self.test_neighbors_bb()
+        self.test_neighbors_cc()
+        self.test_neighbors_dd()
+
+
+class ExtendedZOrderNNPSSubdividedSymTestCase(
+        ExtendedZOrderNNPSSubdividedAsymTestCase):
+    """Test for symmetric Extended Z-Order SFC based algorithm with
+    subdivision"""
+
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.ExtendedZOrderNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0, H=3,
+            asymmetric=False
         )
 
 
@@ -1011,8 +1078,7 @@ class TestLinkedListNNPSWithSorting(unittest.TestCase):
         for i in range(pa.get_number_of_particles()):
             nps.get_nearest_particles(0, 0, i, nbrs)
             nb = nbrs.get_npy_array()
-            sorted_nbrs = nb.copy()
-            sorted_nbrs.sort()
+            sorted_nbrs = sorted(nb.copy())
             self.assertTrue(numpy.all(nb == sorted_nbrs))
 
     def test_nnps_sorts_with_valid_gids(self):
@@ -1032,8 +1098,7 @@ class TestLinkedListNNPSWithSorting(unittest.TestCase):
         for i in range(pa.get_number_of_particles()):
             nps.get_nearest_particles(0, 0, i, nbrs)
             nb = nbrs.get_npy_array()
-            sorted_nbrs = nb.copy()
-            sorted_nbrs.sort()
+            sorted_nbrs = sorted(nb.copy())
             self.assertTrue(numpy.all(nb == sorted_nbrs))
 
 
