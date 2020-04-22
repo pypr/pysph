@@ -26,11 +26,13 @@ class MultiprocessingInterface(BaseManager):
     This object exports a controller instance proxy over the multiprocessing
     interface. Control actions can be performed by connecting to the interface
     and calling methods on the controller proxy instance """
-    def __init__(self, address=None, authkey=None, try_next_port=False):
+    def __init__(self, address=None, authkey=None):
         authkey = get_authkey_bytes(authkey)
-        BaseManager.__init__(self, address, authkey)
+        super().__init__(address, authkey)
         self.authkey = authkey
-        self.try_next_port = try_next_port
+
+    def stop(self):
+        self.shutdown()
 
     def get_controller(self):
         return self.controller
@@ -38,21 +40,7 @@ class MultiprocessingInterface(BaseManager):
     def start(self, controller):
         self.controller = controller
         self.register('get_controller', self.get_controller)
-        if not self.try_next_port:
-            self.get_server().serve_forever()
-        host, port = self.address
-        while self.try_next_port:
-            try:
-                BaseManager.__init__(self, (host, port), self.authkey)
-                self.get_server().serve_forever()
-                self.try_next_port = False
-            except socket.error as e:
-                try_next_port = False
-                import errno
-                if e.errno == errno.EADDRINUSE:
-                    port += 1
-                else:
-                    raise
+        super().start()
 
 
 class MultiprocessingClient(BaseManager):
@@ -146,6 +134,9 @@ class XMLRPCInterface(SimpleXMLRPCServer):
                  encoding=None, bind_and_activate=True):
         SimpleXMLRPCServer.__init__(self, addr, requestHandler, logRequests,
                                     allow_none, encoding, bind_and_activate)
+
+    def stop(self):
+        self.server_close()
 
     def start(self, controller):
         self.register_instance(controller, allow_dotted_names=False)
