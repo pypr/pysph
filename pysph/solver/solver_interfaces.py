@@ -1,6 +1,7 @@
 import threading
 import os
 import socket
+import sys
 try:
     from SimpleXMLRPCServer import (SimpleXMLRPCServer,
                                     SimpleXMLRPCRequestHandler)
@@ -39,6 +40,8 @@ class MultiprocessingInterface(BaseManager):
                 self._server.shutdown(conn)
             finally:
                 conn.close()
+        elif hasattr(self, 'shutdown'):
+            self.shutdown()
 
     def get_controller(self):
         return self.controller
@@ -46,8 +49,11 @@ class MultiprocessingInterface(BaseManager):
     def start(self, controller):
         self.controller = controller
         self.register('get_controller', self.get_controller)
-        self._server = self.get_server()
-        self._server.serve_forever()
+        if sys.platform == 'win32':
+            self.start()
+        else:
+            self._server = self.get_server()
+            self._server.serve_forever()
 
 
 class MultiprocessingClient(BaseManager):
