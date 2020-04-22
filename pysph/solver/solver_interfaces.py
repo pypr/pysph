@@ -30,9 +30,15 @@ class MultiprocessingInterface(BaseManager):
         authkey = get_authkey_bytes(authkey)
         super().__init__(address, authkey)
         self.authkey = authkey
+        self._server = None
 
     def stop(self):
-        self.shutdown()
+        if self._server is not None:
+            conn = self._Client(self._address, authkey=self._authkey)
+            try:
+                self._server.shutdown(conn)
+            finally:
+                conn.close()
 
     def get_controller(self):
         return self.controller
@@ -40,7 +46,8 @@ class MultiprocessingInterface(BaseManager):
     def start(self, controller):
         self.controller = controller
         self.register('get_controller', self.get_controller)
-        super().start()
+        self._server = self.get_server()
+        self._server.serve_forever()
 
 
 class MultiprocessingClient(BaseManager):

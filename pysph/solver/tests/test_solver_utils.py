@@ -192,15 +192,15 @@ class TestGetFreePort(TestCase):
     def test_finds_port_not_taken(self):
         # Given
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(('', 8800))
+        sock.bind(('', 9800))
         self.addCleanup(sock.close)
 
         # When
-        port = get_free_port(8800)
+        port = get_free_port(9800)
 
         # Then
-        self.assertNotEqual(port, 8800)
-        self.assertTrue(port > 8800)
+        self.assertNotEqual(port, 9800)
+        self.assertTrue(port > 9800)
 
         # When
         port1 = get_free_port(port)
@@ -211,14 +211,14 @@ class TestGetFreePort(TestCase):
 
     def test_free_port_skips_given(self):
         # Given
-        skip = (8800, 8801)
+        skip = (9800, 9801)
 
         # When
-        port = get_free_port(8800, skip=skip)
+        port = get_free_port(9800, skip=skip)
 
         # Then
         self.assertNotIn(port, skip)
-        self.assertTrue(port > 8801)
+        self.assertTrue(port > 9801)
 
 
 if __name__ == '__main__':
