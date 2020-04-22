@@ -1237,6 +1237,10 @@ class Application(object):
         solver.set_command_handler(self.command_manager.execute_commands)
 
         _used_ports = []
+        if self._interfaces:
+            self._stop_interfaces()
+            self._interfaces = []
+
         if self.rank == 0:
             # commandline interface
             if options.cmd_line:
@@ -1391,6 +1395,10 @@ class Application(object):
 
         if is_overloaded_method(obj.post_step):
             self.solver.add_post_step_callback(obj.post_step)
+
+    def _stop_interfaces(self):
+        for interface in self._interfaces:
+            interface.stop()
 
     def _message(self, msg):
         if self.num_procs == 1:
@@ -1584,8 +1592,7 @@ class Application(object):
         self._write_info(
             self.info_filename, completed=True, cpu_time=run_duration)
 
-        for interface in self._interfaces:
-            interface.stop()
+        self._stop_interfaces()
 
     def set_args(self, args):
         self.args = args
