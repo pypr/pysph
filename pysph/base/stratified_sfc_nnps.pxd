@@ -27,8 +27,6 @@ cdef extern from "z_order.h":
                 int length) nogil except +
         inline void compare_sort() nogil
 
-ctypedef map[uint64_t, pair[uint32_t, uint32_t]] key_to_idx_t
-
 cdef class StratifiedSFCNNPS(NNPS):
     ############################################################################
     # Data Attributes
@@ -38,6 +36,9 @@ cdef class StratifiedSFCNNPS(NNPS):
     cdef public int num_levels
     cdef int max_num_bits
 
+    cdef uint64_t* max_keys
+    cdef uint64_t current_max_key
+
     cdef double interval_size
 
     cdef uint32_t** pids
@@ -46,8 +47,8 @@ cdef class StratifiedSFCNNPS(NNPS):
     cdef uint64_t** keys
     cdef uint64_t* current_keys
 
-    cdef key_to_idx_t** pid_indices
-    cdef key_to_idx_t* current_indices
+    cdef int*** key_to_idx
+    cdef int** current_key_to_idx
 
     cdef double** cell_sizes
     cdef double* current_cells
@@ -57,6 +58,7 @@ cdef class StratifiedSFCNNPS(NNPS):
     ##########################################################################
     # Member functions
     ##########################################################################
+    cpdef np.ndarray get_keys(self, pa_index)
 
     cpdef set_context(self, int src_index, int dst_index)
 
@@ -73,8 +75,7 @@ cdef class StratifiedSFCNNPS(NNPS):
 
     cdef void fill_array(self, NNPSParticleArrayWrapper pa_wrapper,
             int pa_index, UIntArray indices, uint32_t* current_pids,
-            uint64_t* current_keys, key_to_idx_t* current_indices,
-            double* current_cells)
+            uint64_t* current_keys, double* current_cells)
 
     cdef inline int _get_level(self, double h) nogil
 
