@@ -1243,7 +1243,7 @@ class Application(object):
 
         if self.rank == 0:
             if sys.platform == 'win32':
-                default_host = "127.0.0.1"
+                default_host = "localhost"
             else:
                 default_host = "0.0.0.0"
             # commandline interface
