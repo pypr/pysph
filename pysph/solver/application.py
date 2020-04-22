@@ -1242,6 +1242,10 @@ class Application(object):
             self._interfaces = []
 
         if self.rank == 0:
+            if sys.platform == 'win32':
+                default_host = "127.0.0.1"
+            else:
+                default_host = "0.0.0.0"
             # commandline interface
             if options.cmd_line:
                 from pysph.solver.solver_interfaces import CommandlineInterface
@@ -1255,7 +1259,7 @@ class Application(object):
                 from pysph.solver.solver_interfaces import XMLRPCInterface
                 addr = options.xml_rpc
                 idx = addr.find(':')
-                host = "0.0.0.0" if idx == -1 else addr[:idx]
+                host = default_host if idx == -1 else addr[:idx]
                 port = int(addr[idx + 1:])
                 interface = XMLRPCInterface((host, port))
                 self._interfaces.append(interface)
@@ -1275,7 +1279,7 @@ class Application(object):
                 authkey = "pysph" if idx == -1 else addr[:idx]
                 addr = addr[idx + 1:]
                 idx = addr.find(':')
-                host = "0.0.0.0" if idx == -1 else addr[:idx]
+                host = default_host if idx == -1 else addr[:idx]
                 port = addr[idx + 1:]
                 if port[-1] == '+':
                     port = get_free_port(int(port[:-1]), skip=_used_ports)
