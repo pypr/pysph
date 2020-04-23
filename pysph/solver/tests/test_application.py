@@ -163,5 +163,6 @@ class TestApplication(TestCase):
         count = 0
         while port1 != port and count < 4:
             time.sleep(0.5)
+            port1 = get_free_port(9000)
             count += 1
         self.assertEqual(port1, port)
