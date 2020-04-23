@@ -276,7 +276,7 @@ def exact(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0,
         pold = p
 
     if i == niter - 1:
-        printf("%s", "Divergence in Newton-Raphson Iteration")
+        printf(b"%s", b"Divergence in Newton-Raphson Iteration")
         return 1
 
     # compute the velocity in the star region 'um'
@@ -709,7 +709,7 @@ def hllc(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
         ustar = ur
 
     else:
-        printf("%s", "Incorrect wave speeds")
+        printf(b"%s", b"Incorrect wave speeds")
         return 1
 
     result[0] = pstar

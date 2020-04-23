@@ -534,7 +534,7 @@ class GSPHAcceleration(Equation):
                          (3.0/8.0)*hij4*(aij*dij + bij*cij) +
                          0.5*hij2*cij*dij)/vij
         else:
-            printf("%s", "Unknown interpolation type")
+            printf(b"%s", b"Unknown interpolation type")
 
         result[0] = vij_i2
         result[1] = vij_j2
