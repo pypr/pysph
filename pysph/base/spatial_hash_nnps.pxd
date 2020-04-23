@@ -1,6 +1,8 @@
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
 from libcpp.vector cimport vector
 
-from nnps_base cimport *
+from .nnps_base cimport *
 
 #Imports for SpatialHashNNPS
 cdef extern from "spatial_hash.h":
@@ -83,5 +85,3 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
     cpdef _refresh(self)
 
     cpdef _bin(self, int pa_index, UIntArray indices)
-
-

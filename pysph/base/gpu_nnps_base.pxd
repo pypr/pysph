@@ -1,3 +1,5 @@
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
 # numpy
 cimport numpy as np
 cimport cython
@@ -12,8 +14,8 @@ import pyopencl.array
 from cyarray.carray cimport UIntArray, IntArray, DoubleArray, LongArray
 
 # local imports
-from particle_array cimport ParticleArray
-from point cimport *
+from .particle_array cimport ParticleArray
+from .point cimport *
 
 from pysph.base.nnps_base cimport *
 

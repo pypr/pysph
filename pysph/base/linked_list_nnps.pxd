@@ -1,7 +1,10 @@
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
+
 from libcpp.map cimport map
 from libcpp.vector cimport vector
 
-from nnps_base cimport *
+from .nnps_base cimport *
 
 # NNPS using the linked list approach
 cdef class LinkedListNNPS(NNPS):
@@ -23,5 +26,3 @@ cdef class LinkedListNNPS(NNPS):
     cdef long _get_valid_cell_index(self, int cid_x, int cid_y, int cid_z,
             int* ncells_per_dim, int dim, int n_cells) nogil
     cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
-
-

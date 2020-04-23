@@ -73,12 +73,12 @@ class TestGeometry(unittest.TestCase):
         x_new, y_new, z_new = G.rotate(x, y, z, axis, angle)
         unit_vector = axis / np.linalg.norm(axis)
         mat = np.cross(np.eye(3), unit_vector * theta)
-        rotation_matrix = G.matrix_exp(np.matrix(mat))
+        rotation_matrix = G.matrix_exp(np.array(mat))
         test_points = []
         for xi, yi, zi in zip(x, y, z):
             point = np.array([xi, yi, zi])
             new = np.asarray(np.dot(rotation_matrix, point))
-            test_points.append(new[0])
+            test_points.append(new)
         test_points = np.asarray(test_points)
         x_test = test_points[:, 0]
         y_test = test_points[:, 1]

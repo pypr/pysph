@@ -9,7 +9,7 @@ from libc.stdio cimport printf
 
 from cython.operator cimport dereference as deref, preincrement as inc
 
-from nnps_base cimport *
+from .nnps_base cimport *
 # Cython for compiler directives
 cimport cython
 
@@ -421,5 +421,3 @@ cdef class StratifiedSFCNNPS(NNPS):
 
         self.fill_array(pa_wrapper, pa_index, indices, current_pids,
                 current_keys, current_cells)
-
-

@@ -1,4 +1,6 @@
-#cython: embedsignature=True
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
+
 # Library imports.
 import numpy as np
 cimport numpy as np
@@ -40,9 +42,9 @@ import compyle.array as array
 
 # Particle Tag information
 from cyarray.carray cimport BaseArray, aligned_malloc, aligned_free
-from utils import ParticleTAGS
+from .utils import ParticleTAGS
 
-from nnps_base cimport *
+from .nnps_base cimport *
 
 from pysph.base.gpu_helper_kernels import (exclusive_input, exclusive_output,
                                            get_scan)

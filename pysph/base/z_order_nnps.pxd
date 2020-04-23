@@ -1,8 +1,9 @@
-# cython: embedsignature=True
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
 from libcpp.map cimport map
 from libcpp.pair cimport pair
 
-from nnps_base cimport *
+from .nnps_base cimport *
 
 cdef extern from "math.h":
     double log2(double) nogil
@@ -126,4 +127,3 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
     cpdef _refresh(self)
 
     cpdef set_context(self, int src_index, int dst_index)
-

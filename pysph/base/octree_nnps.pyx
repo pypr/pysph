@@ -1,7 +1,7 @@
 #cython: embedsignature=True
 
-from nnps_base cimport *
-from octree cimport Octree, CompressedOctree, cOctreeNode
+from .nnps_base cimport *
+from .octree cimport Octree, CompressedOctree, cOctreeNode
 
 from libcpp.vector cimport vector
 from libc.stdlib cimport malloc, free
@@ -228,5 +228,3 @@ cdef class CompressedOctreeNNPS(OctreeNNPS):
 
     cpdef _bin(self, int pa_index, UIntArray indices):
         pass
-
-

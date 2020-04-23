@@ -1,4 +1,5 @@
-# cython: embedsignature=True
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
 from libcpp.map cimport map
 from libcpp.pair cimport pair
 
