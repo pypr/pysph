@@ -741,30 +741,17 @@ class Application(object):
             help=("Add an XML-RPC interface to the solver;"
                   "HOST=0.0.0.0 by default"))
 
-        if sys.platform == 'win32':
-            default = "pysph@127.0.0.1:8800+"
-        else:
-            default = "pysph@0.0.0.0:8800+"
-
         interfaces.add_argument(
             "--multiproc",
             action="store",
             dest="multiproc",
             metavar='[[AUTHKEY@] HOST:] PORT[+] ',
-            default=default,
+            default=None,
             help=("Add a python multiprocessing interface "
                   "to the solver; "
-                  "AUTHKEY=pysph, HOST=0.0.0.0, PORT=8800+ by"
-                  " default (8800+ means first available port "
-                  "number 8800 onwards)"))
-
-        interfaces.add_argument(
-            "--no-multiproc",
-            action="store_const",
-            dest="multiproc",
-            const=None,
-            help=("Disable multiprocessing interface "
-                  "to the solver"))
+                  "AUTHKEY=pysph, HOST=0.0.0.0, PORT=8800+ when"
+                  " given 'auto' (8800+ means first available port "
+                  "number 8800 onwards);"))
 
         interfaces.add_argument(
             "--octree-leaf-size",
@@ -1248,8 +1235,10 @@ class Application(object):
 
         if self.rank == 0:
             if sys.platform == 'win32':
+                auto = "pysph@127.0.0.1:8800+"
                 default_host = "127.0.0.1"
             else:
+                auto = "pysph@0.0.0.0:8800+"
                 default_host = "0.0.0.0"
             # commandline interface
             if options.cmd_line:
@@ -1279,7 +1268,10 @@ class Application(object):
                 from pysph.solver.solver_interfaces import (
                     MultiprocessingInterface
                 )
-                addr = options.multiproc
+                if options.multiproc == 'auto':
+                    addr = auto
+                else:
+                    addr = options.multiproc
                 idx = addr.find('@')
                 authkey = "pysph" if idx == -1 else addr[:idx]
                 addr = addr[idx + 1:]
@@ -1296,7 +1288,6 @@ class Application(object):
                 )
                 self._interfaces.append(interface)
                 self.command_manager.add_interface(interface.start)
-                _used_ports.append(port)
 
                 logger.info('Started multiprocessing interface on %s:%d' %
                             (host, port))
