@@ -15,6 +15,7 @@ import os
 import shutil
 import sys
 from tempfile import mkdtemp
+import time
 
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
@@ -159,4 +160,8 @@ class TestApplication(TestCase):
             app._interfaces[0], XMLRPCInterface
         ))
         port1 = get_free_port(9000)
+        count = 0
+        while port1 != port and count < 4:
+            time.sleep(0.5)
+            count += 1
         self.assertEqual(port1, port)
