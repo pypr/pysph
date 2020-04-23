@@ -1,6 +1,6 @@
-#cython: embedsignature=True
-
-from nnps_base cimport *
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
+from .nnps_base cimport *
 from libcpp.vector cimport vector
 cimport cython
 
@@ -133,5 +133,3 @@ cdef class CompressedOctree(Octree):
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
             vector[u_int]* indices, double* xmin, double length,
             cOctreeNode* node, int level) nogil
-
-

@@ -1,4 +1,5 @@
-#cython: embedsignature=True
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
 
 # malloc and friends
 from libc.stdlib cimport malloc, free
@@ -360,4 +361,3 @@ cdef class CellIndexingNNPS(NNPS):
         cdef key_to_idx_t* current_indices = self.key_indices[pa_index]
 
         self.fill_array(pa_wrapper, pa_index, indices, current_keys, current_indices)
-

@@ -1,8 +1,10 @@
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
 from libcpp.vector cimport vector
 from libcpp.map cimport map
 from libcpp.pair cimport pair
 
-from nnps_base cimport *
+from .nnps_base cimport *
 
 cdef extern from 'math.h':
     int abs(int) nogil
@@ -82,5 +84,3 @@ cdef class StratifiedSFCNNPS(NNPS):
     cpdef _refresh(self)
 
     cpdef _bin(self, int pa_index, UIntArray indices)
-
-

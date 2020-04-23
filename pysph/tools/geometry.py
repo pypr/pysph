@@ -4,7 +4,7 @@ import copy
 from pysph.base.nnps import LinkedListNNPS
 from pysph.base.utils import get_particle_array, get_particle_array_wcsph
 from cyarray.api import UIntArray
-from numpy.linalg import norm
+from numpy.linalg import norm, matrix_power
 
 
 def distance(point1, point2=np.array([0.0, 0.0, 0.0])):
@@ -42,13 +42,13 @@ def matrix_exp(matrix):
             [0., 1.]])
     """
 
-    matrix = np.asmatrix(matrix)
+    matrix = np.asarray(matrix)
     tol = 1.0e-16
-    result = matrix**(0)
+    result = matrix_power(matrix, 0)
     n = 1
     condition = True
     while condition:
-        adding = matrix**(n) / (1.0 * np.math.factorial(n))
+        adding = matrix_power(matrix, n) / (1.0 * np.math.factorial(n))
         result += adding
         residue = np.sqrt(np.sum(np.square(adding)) /
                           np.sum(np.square(result)))
@@ -173,12 +173,12 @@ def rotate(x, y, z, axis=np.array([0.0, 0.0, 1.0]), angle=90.0):
     theta = angle * np.pi / 180.0
     unit_vector = np.asarray(axis) / norm(np.asarray(axis))
     matrix = np.cross(np.eye(3), unit_vector * theta)
-    rotation_matrix = matrix_exp(np.matrix(matrix))
+    rotation_matrix = matrix_exp(matrix)
     new_points = []
     for xi, yi, zi in zip(np.asarray(x), np.asarray(y), np.asarray(z)):
         point = np.array([xi, yi, zi])
         new = np.dot(rotation_matrix, point)
-        new_points.append(np.asarray(new)[0])
+        new_points.append(new)
     new_points = np.array(new_points)
     x_new = new_points[:, 0]
     y_new = new_points[:, 1]

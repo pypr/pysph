@@ -1,3 +1,5 @@
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
 from pysph.base.gpu_nnps_base cimport *
 
 

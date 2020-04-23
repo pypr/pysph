@@ -5,7 +5,7 @@ from libc.stdlib cimport malloc, free
 from libc.stdio cimport printf
 from libcpp.vector cimport vector
 
-from nnps_base cimport *
+from .nnps_base cimport *
 
 # Cython for compiler directives
 cimport cython
@@ -323,4 +323,3 @@ cdef class StratifiedHashNNPS(NNPS):
                     &c_x, &c_y, &c_z
                     )
             current_hash[hash_id].add(c_x, c_y, c_z, idx, src_h_ptr[idx])
-

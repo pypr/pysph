@@ -1,4 +1,5 @@
-#cython: embedsignature=True
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
 # Library imports.
 import numpy as np
 cimport numpy as np
@@ -55,7 +56,7 @@ IF UNAME_SYSNAME == "Windows":
 
 # Particle Tag information
 from cyarray.carray cimport BaseArray, aligned_malloc, aligned_free
-from utils import ParticleTAGS
+from .utils import ParticleTAGS
 
 cdef int Local = ParticleTAGS.Local
 cdef int Remote = ParticleTAGS.Remote
@@ -345,7 +346,7 @@ cdef class DomainManagerBase(object):
         self.mirror_in_x = mirror_in_x
         self.mirror_in_y = mirror_in_y
         self.mirror_in_z = mirror_in_z
-        
+
         self.is_periodic = periodic_in_x or periodic_in_y or periodic_in_z
         self.is_mirror = mirror_in_x or mirror_in_y or mirror_in_z
         self.n_layers = n_layers
@@ -517,7 +518,7 @@ cdef class CPUDomainManager(DomainManagerBase):
         cdef int i
         for i in range(arr.length):
             arr.data[i] *= val
-            
+
     cdef _create_ghosts_mirror(self):
         """Identify boundary particles and create images.
 
@@ -1244,7 +1245,7 @@ cdef class NeighborCache:
             arr = <UIntArray>self._neighbors[i]
             arr.c_reset()
             arr.c_reserve(
-                self._last_avg_nbr_size*np/n_threads + safety
+                <size_t>(self._last_avg_nbr_size*np/n_threads) + safety
             )
 
     #### Private protocol ################################################

@@ -1,7 +1,8 @@
-#cython: embedsignature=True
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
 
-from nnps_base cimport *
-from octree cimport Octree, CompressedOctree, cOctreeNode
+from .nnps_base cimport *
+from .octree cimport Octree, CompressedOctree, cOctreeNode
 
 from libcpp.vector cimport vector
 cimport cython
@@ -57,6 +58,3 @@ cdef class CompressedOctreeNNPS(OctreeNNPS):
     cpdef _refresh(self)
 
     cpdef _bin(self, int pa_index, UIntArray indices)
-
-
-

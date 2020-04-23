@@ -78,8 +78,8 @@ class TestLinalg(unittest.TestCase):
                [0., 0., 100., 200.]]
         b = [0.02, 1., 4., 800.]
         sing, result = gj_solve_helper(np.ravel(mat), b, n)
-        mat = np.matrix(mat)
-        new_b = mat * np.transpose(np.matrix(result))
+        mat = np.array(mat)
+        new_b = np.dot(mat, np.transpose(np.array(result)))
         new_b = np.ravel(np.array(new_b))
         assert np.allclose(new_b, np.array(b))
         self.assertAlmostEqual(sing, 0.0)
@@ -89,8 +89,8 @@ class TestLinalg(unittest.TestCase):
         mat = [[1., -2., 0.], [1., -1., 3.], [2., 5., 0.]]
         b = [-3., 1., 0.5]
         sing, result = gj_solve_helper(np.ravel(mat), b, n)
-        mat = np.matrix(mat)
-        new_b = mat * np.transpose(np.matrix(result))
+        mat = np.array(mat)
+        new_b = np.dot(mat, np.transpose(np.array(result)))
         new_b = np.ravel(np.array(new_b))
         assert np.allclose(new_b, np.array(b))
         self.assertAlmostEqual(sing, 0.0)
@@ -100,8 +100,8 @@ class TestLinalg(unittest.TestCase):
         mat = [[0.96, 4.6, -3.7], [2.7, 4.3, -0.67], [0.9, 0., -5.]]
         b = [2.4, 3.6, -5.8]
         sing, result = gj_solve_helper(np.ravel(mat), b, n)
-        mat = np.matrix(mat)
-        new_b = mat * np.transpose(np.matrix(result))
+        mat = np.array(mat)
+        new_b = np.dot(mat, np.transpose(np.array(result)))
         new_b = np.ravel(np.array(new_b))
         assert np.allclose(new_b, np.array(b))
         self.assertAlmostEqual(sing, 0.0)
@@ -112,8 +112,8 @@ class TestLinalg(unittest.TestCase):
                [0., 0., 1., -2.]]
         b = [-1., 0., 0., -5.]
         sing, result = gj_solve_helper(np.ravel(mat), b, n)
-        mat = np.matrix(mat)
-        new_b = mat * np.transpose(np.matrix(result))
+        mat = np.array(mat)
+        new_b = np.dot(mat, np.transpose(np.array(result)))
         new_b = np.ravel(np.array(new_b))
         assert np.allclose(new_b, np.array(b))
         self.assertAlmostEqual(sing, 0.0)
@@ -123,8 +123,8 @@ class TestLinalg(unittest.TestCase):
         mat = [[0.96, 4.6, -3.7], [4.6, 4.3, -0.67], [-3.7, -0.67, -5.]]
         b = [2.4, 3.6, -5.8]
         sing, result = gj_solve_helper(np.ravel(mat), b, n)
-        mat = np.matrix(mat)
-        new_b = mat * np.transpose(np.matrix(result))
+        mat = np.array(mat)
+        new_b = np.dot(mat, np.transpose(np.array(result)))
         new_b = np.ravel(np.array(new_b))
         assert np.allclose(new_b, np.array(b))
         self.assertAlmostEqual(sing, 0.0)
@@ -135,8 +135,8 @@ class TestLinalg(unittest.TestCase):
                [-1., -1., -4., 10.]]
         b = [2.4, 3.6, -5.8, 0.5]
         sing, result = gj_solve_helper(np.ravel(mat), b, n)
-        mat = np.matrix(mat)
-        new_b = mat * np.transpose(np.matrix(result))
+        mat = np.array(mat)
+        new_b = np.dot(mat, np.transpose(np.array(result)))
         new_b = np.ravel(np.array(new_b))
         assert np.allclose(new_b, np.array(b))
         self.assertAlmostEqual(sing, 0.0)

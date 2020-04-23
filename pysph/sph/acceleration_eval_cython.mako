@@ -1,5 +1,6 @@
 # Automatically generated, do not edit.
-#cython: cdivision=True
+# cython: cdivision=True, language_level=3
+# distutils: language=c++
 <%def name="indent(text, level=0)" buffered="True">
 % for l in text.splitlines():
 ${' '*4*level}${l}
