@@ -272,8 +272,11 @@ class AccelerationEvalCythonHelper(object):
         else:
             return "if True: # Placeholder used for OpenMP."
 
-    def get_parallel_range(self, start, stop=None, step=1):
-        return get_parallel_range(start, stop, step)
+    def get_parallel_range(self, start, stop=None, step=1, nogil=True):
+        if nogil:
+            return get_parallel_range(start, stop, step, nogil=True)
+        else:
+            return get_parallel_range(start, stop, step)
 
     def get_particle_array_names(self):
         parrays = [pa.name for pa in self.object.particle_arrays]
