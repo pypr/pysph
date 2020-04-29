@@ -37,7 +37,7 @@ ${indent(all_eqs.get_py_initialize_code(), 0)}
 #######################################################################
 % if all_eqs.has_initialize():
 # Initialization for destination ${dest}.
-for d_idx in range(NP_DEST):
+for d_idx in ${helper.get_parallel_range("NP_DEST")}:
     ${indent(all_eqs.get_initialize_code(helper.object.kernel), 1)}
 % endif
 #######################################################################
@@ -46,7 +46,7 @@ for d_idx in range(NP_DEST):
 % if len(eqs_with_no_source.equations) > 0:
 % if eqs_with_no_source.has_loop():
 # SPH Equations with no sources.
-for d_idx in range(NP_DEST):
+for d_idx in ${helper.get_parallel_range("NP_DEST")}:
     ${indent(eqs_with_no_source.get_loop_code(helper.object.kernel), 1)}
 % endif
 % endif
@@ -65,7 +65,7 @@ ${indent(helper.get_src_array_setup(source, eq_group), 0)}
 src_array_index = src.index
 
 % if eq_group.has_initialize_pair():
-for d_idx in range(NP_DEST):
+for d_idx in ${helper.get_parallel_range("NP_DEST")}:
     ${indent(eq_group.get_initialize_pair_code(helper.object.kernel), 1)}
 % endif
 
@@ -78,7 +78,7 @@ nnps.set_context(src_array_index, dst_array_index)
 ${helper.get_parallel_block()}
     thread_id = threadid()
     ${indent(eq_group.get_variable_array_setup(), 1)}
-    for d_idx in ${helper.get_parallel_range("NP_DEST")}:
+    for d_idx in ${helper.get_parallel_range("NP_DEST", nogil=False)}:
         ###############################################################
         ## Find and iterate over neighbors.
         ###############################################################
@@ -105,7 +105,7 @@ ${helper.get_parallel_block()}
 ###################################################################
 % if all_eqs.has_post_loop():
 # Post loop for destination ${dest}.
-for d_idx in range(NP_DEST):
+for d_idx in ${helper.get_parallel_range("NP_DEST")}:
     ${indent(all_eqs.get_post_loop_code(helper.object.kernel), 1)}
 % endif
 
