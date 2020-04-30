@@ -3,7 +3,7 @@
 
 import numpy as np
 
-from pyzoltan.core.carray import BaseArray
+from cyarray.carray import BaseArray
 
 
 def _check_operation(op):

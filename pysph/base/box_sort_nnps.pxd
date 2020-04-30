@@ -1,7 +1,9 @@
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
 from libcpp.map cimport map
 
-from nnps_base cimport *
-from linked_list_nnps cimport *
+from .nnps_base cimport *
+from .linked_list_nnps cimport *
 
 # NNPS using the original gridding algorithm
 cdef class DictBoxSortNNPS(NNPS):
@@ -21,5 +23,3 @@ cdef class BoxSortNNPS(LinkedListNNPS):
     # Data Attributes
     ############################################################################
     cdef public map[long, int] cell_to_index  # Maps cell ID to an index
-
-

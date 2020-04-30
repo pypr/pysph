@@ -1,4 +1,5 @@
-#cython: embedsignature=True
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
 
 # malloc and friends
 from libc.stdlib cimport malloc, free
@@ -8,7 +9,7 @@ from libcpp.pair cimport pair
 
 from cython.operator cimport dereference as deref, preincrement as inc
 
-from gpu_nnps_helper import GPUNNPSHelper
+from .gpu_nnps_helper import GPUNNPSHelper
 
 import pyopencl as cl
 import pyopencl.array
@@ -16,9 +17,9 @@ import pyopencl.algorithm
 from pyopencl.scan import GenericScanKernel
 from pyopencl.elementwise import ElementwiseKernel
 
-from pysph.cpy.array import Array
-import pysph.cpy.array as array
-from pysph.cpy.opencl import get_context
+from compyle.array import Array
+import compyle.array as array
+from compyle.opencl import get_context
 
 # Cython for compiler directives
 cimport cython
@@ -120,7 +121,7 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
                 scan_kernel=GenericScanKernel, key_expr="keys[i]",
                 sort_arg_names=["pids", "keys"])
 
-        cdef int max_num_bits = <int> (self.max_num_bits - 1 + \
+        cdef int max_num_bits = <int> (self.max_num_bits + \
                 ceil(log2(self.num_levels)))
 
         (sorted_indices, sorted_keys), evnt = radix_sort(self.pids[pa_index].dev,
@@ -160,8 +161,8 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
         find_nbr_lengths = self.helper.get_kernel("find_nbr_lengths",
                 sorted=self._sorted)
 
-        make_vec = cl.array.vec.make_double3 if self.use_double \
-                else cl.array.vec.make_float3
+        make_vec = cl.cltypes.make_double3 if self.use_double \
+                else cl.cltypes.make_float3
 
         mask_lengths = array.zeros(self.dst.get_number_of_particles(),
                 dtype=np.int32, backend=self.backend)
@@ -184,8 +185,8 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
         find_nbrs = self.helper.get_kernel("find_nbrs",
                 sorted=self._sorted)
 
-        make_vec = cl.array.vec.make_double3 if self.use_double \
-                else cl.array.vec.make_float3
+        make_vec = cl.cltypes.make_double3 if self.use_double \
+                else cl.cltypes.make_float3
 
         dst_gpu = self.dst.pa.gpu
         src_gpu = self.src.pa.gpu

@@ -6,7 +6,7 @@ import numpy as np
 
 # Local library imports.
 from pysph.base.particle_array import ParticleArray
-from pysph.cpy.api import KnownType
+from compyle.api import KnownType
 from pysph.sph.acceleration_eval_cython_helper import (
     get_all_array_names, get_known_types_for_arrays
 )

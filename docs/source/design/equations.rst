@@ -38,11 +38,16 @@ methods of a typical :py:class:`Equation` subclass::
           # Otherwise, no need to override __init__
 
       def py_initialize(self, dst, t, dt):
-          # Called once per destination before initialize.
+          # Called once per destination array before initialize.
           # This is a pure Python function and is not translated.
 
       def initialize(self, d_idx, ...):
-          # Called once per destination before loop.
+          # Called once per destination particle before loop.
+
+      def initialize_pair(self, d_idx, d_*, s_*):
+          # Called once per destination particle for each source.
+          # Can access all source arrays.  Does not have
+          # access to neighbor information.
 
       def loop_all(self, d_idx, ..., NBRS, N_NBRS, ...):
           # Called once before the loop and can be used
@@ -80,6 +85,9 @@ equation is used.  What happens is as follows:
 - for each fluid particle, the ``initialize`` method is called with the
   required arrays.
 
+- for each fluid particle, the ``initialize_pair`` method is called while
+  having access to all the *fluid* arrays.
+
 - the *fluid* neighbors for each fluid particle are found for each particle
   and can be passed en-masse to the ``loop_all`` method. One can pass ``NBRS``
   which is an array of unsigned ints with indices to the neighbors in the
@@ -89,6 +97,9 @@ equation is used.  What happens is as follows:
 
 - the *fluid* neighbors for each fluid particle are found and for each pair,
   the ``loop`` method is called with the required properties/values.
+
+- for each fluid particle, the ``initialize_pair`` method is called while
+  having access to all the *solid* arrays.
 
 - the *solid* neighbors for each fluid particle are found and for each pair,
   the ``loop`` method is called with the required properties/values.
@@ -101,9 +112,9 @@ equation is used.  What happens is as follows:
   and timestep. It is transpiled when you are using Cython but is a pure
   Python function when you run this via OpenCL or CUDA.
 
-The ``initialize, loop_all, loop, post_loop`` methods all may be called in
-separate threads (both on CPU/GPU) depending on the implementation of the
-backend.
+The ``initialize, initialize_pair, loop_all, loop, post_loop`` methods all may
+be called in separate threads (both on CPU/GPU) depending on the
+implementation of the backend.
 
 It is possible to set a scalar value in the equation as an instance attribute,
 i.e. by setting ``self.something = value`` but remember that this is just one
@@ -113,10 +124,12 @@ private (i.e. do not start with an underscore). There is only one equation
 instance used in the code, not one equation per thread or particle. So if you
 wish to calculate a temporary quantity for each particle, you should create a
 separate property for it and use that instead of assuming that the initialize
-and loop functions run in serial. They do not when you use OpenMP or OpenCL.
-So do not create temporary arrays inside the equation for these sort of
-things. In general if you need a constant per destination array, add it as a
-constant to the particle array.
+and loop functions run in serial. They do not run in serial when you use
+OpenMP or OpenCL. So do not create temporary arrays inside the equation for
+these sort of things. In general if you need a constant per destination array,
+add it as a constant to the particle array. Also note that you can add
+properties that have strides (see :ref:`simple_tutorial` and look for
+"stride").
 
 Now, if the group containing the equation has ``iterate`` set to True, then
 the group will be iterated until convergence is attained for all the equations
@@ -133,6 +146,116 @@ carefully -- ideally declare any variables used in this as
 ``declare('object')``. On the GPU, this function is not called via OpenCL and
 is a pure Python function.
 
+Understanding Groups a bit more
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Equations can be grouped together and it is important to understand how
+exactly this works. Let us take a simple example of a :py:class:`Group` with
+two equations. We illustrate two simple equations with pseudo-code::
+
+  class Eq1(Equation):
+      def initialize(self, ...):
+          # ...
+      def loop(...):
+          # ...
+      def post_loop(...):
+          # ...
+
+Let us say that ``Eq2`` has a similar structure with respect to its methods.
+Let us say we have a group defined as::
+
+  Group(
+      equations=[
+          Eq1(dest='fluid', sources=['fluid', 'solid']),
+          Eq2(dest='fluid', sources=['fluid', 'solid']),
+      ]
+  )
+
+When this is expanded out and used inside PySPH, this is what happens in terms
+of pseudo-code::
+
+    # Instances of the Eq1, and Eq2.
+    eq1 = Eq1(...)
+    eq2 = Eq2(...)
+
+    for d_idx in range(n_destinations):
+        eq1.initialize(...)
+        eq2.initialize(...)
+
+    # Sources from 'fluid'
+    for d_idx in range(n_destinations):
+        for s_idx in NEIGHBORS('fluid', d_idx):
+            eq1.loop(...)
+            eq2.loop(...)
+
+    # Sources from 'solid'
+    for d_idx in range(n_destinations):
+        for s_idx in NEIGHBORS('solid', d_idx):
+            eq1.loop(...)
+            eq2.loop(...)
+
+    for d_idx in range(n_destinations):
+        eq1.post_loop(...)
+        eq2.post_loop(...)
+
+That is, all the initialization is done for each equation in sequence,
+followed by the loops for each set of sources, fluid and solid in this case.
+In the end, the ``post_loop`` is called for the destinations. The equations
+are therefore merged inside a group and entirely completed before the next
+group is taken up. Note that the order of the equations will be exactly as
+specified in the group.
+
+When the ``real=False`` is used, then the non-local *destination* particles
+are also iterated over. ``real=True`` by default, which means that only
+destination particles whose ``tag`` property is local or equal to 0 are
+operated on. Otherwise, when ``real=False``, remote and ghost particles are
+also operated on. It is important to note that this does not affect the source
+particles. That is, **ALL** source particles influence the destinations
+whether the sources are local, remote or ghost particles. The ``real`` keyword
+argument only affects the destination particles and not the sources.
+
+Note that if you have different destinations in the same group, they are
+internally split up into different sets of loops for each destination and that
+these are done separately. I.e. one destination is fully processed and then
+the next is considered. So if we had for example, both ``fluid`` and ``solid``
+destinations, they would be processed separately. For example lets say you had
+this::
+
+  Group(
+      equations=[
+          Eq1(dest='fluid', sources=['fluid', 'solid']),
+          Eq1(dest='solid', sources=['fluid', 'solid']),
+          Eq2(dest='fluid', sources=['fluid', 'solid']),
+          Eq2(dest='solid', sources=['fluid', 'solid']),
+      ]
+  )
+
+This would internally be equivalent to the following::
+
+  [
+      Group(
+          equations=[
+              Eq1(dest='fluid', sources=['fluid', 'solid']),
+              Eq2(dest='fluid', sources=['fluid', 'solid']),
+          ]
+       ),
+       Group(
+          equations=[
+              Eq1(dest='solid', sources=['fluid', 'solid']),
+              Eq2(dest='solid', sources=['fluid', 'solid']),
+          ]
+       )
+  ]
+
+Note that basically the fluids are done first and then the solid particles are
+done. Obviously the first form is a lot more compact.
+
+While it may appear that the PySPH equations and groups are fairly complex,
+they actually do a lot of work for you and allow you to express the
+interactions in a rather compact form.
+
+When debugging it sometimes helps to look at the generated log file which will
+also print out the exact equations and groups that are being used.
 
 
 Conventions followed
@@ -208,16 +331,31 @@ following:
    destination particle with index, ``d_idx``.
 
 
-
 .. note::
 
    Note that all standard functions and constants in ``math.h`` are available
-   for use in the equations. ``pi`` is defined. Please avoid using functions
-   from ``numpy`` as these are Python functions and are slow. They also will
-   not allow PySPH to be run with OpenMP. Similarly, do not use functions or
-   constants from ``sympy`` and other libraries inside the equation methods as
-   these will significantly slow down your code.
+   for use in the equations. The value of :math:`\pi` is available as
+   ``M_PI``. Please avoid using functions from ``numpy`` as these are Python
+   functions and are slow. They also will not allow PySPH to be run with
+   OpenMP. Similarly, do not use functions or constants from ``sympy`` and
+   other libraries inside the equation methods as these will significantly
+   slow down your code.
 
+In addition, these constants from the math library are available:
+
+  - ``M_E``: value of e
+  - ``M_LOG2E``: value of log2e
+  - ``M_LOG10E``: value of log10e
+  - ``M_LN2``: value of loge2
+  - ``M_LN10``: value of loge10
+  - ``M_PI``: value of pi
+  - ``M_PI_2``: value of pi / 2
+  - ``M_PI_4``: value of pi / 4
+  - ``M_1_PI``: value of 1 / pi
+  - ``M_2_PI``: value of 2 / pi
+  - ``M_2_SQRTPI``: value of 2 / (square root of pi)
+  - ``M_SQRT2``: value of square root of 2
+  - ``M_SQRT1_2``: value of square root of 1/2
 
 In an equation, any undeclared variables are automatically declared to be
 doubles in the high-performance Cython code that is generated.  In addition
@@ -244,9 +382,9 @@ one desires a ``long`` data type, one may use ``i = declare("long")``.
 Note that the additional (optional) argument in the declare specifies the
 number of variables. While this is ignored during transpilation, this is
 useful when writing functions in pure Python, the
-:py:func:`pysph.base.cython_generator.declare` function provides a pure Python
+:py:func:`compyle.api.declare` function provides a pure Python
 implementation of this so that the code works both when compiled as well as
-when run from pure Python. For example::
+when run from pure Python. For example:
 
 .. code-block:: python
 
@@ -309,10 +447,45 @@ equation in the list of equations to be passed to the application.  It is
 often easiest to look at the many existing equations in PySPH and learn the
 general patterns.
 
-If you wish to use adaptive time stepping, see the code
-:py:class:`pysph.sph.integrator.Integrator`. The integrator uses information
-from the arrays ``dt_cfl``, ``dt_force``, and ``dt_visc`` in each of the
-particle arrays to determine the most suitable time step.
+Adaptive timesteps
+--------------------
+
+There are a couple of ways to use adaptive timesteps. The first is to compute
+a required timestep directly per-particle in a particle array property called
+``dt_adapt``. The minimum value of this array across all particle arrays is
+used to set the timestep directly. This is the easiest way to set the adaptive
+timestep.
+
+If the ``dt_adapt`` parameter is not set one may also use standard velocity,
+force, and viscosity based parameters. The integrator uses information from
+the arrays ``dt_cfl``, ``dt_force``, and ``dt_visc`` in each of the particle
+arrays to determine the most suitable time step. This is done using the
+following approach. The minimum smoothing parameter ``h`` is found as
+``hmin``. Let the CFL number be given as ``cfl``. For the velocity criterion,
+the maximum value of ``dt_cfl`` is found and then a suitable timestep is found
+as::
+
+  dt_min_vel = hmin/max(dt_cfl)
+
+For the force based criterion we use the following::
+
+  dt_min_force = sqrt(hmin/sqrt(max(dt_force)))
+
+for the viscosity we have::
+
+  dt_min_visc = hmin/max(dt_visc_fac)
+
+Then the correct timestep is found as::
+
+  dt = cfl*min(dt_min_vel, dt_min_force, dt_min_visc)
+
+The ``cfl`` is set to 0.3 by default. One may pass ``--cfl`` to the
+application to change the CFL. Note that when the ``dt_adapt`` property is
+used the CFL has no effect as we assume that the user will compute a suitable
+value based on their requirements.
+
+The :py:class:`pysph.sph.integrator.Integrator` class code may be instructive
+to look at if you are wondering about any particular details.
 
 Illustration of the ``loop_all`` method
 ----------------------------------------
@@ -339,7 +512,7 @@ perform what the ``loop`` method usually does ourselves.
                xij[0] = d_x[d_idx] - s_x[s_idx]
                xij[1] = d_y[d_idx] - s_y[s_idx]
                xij[2] = d_z[d_idx] - s_z[s_idx]
-               rij = sqrt(xij[0]*xij[0], xij[1]*xij[1], xij[2]*xij[2])
+               rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1] + xij[2]*xij[2])
                sum += s_m[s_idx]*SPH_KERNEL.kernel(xij, rij, 0.5*(s_h[s_idx] + d_h[d_idx]))
            d_rho[d_idx] += sum
 
@@ -475,6 +648,73 @@ they will be called automatically. They are passed the destination particle
 array, the current time, and current timestep.
 
 
+Different equations for different stages
+-----------------------------------------
+
+By default, when one creates equations the implicit assumption is that the
+same right-hand-side is evaluated at each stage of the integrator. However,
+some schemes require that one solve different equations for different
+integrator stages. PySPH does support this but to do this when one creates
+equations in the application, one should return an instance of
+:py:class:`pysph.sph.equation.MultiStageEquations`. For example:
+
+.. code-block:: python
+
+    def create_equations(self):
+        # ...
+        eqs = [
+            [Eq1(dest='fluid', sources=['fluid'])],
+            [Eq2(dest='fluid', sources=['fluid'])]
+        ]
+        from pysph.sph.equation import MultiStageEquations
+        return MultiStageEquations(eqs)
+
+In the above, note that each element of ``eqs`` is a list, it could have also
+been a group. Each item of the given equations is treated as a separate
+collection of equations which is to be used. The use of the
+:py:class:`pysph.sph.equation.MultiStageEquations` tells PySPH that multiple
+equation sets are being used.
+
+Now that we have this, how do we call the right accelerations at the right
+times? We do this by sub-classing the
+:py:class:`pysph.sph.integrator.Integrator`. We show a simple example from our
+test suite to illustrate this:
+
+.. code-block:: python
+
+    from pysph.sph.integrator import Integrator
+
+    class MyIntegrator(Integrator):
+        def one_timestep(self, t, dt):
+
+            self.compute_accelerations(0)
+            # Equivalent to self.compute_accelerations()
+            self.stage1()
+            self.do_post_stage(dt, 1)
+
+            self.compute_accelerations(1, update_nnps=False)
+            self.stage2()
+            self.update_domain()
+            self.do_post_stage(dt, 2)
+
+Note that the ``compute_accelerations`` method takes two arguments, the
+``index`` (which defaults to zero) and ``update_nnps`` which defaults to
+``True``. A simple integrator with a single RHS would simply call
+``self.compute_accelerations()``. However, in the above, the first set of
+equations is called first, and then for the second stage the second set of
+equations is evaluated but without updating the NNPS (handy if the particles
+do not move in stage1). Note the call ``self.update_domain()`` after the
+second stage, this sets up any ghost particles for periodicity when particles
+have been moved, it also updates the neighbor finder to use an appropriate
+neighbor length based on the current smoothing length. If you do not need to
+do this for your particular integrator you may choose not to add this. In the
+above case, the domain is not updated after the first stage as the particles
+have not moved.
+
+The above illustrates how one can create more complex integrators that employ
+different accelerations in each stage.
+
+
 Examples to study
 ------------------
 
@@ -489,3 +729,10 @@ The equations that demonstrate the ``converged`` method are:
 
 - :py:class:`pysph.sph.gas_dynamics.basic.SummationDensity`: relatively simple.
 - :py:class:`pysph.sph.iisph.PressureSolve`.
+
+Some equations that demonstrate using matrices and solving systems of
+equations are:
+
+- :py:class:`pysph.sph.wc.density_correction.MLSFirstOrder2D`.
+- :py:class:`pysph.sph.wc.density_correction.MLSFirstOrder3D`.
+- :py:class:`pysph.sph.wc.kernel_correction.GradientCorrection`.

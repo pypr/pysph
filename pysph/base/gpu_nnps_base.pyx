@@ -1,4 +1,6 @@
-#cython: embedsignature=True
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
+
 # Library imports.
 import numpy as np
 cimport numpy as np
@@ -26,30 +28,32 @@ cimport cython
 
 import pyopencl as cl
 import pyopencl.array
-from pyopencl.scan import ExclusiveScanKernel
 from pyopencl.elementwise import ElementwiseKernel
 
 from pysph.base.nnps_base cimport *
 from pysph.base.device_helper import DeviceHelper
-from pysph.cpy.config import get_config
-from pysph.cpy.array import Array
-from pysph.cpy.parallel import Elementwise, Scan
-from pysph.cpy.types import annotate
-from pysph.cpy.opencl import (get_context, get_queue,
-                              set_context, set_queue)
-import pysph.cpy.array as array
+from compyle.config import get_config
+from compyle.array import get_backend, Array
+from compyle.parallel import Elementwise, Scan
+from compyle.types import annotate
+from compyle.opencl import (get_context, get_queue,
+                            set_context, set_queue)
+import compyle.array as array
 
 # Particle Tag information
-from pyzoltan.core.carray cimport BaseArray, aligned_malloc, aligned_free
-from utils import ParticleTAGS
+from cyarray.carray cimport BaseArray, aligned_malloc, aligned_free
+from .utils import ParticleTAGS
 
-from nnps_base cimport *
+from .nnps_base cimport *
+
+from pysph.base.gpu_helper_kernels import (exclusive_input, exclusive_output,
+                                           get_scan)
 
 
 cdef class GPUNeighborCache:
     def __init__(self, GPUNNPS nnps, int dst_index, int src_index,
-            backend='opencl'):
-        self.backend = backend
+            backend=None):
+        self.backend = get_backend(backend)
         self._dst_index = dst_index
         self._src_index = src_index
         self._nnps = nnps
@@ -84,11 +88,13 @@ cdef class GPUNeighborCache:
     #### Private protocol ################################################
 
     cdef void _find_neighbors(self):
+
         self._nnps.find_neighbor_lengths(self._nbr_lengths_gpu)
         # FIXME:
         # - Store sum kernel
         # - don't allocate neighbors_gpu each time.
         # - Don't allocate _nbr_lengths and start_idx.
+
         total_size_gpu = array.sum(self._nbr_lengths_gpu)
 
         cdef unsigned long total_size = <unsigned long>(total_size_gpu)
@@ -100,11 +106,10 @@ cdef class GPUNeighborCache:
 
         # Do prefix sum on self._neighbor_lengths for the self._start_idx
         if self._get_start_indices is None:
-            self._get_start_indices = ExclusiveScanKernel(
-                get_context(), np.uint32, scan_expr="a+b", neutral="0"
-            )
+            self._get_start_indices = get_scan(exclusive_input, exclusive_output,
+                    dtype=np.uint32, backend=self.backend)
 
-        self._get_start_indices(self._start_idx_gpu.dev)
+        self._get_start_indices(ary=self._start_idx_gpu)
 
         self._nnps.find_nearest_neighbors_gpu(self._neighbors_gpu,
                 self._start_idx_gpu)
@@ -143,7 +148,7 @@ cdef class GPUNNPS(NNPSBase):
     """
     def __init__(self, int dim, list particles, double radius_scale=2.0,
                  int ghost_layers=1, domain=None, bint cache=True,
-                 bint sort_gids=False, backend='opencl'):
+                 bint sort_gids=False, backend=None):
         """Constructor for NNPS
 
         Parameters
@@ -170,13 +175,14 @@ cdef class GPUNNPS(NNPSBase):
             This is useful when comparing parallel results with those
             from a serial run.
 
-        ctx : pyopencl.Context
-            For testing purpose
+        backend : string
+            Backend on which to build NNPS Module
         """
         NNPSBase.__init__(self, dim, particles, radius_scale, ghost_layers,
                 domain, cache, sort_gids)
 
-        self.backend = backend
+        self.backend = get_backend(backend)
+        self.backend = 'opencl' if self.backend is 'cython' else self.backend
         self.use_double = get_config().use_double
         self.dtype = np.float64 if self.use_double else np.float32
         self.dtype_max = np.finfo(self.dtype).max
@@ -219,6 +225,12 @@ cdef class GPUNNPS(NNPSBase):
         self.particles[pa_index].gpu.align(indices)
         callback()
 
+    def set_use_cache(self, bint use_cache):
+        self.use_cache = use_cache
+        if use_cache:
+            for cache in self.cache:
+                cache.update()
+
     cdef void find_neighbor_lengths(self, nbr_lengths):
         raise NotImplementedError("NNPS :: find_neighbor_lengths called")
 
@@ -248,7 +260,7 @@ cdef class GPUNNPS(NNPSBase):
             for cache in self.cache:
                 cache.update()
 
-    def update_domain(self, *args, **kwargs):
+    def update_domain(self):
         self.domain.update()
 
     cdef _compute_bounds(self):
@@ -269,9 +281,7 @@ cdef class GPUNNPS(NNPSBase):
             y = pa_wrapper.pa.gpu.get_device_array('y')
             z = pa_wrapper.pa.gpu.get_device_array('z')
 
-            x.update_min_max()
-            y.update_min_max()
-            z.update_min_max()
+            pa_wrapper.pa.gpu.update_minmax_cl(['x', 'y', 'z'])
 
             # find min and max of variables
             xmax = np.maximum(x.maximum, xmax)

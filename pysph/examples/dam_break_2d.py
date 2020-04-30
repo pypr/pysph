@@ -11,7 +11,7 @@ import os
 import numpy as np
 
 from pysph.base.kernels import WendlandQuintic, QuinticSpline
-from pysph.examples._db_geometry import DamBreak2DGeometry
+from pysph.base.utils import get_particle_array
 from pysph.solver.application import Application
 from pysph.sph.scheme import WCSPHScheme, SchemeChooser, AdamiHuAdamsScheme
 from pysph.sph.wc.edac import EDACScheme
@@ -21,6 +21,9 @@ from pysph.sph.wc.kernel_correction import (GradientCorrectionPreStep,
                                             GradientCorrection,
                                             MixedKernelCorrectionPreStep)
 from pysph.sph.wc.crksph import CRKSPHPreStep, CRKSPH
+from pysph.sph.wc.gtvf import GTVFScheme
+from pysph.sph.isph.sisph import SISPHScheme
+from pysph.tools.geometry import get_2d_tank, get_2d_block
 
 
 fluid_column_height = 2.0
@@ -29,41 +32,48 @@ container_height = 4.0
 container_width = 4.0
 nboundary_layers = 2
 nu = 0.0
-h = 0.039
+dx = 0.03
 g = 9.81
 ro = 1000.0
-co = 10.0 * np.sqrt(2 * 9.81 * fluid_column_height)
+vref = np.sqrt(2 * 9.81 * fluid_column_height)
+co = 10.0 * vref
 gamma = 7.0
 alpha = 0.1
 beta = 0.0
 B = co * co * ro / gamma
 p0 = 1000.0
+hdx = 1.3
+h = hdx * dx
+m = dx**2 * ro
 
 
 class DamBreak2D(Application):
 
     def add_user_options(self, group):
-        self.hdx = 1.3
         corrections = ['', 'mixed-corr', 'grad-corr', 'kernel-corr', 'crksph']
         group.add_argument(
-            "--h-factor", action="store", type=float, dest="h_factor",
-            default=1.0,
-            help="Divide default h by this factor to change resolution"
+            '--dx', action='store', type=float, dest='dx', default=dx,
+            help='Particle spacing.'
+        )
+        group.add_argument(
+            '--hdx', action='store', type=float, dest='hdx', default=hdx,
+            help='Specify the hdx factor where h = hdx * dx.'
         )
         group.add_argument(
             "--kernel-corr", action="store", type=str, dest='kernel_corr',
             default='', help="Type of Kernel Correction", choices=corrections
         )
+        group.add_argument(
+            '--staggered-grid', action="store_true", dest='staggered_grid',
+            default=False, help="Use a staggered grid for particles.",
+        )
 
     def consume_user_options(self):
-        self.h = h / self.options.h_factor
+        self.hdx = self.options.hdx
+        self.dx = self.options.dx
+        self.h = self.hdx * self.dx
         self.kernel_corr = self.options.kernel_corr
         print("Using h = %f" % self.h)
-        if self.options.scheme == 'wcsph':
-            self.hdx = self.hdx
-        else:
-            self.hdx = 1.0
-        self.dx = self.h / self.hdx
 
     def configure_scheme(self):
         tf = 2.5
@@ -71,14 +81,15 @@ class DamBreak2D(Application):
             tf=tf, output_at_times=[0.4, 0.6, 0.8, 1.0]
         )
         if self.options.scheme == 'wcsph':
+            dt = 0.125 * self.h / co
             self.scheme.configure(h0=self.h, hdx=self.hdx)
             kernel = WendlandQuintic(dim=2)
-            from pysph.sph.integrator import EPECIntegrator
+            from pysph.sph.integrator import PECIntegrator
             kw.update(
                 dict(
-                    integrator_cls=EPECIntegrator,
+                    integrator_cls=PECIntegrator,
                     kernel=kernel, adaptive_timestep=True, n_damp=50,
-                    fixed_h=False
+                    fixed_h=False, dt=dt
                 )
             )
         elif self.options.scheme == 'aha':
@@ -110,6 +121,21 @@ class DamBreak2D(Application):
                 )
             )
             print("dt = %f" % dt)
+        elif self.options.scheme == 'gtvf':
+            scheme = self.scheme
+            kernel = QuinticSpline(dim=2)
+            dt = 0.125 * self.h / co
+            kw.update(dict(kernel=kernel, dt=dt))
+            scheme.configure(pref=B*gamma, h0=self.h)
+            print("dt = %f" % dt)
+        elif self.options.scheme == 'sisph':
+            dt = 0.125*self.h/vref
+            kernel = QuinticSpline(dim=2)
+            print("SISPH dt = %f" % dt)
+            kw.update(dict(kernel=kernel))
+            self.scheme.configure_solver(
+                dt=dt, tf=tf, adaptive_timestep=False, pfreq=10,
+            )
 
         self.scheme.configure_solver(**kw)
 
@@ -131,13 +157,24 @@ class DamBreak2D(Application):
             fluids=['fluid'], solids=['boundary'], dim=2, nu=nu,
             rho0=ro, gy=-g
         )
+        gtvf = GTVFScheme(
+            fluids=['fluid'], solids=['boundary'], dim=2, nu=nu,
+            rho0=ro, gy=-g, h0=None, c0=co, pref=None
+        )
+        sisph = SISPHScheme(
+            fluids=['fluid'], solids=['boundary'], dim=2, nu=nu,
+            c0=co, rho0=ro, alpha=0.05, gy=-g, pref=ro*co**2,
+            internal_flow=False, hg_correction=True, gtvf=True, symmetric=True
+        )
         s = SchemeChooser(default='wcsph', wcsph=wcsph, aha=aha, edac=edac,
-                          iisph=iisph)
+                          iisph=iisph, gtvf=gtvf, sisph=sisph)
         return s
 
     def create_equations(self):
         eqns = self.scheme.get_equations()
-        if self.options.scheme == 'iisph':
+        if self.options.scheme == 'iisph' or self.options.scheme == 'sisph':
+            return eqns
+        if self.options.scheme == 'gtvf':
             return eqns
         n = len(eqns)
         if self.kernel_corr == 'grad-corr':
@@ -170,7 +207,7 @@ class DamBreak2D(Application):
         return eqns
 
     def create_particles(self):
-        if self.options.scheme == 'wcsph':
+        if self.options.staggered_grid:
             nboundary_layers = 2
             nfluid_offset = 2
             wall_hex_pack = True
@@ -178,17 +215,19 @@ class DamBreak2D(Application):
             nboundary_layers = 4
             nfluid_offset = 1
             wall_hex_pack = False
-        geom = DamBreak2DGeometry(
-            container_width=container_width, container_height=container_height,
-            fluid_column_height=fluid_column_height,
-            fluid_column_width=fluid_column_width, dx=self.dx, dy=self.dx,
-            nboundary_layers=1, ro=ro, co=co,
-            with_obstacle=False, wall_hex_pack=wall_hex_pack,
-            beta=1.0, nfluid_offset=1, hdx=self.hdx)
-        fluid, boundary = geom.create_particles(
-            nboundary_layers=nboundary_layers, hdx=self.hdx,
-            nfluid_offset=nfluid_offset,
-        )
+        xt, yt = get_2d_tank(dx=self.dx, length=container_width,
+                             height=container_height, base_center=[2, 0],
+                             num_layers=nboundary_layers)
+        xf, yf = get_2d_block(dx=self.dx, length=fluid_column_width,
+                              height=fluid_column_height, center=[0.5, 1])
+
+        xf += self.dx
+        yf += self.dx
+
+        fluid = get_particle_array(name='fluid', x=xf, y=yf, h=h, m=m, rho=ro)
+        boundary = get_particle_array(name='boundary', x=xt, y=yt, h=h, m=m,
+                                      rho=ro)
+
         self.scheme.setup_properties([fluid, boundary])
         if self.options.scheme == 'iisph':
             # the default position tends to cause the particles to be pushed
@@ -201,22 +240,16 @@ class DamBreak2D(Application):
             fluid.add_property('cwij')
             boundary.add_property('cwij')
         if corr == 'mixed-corr' or corr == 'grad-corr':
-            len_f = len(fluid.x) * 9
-            len_b = len(boundary.x) * 9
-            fluid.add_constant('m_mat', [0.0] * len_f)
-            boundary.add_constant('m_mat', [0.0] * len_b)
+            fluid.add_property('m_mat', stride=9)
+            boundary.add_property('m_mat', stride=9)
         elif corr == 'crksph':
             fluid.add_property('ai')
             boundary.add_property('ai')
-            len_f = len(fluid.x) * 9
-            len_b = len(boundary.x) * 9
-            fluid.add_constant('gradbi', [0.0] * len_f)
-            boundary.add_constant('gradbi', [0.0] * len_b)
-            len_f = len(fluid.x) * 3
-            len_b = len(boundary.x) * 3
-            for const in ['gradai', 'bi']:
-                fluid.add_constant(const, [0.0] * len_f)
-                boundary.add_constant(const, [0.0] * len_b)
+            fluid.add_property('gradbi', stride=9)
+            boundary.add_property('gradbi', stride=9)
+            for prop in ['gradai', 'bi']:
+                fluid.add_property(prop, stride=3)
+                boundary.add_property(prop, stride=3)
 
         return [fluid, boundary]
 
@@ -252,6 +285,12 @@ class DamBreak2D(Application):
         plt.legend(loc='upper left')
         plt.savefig(os.path.join(self.output_dir, 'x_vs_t.png'), dpi=300)
         plt.close()
+
+    def customize_output(self):
+        self._mayavi_config('''
+        b = particle_arrays['fluid']
+        b.scalar = 'vmag'
+        ''')
 
 
 if __name__ == '__main__':

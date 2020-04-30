@@ -10,12 +10,12 @@ import numpy
 from pysph.base import particle_array
 from pysph.base import utils
 
-from pyzoltan.core.carray import LongArray, IntArray, DoubleArray
+from cyarray.carray import LongArray, IntArray, DoubleArray
 
 import pickle
 import pytest
 
-from pysph.cpy.config import get_config
+from compyle.config import get_config
 
 
 def check_array(x, y):
@@ -844,15 +844,53 @@ class ParticleArrayTest(object):
         self.assertEqual(a.get_c_type(), 'double')
         self.assertTrue(check_array(a.get_npy_array(), v))
 
-    def test_extract_particles_extracts_particles_and_output_arrays(self):
+    def test_empty_clone_works_without_specific_props(self):
         # Given
         p = particle_array.ParticleArray(name='f', x=[1, 2, 3],
                                          backend=self.backend)
         p.add_property('A', data=numpy.arange(6), stride=2)
         p.set_output_arrays(['x', 'A'])
+        v = [0.0, 1.0, 2.0]
+        p.add_constant('v', v)
+
+        # When
+        clone = p.empty_clone()
+        self.pull(clone)
+
+        # Then
+        self.assertTrue(check_array(clone.v, v))
+        self.assertEqual(sorted(clone.output_property_arrays),
+                         sorted(p.output_property_arrays))
+
+    def test_empty_clone_works_with_specific_props(self):
+        # Given
+        p = particle_array.ParticleArray(name='f', x=[1, 2, 3],
+                                         backend=self.backend)
+        p.add_property('A', data=numpy.arange(6), stride=2)
+        p.set_output_arrays(['x', 'A'])
+        v = [0.0, 1.0, 2.0]
+        p.add_constant('v', v)
+
+        # When
+        clone = p.empty_clone(props=['x', 'A'])
+        self.pull(clone)
+
+        # Then
+        self.assertTrue(check_array(clone.v, v))
+        self.assertEqual(sorted(clone.output_property_arrays),
+                         sorted(p.output_property_arrays))
+        self.assertFalse('y' in clone.properties)
+        self.assertTrue('x' in clone.properties)
+        self.assertTrue('A' in clone.properties)
+
+    def test_extract_particles_works_without_specific_props_without_dest(self):
+        # Given
+        p = particle_array.ParticleArray(name='f', x=[1, 2, 3],
+                                         backend=self.backend)
+        p.add_property('A', data=numpy.arange(6), stride=2)
 
         # When.
-        n = p.extract_particles(indices=[1])
+        n = p.extract_particles([1])
         self.pull(n)
 
         # Then.
@@ -862,29 +900,82 @@ class ParticleArrayTest(object):
         self.assertEqual(len(n.A), 2)
         self.assertEqual(n.x[0], 2.0)
         numpy.testing.assert_array_equal(n.A, [2, 3])
-        self.assertEqual(n.output_property_arrays, p.output_property_arrays)
 
-    def test_extract_particles_works_with_specific_props(self):
+    def test_extract_particles_works_with_specific_props_without_dest(self):
         # Given
         p = particle_array.ParticleArray(name='f', x=[1, 2, 3], y=[0, 0, 0],
                                          backend=self.backend)
         p.add_property('A', data=numpy.arange(6), stride=2)
-        p.set_output_arrays(['x', 'y', 'A'])
 
         # When.
-        n = p.extract_particles(indices=[1], props=['x', 'A'])
+        n = p.extract_particles([1, 2], props=['x', 'A'])
         self.pull(n)
 
         # Then.
         self.assertEqual(len(p.x), 3)
-        self.assertEqual(len(n.x), 1)
+        self.assertEqual(len(n.x), 2)
         self.assertEqual(n.x[0], 2.0)
+        self.assertEqual(n.x[0], 2.0)
+        numpy.testing.assert_array_equal(n.A, [2, 3, 4, 5])
+        self.assertFalse('y' in n.properties)
+
+    def test_extract_particles_works_without_specific_props_with_dest(self):
+        # Given
+        p = particle_array.ParticleArray(name='f', x=[1, 2, 3],
+                                         backend=self.backend)
+        p.add_property('A', data=numpy.arange(6), stride=2)
+        n = p.empty_clone()
+
+        # When.
+        p.extract_particles([1], dest_array=n)
+        self.pull(n)
+
+        # Then.
+        self.assertEqual(len(p.x), 3)
+        self.assertEqual(len(p.A), 6)
+        self.assertEqual(len(n.x), 1)
+        self.assertEqual(len(n.A), 2)
         self.assertEqual(n.x[0], 2.0)
         numpy.testing.assert_array_equal(n.A, [2, 3])
+
+    def test_extract_particles_works_with_non_empty_dest(self):
+        # Given
+        p = particle_array.ParticleArray(name='f', x=[1, 2, 3],
+                                         backend=self.backend)
+        p.add_property('A', data=numpy.arange(6), stride=2)
+        n = p.empty_clone()
+        n.extend(2)
+
+        # When.
+        p.extract_particles([1], dest_array=n)
+        self.pull(n)
+
+        # Then.
+        self.assertEqual(len(p.x), 3)
+        self.assertEqual(len(p.A), 6)
+        self.assertEqual(len(n.x), 3)
+        self.assertEqual(len(n.A), 6)
+        numpy.testing.assert_array_equal(n.x, [0.0, 0.0, 2.0])
+        numpy.testing.assert_array_equal(n.A, [0, 0, 0, 0, 2, 3])
+
+    def test_extract_particles_works_with_specific_props_with_dest(self):
+        # Given
+        p = particle_array.ParticleArray(name='f', x=[1, 2, 3], y=[0, 0, 0],
+                                         backend=self.backend)
+        p.add_property('A', data=numpy.arange(6), stride=2)
+        n = p.empty_clone(props=['x', 'A'])
+
+        # When.
+        p.extract_particles([1, 2], dest_array=n, props=['x', 'A'])
+        self.pull(n)
+
+        # Then.
+        self.assertEqual(len(p.x), 3)
+        self.assertEqual(len(n.x), 2)
+        self.assertEqual(n.x[0], 2.0)
+        self.assertEqual(n.x[0], 2.0)
+        numpy.testing.assert_array_equal(n.A, [2, 3, 4, 5])
         self.assertFalse('y' in n.properties)
-        self.assertEqual(sorted(p.output_property_arrays),
-                         sorted(['A', 'x', 'y']))
-        self.assertEqual(sorted(n.output_property_arrays), ['A', 'x'])
 
     def test_that_remove_property_also_removes_output_arrays(self):
         # Given
@@ -1013,8 +1104,13 @@ class ParticleArrayTestCPU(unittest.TestCase, ParticleArrayTest):
 class ParticleArrayTestOpenCL(unittest.TestCase, ParticleArrayTest):
     def setUp(self):
         ocl = pytest.importorskip("pyopencl")
-        get_config().use_double = True
+        cfg = get_config()
+        self.orig_use_double = cfg.use_double
+        cfg.use_double = True
         self.backend = 'opencl'
+
+    def tearDown(self):
+        get_config().use_double = self.orig_use_double
 
     def pull(self, p):
         p.gpu.pull()
@@ -1026,8 +1122,13 @@ class ParticleArrayTestOpenCL(unittest.TestCase, ParticleArrayTest):
 class ParticleArrayTestCUDA(unittest.TestCase, ParticleArrayTest):
     def setUp(self):
         cu = pytest.importorskip("pycuda")
-        get_config().use_double = True
+        cfg = get_config()
+        self.orig_use_double = cfg.use_double
+        cfg.use_double = True
         self.backend = 'cuda'
+
+    def tearDown(self):
+        get_config().use_double = self.orig_use_double
 
     def pull(self, p):
         p.gpu.pull()

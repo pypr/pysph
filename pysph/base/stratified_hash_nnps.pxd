@@ -1,6 +1,8 @@
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
 from libcpp.vector cimport vector
 
-from nnps_base cimport *
+from .nnps_base cimport *
 
 ctypedef unsigned int u_int
 
@@ -74,5 +76,3 @@ cdef class StratifiedHashNNPS(NNPS):
     cpdef _refresh(self)
 
     cpdef _bin(self, int pa_index, UIntArray indices)
-
-

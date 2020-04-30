@@ -1,7 +1,7 @@
 #cython: embedsignature=True
 
-from nnps_base cimport *
-from octree cimport Octree, CompressedOctree, cOctreeNode
+from .nnps_base cimport *
+from .octree cimport Octree, CompressedOctree, cOctreeNode
 
 from libcpp.vector cimport vector
 from libc.stdlib cimport malloc, free
@@ -45,6 +45,9 @@ cdef class OctreeNNPS(NNPS):
 
 
     #### Public protocol ################################################
+
+    cpdef get_depth(self, int pa_index):
+        return (<Octree>self.tree[pa_index]).depth
 
     cpdef set_context(self, int src_index, int dst_index):
         """Set context for nearest neighbor searches.
@@ -225,5 +228,3 @@ cdef class CompressedOctreeNNPS(OctreeNNPS):
 
     cpdef _bin(self, int pa_index, UIntArray indices):
         pass
-
-

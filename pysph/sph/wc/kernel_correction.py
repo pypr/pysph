@@ -1,3 +1,21 @@
+'''
+Kernel Corrections
+###################
+
+These are the equations for the kernel corrections that are mentioned in the
+paper by Bonet and Lok [BonetLok1999].
+
+References
+-----------
+
+    .. [BonetLok1999] Bonet, J. and Lok T.-S.L. (1999)
+        Variational and Momentum Preservation Aspects of Smoothed
+        Particle Hydrodynamic Formulations.
+
+'''
+
+from math import sqrt
+from compyle.api import declare
 from pysph.sph.equation import Equation
 from pysph.sph.wc.density_correction import gj_solve
 
@@ -5,15 +23,11 @@ from pysph.sph.wc.density_correction import gj_solve
 class KernelCorrection(Equation):
     r"""**Kernel Correction**
 
+    From [BonetLok1999], equation (53):
+
     .. math::
             \mathbf{f}_{a} = \frac{\sum_{b}\frac{m_{b}}{\rho_{b}}
             \mathbf{f}_{b}W_{ab}}{\sum_{b}\frac{m_{b}}{\rho_{b}}W_{ab}}
-    References
-    ----------
-    .. [Bonet and Lok, 1999] Bonet, J. and Lok T.-S.L. (1999)
-        Variational and Momentum Preservation Aspects of Smoothed
-        Particle Hydrodynamic Formulations.
-
     """
 
     def initialize(self, d_idx, d_cwij):
@@ -52,61 +66,67 @@ class GradientCorrectionPreStep(Equation):
             hij = (h + s_h[s_idx]) * 0.5
             r = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
             SPH_KERNEL.gradient(xij, r, hij, dwij)
-            dw = sqrt(dwij[0] * dwij[0] + dwij[1] * dwij[1]
-                      + dwij[2] * dwij[2])
             V = s_m[s_idx] / s_rho[s_idx]
-            if r >= 1.0e-12:
+            if r > 1.0e-12:
                 for i in range(n):
-                    xi = xij[i]
                     for j in range(n):
                         xj = xij[j]
-                        d_m_mat[9 * d_idx + 3 * i + j] += dw * V * xi * xj / r
+                        d_m_mat[9 * d_idx + 3 * i + j] -= V * dwij[i] * xj
 
 
 class GradientCorrection(Equation):
     r"""**Kernel Gradient Correction**
 
+    From [BonetLok1999], equations (42) and (45)
+
     .. math::
             \nabla \tilde{W}_{ab} = L_{a}\nabla W_{ab}
 
     .. math::
-            L_{a} = \left(\sum \frac{m_{b}}{\rho_{b}}\nabla W_{ab}
-            \mathbf{\times}x_{ab} \right)^{-1}
-    References
-    ----------
-    .. [Bonet and Lok, 1999] Bonet, J. and Lok T.-S.L. (1999)
-        Variational and Momentum Preservation Aspects of Smoothed
-        Particle Hydrodynamic Formulations.
+            L_{a} = \left(\sum \frac{m_{b}}{\rho_{b}} \nabla W_{ab}
+            \mathbf{\otimes}x_{ba} \right)^{-1}
     """
 
     def _get_helpers_(self):
         return [gj_solve]
 
-    def __init__(self, dest, sources, dim=2, tol=0.5):
+    def __init__(self, dest, sources, dim=2, tol=0.1):
         self.dim = dim
         self.tol = tol
         super(GradientCorrection, self).__init__(dest, sources)
 
     def loop(self, d_idx, d_m_mat, DWIJ, HIJ):
-        i, j, n = declare('int', 3)
+        i, j, n, nt = declare('int', 4)
         n = self.dim
-        temp = declare('matrix(9)')
+        nt = n + 1
+        # Note that we allocate enough for a 3D case but may only use a
+        # part of the matrix.
+        temp = declare('matrix(12)')
         res = declare('matrix(3)')
         eps = 1.0e-04 * HIJ
         for i in range(n):
             for j in range(n):
-                temp[n * i + j] = d_m_mat[9 * d_idx + 3 * i + j]
-        gj_solve(temp, DWIJ, n, res)
-        change = 0.0
+                temp[nt * i + j] = d_m_mat[9 * d_idx + 3 * i + j]
+            # Augmented part of matrix
+            temp[nt*i + n] = DWIJ[i]
+
+        gj_solve(temp, n, 1, res)
+
+        res_mag = 0.0
+        dwij_mag = 0.0
         for i in range(n):
-            change += abs(DWIJ[i] - res[i]) / (abs(DWIJ[i]) + eps)
-        if change <= self.tol:
+            res_mag += abs(res[i])
+            dwij_mag += abs(DWIJ[i])
+        change = abs(res_mag - dwij_mag)/(dwij_mag + eps)
+        if change < self.tol:
             for i in range(n):
                 DWIJ[i] = res[i]
 
 
 class MixedKernelCorrectionPreStep(Equation):
     r"""**Mixed Kernel Correction**
+
+    From [BonetLok1999], equations (54), (57) and (58)
 
     .. math::
             \tilde{W}_{ab} = \frac{W_{ab}}{\sum_{b} V_{b}W_{ab}}
@@ -117,21 +137,16 @@ class MixedKernelCorrectionPreStep(Equation):
     where,
 
     .. math::
-            L_{a} = \left(\sum_{b} V_{b}}\nabla \bar{W}_{ab}
-            \mathbf{\times}x_{ab} \right)^{-1}
+            L_{a} = \left(\sum_{b} V_{b} \nabla \bar{W}_{ab}
+            \mathbf{\otimes}x_{ba} \right)^{-1}
 
     .. math::
             \nabla \bar{W}_{ab} = \frac{\nabla W_{ab} - \gamma}
             {\sum_{b} V_{b}W_{ab}}
 
-    ..math::
+    .. math::
             \gamma = \frac{\sum_{b} V_{b}\nabla W_{ab}}
             {\sum_{b} V_{b}W_{ab}}
-    References
-    ----------
-    .. [Bonet and Lok, 1999] Bonet, J. and Lok T.-S.L. (1999)
-        Variational and Momentum Preservation Aspects of Smoothed
-        Particle Hydrodynamic Formulations.
 
     """
 
@@ -144,8 +159,9 @@ class MixedKernelCorrectionPreStep(Equation):
         for i in range(9):
             d_m_mat[9 * d_idx + i] = 0.0
 
-    def loop_all(self, d_idx, d_x, d_y, d_z, d_h, s_x, s_y, s_z, s_h, SPH_KERNEL,
-                 N_NBRS, NBRS, d_m_mat, s_m, s_rho, d_cwij):
+    def loop_all(self, d_idx, d_x, d_y, d_z, d_h, s_x, s_y, s_z, s_h,
+                 SPH_KERNEL, N_NBRS, NBRS, d_m_mat, s_m, s_rho, d_cwij,
+                 d_dw_gamma):
         x = d_x[d_idx]
         y = d_y[d_idx]
         z = d_z[d_idx]
@@ -159,7 +175,6 @@ class MixedKernelCorrectionPreStep(Equation):
 
         for i in range(3):
             numerator[i] = 0.0
-            dwij1[i] = 0.0
         den = 0.0
 
         for k in range(N_NBRS):
@@ -175,6 +190,9 @@ class MixedKernelCorrectionPreStep(Equation):
             den += V * wij
             for i in range(n):
                 numerator[i] += V * dwij[i]
+
+        for i in range(n):
+            d_dw_gamma[3*d_idx + i] = numerator[i]/den
         d_cwij[d_idx] = den
 
         for k in range(N_NBRS):
@@ -187,12 +205,51 @@ class MixedKernelCorrectionPreStep(Equation):
             SPH_KERNEL.gradient(xij, r, hij, dwij)
             for i in range(n):
                 dwij1[i] = (dwij[i] - numerator[i] / den) / den
-            dw = sqrt(dwij1[0] * dwij1[0] + dwij1[1]
-                      * dwij1[1] + dwij1[2] * dwij1[2])
             V = s_m[s_idx] / s_rho[s_idx]
-            if r >= 1.0e-12:
+            if r > 1.0e-12:
                 for i in range(n):
-                    xi = xij[i]
                     for j in range(n):
                         xj = xij[j]
-                        d_m_mat[9 * d_idx + 3 * i + j] += dw * V * xi * xj / r
+                        d_m_mat[9 * d_idx + 3 * i + j] -= V * dwij1[i] * xj
+
+
+class MixedGradientCorrection(Equation):
+    r"""**Mixed Kernel Gradient Correction**
+
+    This is as per [BonetLok1999]. See the MixedKernelCorrectionPreStep for the
+    equations.
+
+    """
+
+    def _get_helpers_(self):
+        return [gj_solve]
+
+    def __init__(self, dest, sources, dim=2, tol=0.1):
+        self.dim = dim
+        self.tol = tol
+        super(MixedGradientCorrection, self).__init__(dest, sources)
+
+    def loop(self, d_idx, d_m_mat, d_dw_gamma, d_cwij, DWIJ, HIJ):
+        i, j, n, nt = declare('int', 4)
+        n = self.dim
+        nt = n + 1
+        temp = declare('matrix(12)')  # The augmented matrix
+        res = declare('matrix(3)')
+        dwij = declare('matrix(3)')
+        eps = 1.0e-04 * HIJ
+        for i in range(n):
+            dwij[i] = (DWIJ[i] - d_dw_gamma[3*d_idx + i])/d_cwij[d_idx]
+            for j in range(n):
+                temp[nt * i + j] = d_m_mat[9 * d_idx + 3 * i + j]
+            temp[nt*i + n] = dwij[i]
+        gj_solve(temp, n, 1, res)
+
+        res_mag = 0.0
+        dwij_mag = 0.0
+        for i in range(n):
+            res_mag += abs(res[i])
+            dwij_mag += abs(dwij[i])
+        change = abs(res_mag - dwij_mag)/(dwij_mag + eps)
+        if change < self.tol:
+            for i in range(n):
+                DWIJ[i] = res[i]

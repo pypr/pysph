@@ -1,5 +1,6 @@
 # Automatically generated, do not edit.
-#cython: cdivision=True
+# cython: cdivision=True, language_level=3
+# distuils: language=c++
 <%def name="indent(text, level=0)" buffered="True">
 % for l in text.splitlines():
 ${' '*4*level}${l}
@@ -7,10 +8,12 @@ ${' '*4*level}${l}
 </%def>
 
 from libc.math cimport *
-from libc.math cimport M_PI as pi
 
+from cython import address
 from pysph.base.nnps_base cimport NNPS
 
+
+${helper.get_helper_code()}
 
 ${helper.get_stepper_code()}
 
@@ -19,15 +22,15 @@ ${helper.get_stepper_code()}
 cdef class Integrator:
     cdef public ParticleArrayWrapper ${helper.get_particle_array_names()}
     cdef public AccelerationEval acceleration_eval
-    cdef public object parallel_manager
-    cdef public NNPS nnps
+    cdef public object integrator
     cdef public double dt, t, orig_t
     cdef object _post_stage_callback
     cdef object steppers
 
     ${indent(helper.get_stepper_defs(), 1)}
 
-    def __init__(self, acceleration_eval, steppers):
+    def __init__(self, integrator, acceleration_eval, steppers):
+        self.integrator = integrator
         self.acceleration_eval = acceleration_eval
         self.steppers = steppers
         self._post_stage_callback = None
@@ -37,22 +40,19 @@ cdef class Integrator:
         ${indent(helper.get_stepper_init(), 2)}
 
     def set_nnps(self, NNPS nnps):
-        self.nnps = nnps
+        pass
 
     def set_parallel_manager(self, object pm):
-        self.parallel_manager = pm
+        pass
 
     def set_post_stage_callback(self, object callback):
         self._post_stage_callback = callback
 
-    cpdef compute_accelerations(self):
-        # update NNPS since particles have moved
-        if self.parallel_manager:
-            self.parallel_manager.update()
-        self.nnps.update()
+    cpdef compute_accelerations(self, int index=0, update_nnps=True):
+        self.integrator.compute_accelerations(index, update_nnps)
 
-        # Evaluate
-        self.acceleration_eval.compute(self.t, self.dt)
+    cpdef update_domain(self):
+        self.integrator.update_domain()
 
     cpdef do_post_stage(self, double stage_dt, int stage):
         """This is called after every stage of the integrator.
@@ -102,7 +102,7 @@ cdef class Integrator:
         # Only iterate over real particles.
         NP_DEST = dst.size(real=True)
         ${indent(helper.get_array_setup(dest, method), 2)}
-        for d_idx in range(NP_DEST):
+        for d_idx in ${helper.get_parallel_range("NP_DEST")}:
             ${indent(helper.get_stepper_loop(dest, method), 3)}
         % endif
         % endfor

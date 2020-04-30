@@ -1,4 +1,5 @@
-#cython: embedsignature=True
+# cython: embedsignature=True, language_level=3
+# distutils: language=c++
 
 
 from libc.math cimport *

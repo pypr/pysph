@@ -236,7 +236,7 @@ class BodyForce(Equation):
         self.gz = gz
         super(BodyForce, self).__init__(dest, sources)
 
-    def initialize(self, d_idx, d_m, d_fx, d_fy, d_fz, d_num_body, d_mi):
+    def initialize(self, d_idx, d_m, d_fx, d_fy, d_fz):
         d_fx[d_idx] = d_m[d_idx]*self.gx
         d_fy[d_idx] = d_m[d_idx]*self.gy
         d_fz[d_idx] = d_m[d_idx]*self.gz

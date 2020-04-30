@@ -3,8 +3,8 @@ import numpy as np
 import copy
 from pysph.base.nnps import LinkedListNNPS
 from pysph.base.utils import get_particle_array, get_particle_array_wcsph
-from pyzoltan.core.carray import UIntArray
-from numpy.linalg import norm
+from cyarray.api import UIntArray
+from numpy.linalg import norm, matrix_power
 
 
 def distance(point1, point2=np.array([0.0, 0.0, 0.0])):
@@ -42,13 +42,13 @@ def matrix_exp(matrix):
             [0., 1.]])
     """
 
-    matrix = np.asmatrix(matrix)
+    matrix = np.asarray(matrix)
     tol = 1.0e-16
-    result = matrix**(0)
+    result = matrix_power(matrix, 0)
     n = 1
     condition = True
     while condition:
-        adding = matrix**(n) / (1.0 * np.math.factorial(n))
+        adding = matrix_power(matrix, n) / (1.0 * np.math.factorial(n))
         result += adding
         residue = np.sqrt(np.sum(np.square(adding)) /
                           np.sum(np.square(result)))
@@ -173,12 +173,12 @@ def rotate(x, y, z, axis=np.array([0.0, 0.0, 1.0]), angle=90.0):
     theta = angle * np.pi / 180.0
     unit_vector = np.asarray(axis) / norm(np.asarray(axis))
     matrix = np.cross(np.eye(3), unit_vector * theta)
-    rotation_matrix = matrix_exp(np.matrix(matrix))
+    rotation_matrix = matrix_exp(matrix)
     new_points = []
     for xi, yi, zi in zip(np.asarray(x), np.asarray(y), np.asarray(z)):
         point = np.array([xi, yi, zi])
         new = np.dot(rotation_matrix, point)
-        new_points.append(np.asarray(new)[0])
+        new_points.append(new)
     new_points = np.array(new_points)
     x_new = new_points[:, 0]
     y_new = new_points[:, 1]
@@ -226,8 +226,9 @@ def get_2d_wall(dx=0.01, center=np.array([0.0, 0.0]), length=1.0,
     return np.tile(x, num_layers), y
 
 
-def get_2d_tank(dx=0.001, base_center=np.array([0.0, 0.0]), length=1.0,
-                height=1.0, num_layers=1, outside=True):
+def get_2d_tank(dx=0.05, base_center=np.array([0.0, 0.0]), length=1.0,
+                height=1.0, num_layers=1, outside=True, staggered=False,
+                top=False):
     """
     Generates an open 2d tank with the base parallel to x-axis and the side
     walls parallel to y-axis. The tank can be rotated to any direction using
@@ -251,6 +252,8 @@ def get_2d_tank(dx=0.001, base_center=np.array([0.0, 0.0]), length=1.0,
     height : a number which is the length of the side wall
     num_layers : Number of layers for the tank
     outside : A boolean value which decides if the layers are inside or outside
+    staggered : A boolean value which decides if the layers are staggered or not
+    top : A boolean value which decides if the top is present or not
 
     Returns
     -------
@@ -258,20 +261,24 @@ def get_2d_tank(dx=0.001, base_center=np.array([0.0, 0.0]), length=1.0,
     y : 1d numpy array with y coordinates of the tank
     """
 
-    base = np.arange(-length / 2., length / 2. + dx, dx) * (1.0 + 0.0j)
-    left_wall = np.arange(dx, height + dx, dx) * (1.0j) - length / 2.
-    right_wall = np.arange(dx, height + dx, dx) * (1.0j) + length / 2.
-    particles = np.concatenate([left_wall, base, right_wall])
-    x = particles.real
-    y = particles.imag
-    value = 1 if outside else -1
-    for i in range(1, num_layers):
-        x1, y1 = get_2d_tank(dx, np.array(
-            [0.0, -value * i * dx]), length + 2.0 * i * value * dx,
-            height + i * value * dx)
-        x = np.concatenate([x, x1])
-        y = np.concatenate([y, y1])
-    return x + base_center[0], y + base_center[1]
+    dy = dx
+    fac = 1 if outside else 0
+    if staggered:
+        dx = dx/2
+
+    start = fac*(1 - num_layers)*dx
+    end = fac*num_layers*dx + (1 - fac) * dx
+    x, y = np.mgrid[start:length+end:dx, start:height+end:dy]
+
+    topset = 0 if top else 10*height
+    if staggered:
+        topset += dx
+        y[1::2] += dx
+
+    offset = 0 if outside else (num_layers-1)*dx
+    cond = ~((x > offset) & (x < length-offset) &
+             (y > offset) & (y < height+topset-offset))
+    return x[cond] + base_center[0] - length/2, y[cond] + base_center[1]
 
 
 def get_2d_circle(dx=0.01, r=0.5, center=np.array([0.0, 0.0])):
@@ -295,7 +302,7 @@ def get_2d_circle(dx=0.01, r=0.5, center=np.array([0.0, 0.0])):
     x, y = np.ravel(x), np.ravel(y)
     condition = (x * x + y * y <= r * r)
     x, y = x[condition], y[condition]
-    return x + center[0], y + center[0]
+    return x + center[0], y + center[1]
 
 
 def get_2d_hollow_circle(dx=0.01, r=1.0, center=np.array([0.0, 0.0]),

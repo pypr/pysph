@@ -20,21 +20,21 @@ particles. These can be constructed from within Python and are fully
 compatible with NumPy arrays. We begin with a brief description for
 the basic data structures for arrays.
 
-.. py:currentmodule:: pyzoltan.core.carray
+.. py:currentmodule:: cyarray.carray
 
 ^^^^^^^^^^
 C-arrays
 ^^^^^^^^^^
 
-The :py:class:`BaseArray` class provides a typed array data structure
-called **CArray**. These are used throughout PySPH and are
-fundamentally very similar to NumPy arrays. The following named types
-are supported:
+The :py:class:`cyarray.carray.BaseArray` class provides a typed array data
+structure called **CArray**. These are used throughout PySPH and are
+fundamentally very similar to NumPy arrays. The following named types are
+supported:
 
-    - :py:class:`UIntArray`    (32 bit unsigned integers)
-    - :py:class:`IntArray`     (32 bit signed integers)
-    - :py:class:`LongArray`    (64 bit signed integers)
-    - :py:class:`DoubleArray`  (64 bit floating point numbers
+    - :py:class:`cyarray.carray.UIntArray`    (32 bit unsigned integers)
+    - :py:class:`cyarray.carray.IntArray`     (32 bit signed integers)
+    - :py:class:`cyarray.carray.LongArray`    (64 bit signed integers)
+    - :py:class:`cyarray.carray.DoubleArray`  (64 bit floating point numbers
 
 Some simple commands to work with **BaseArrays** from the interactive
 shell are given below
@@ -42,7 +42,7 @@ shell are given below
 .. code-block:: python
 
     >>> import numpy
-    >>> from pyzoltan.core.carray import DoubleArray
+    >>> from cyarray.carray import DoubleArray
     >>> array = DoubleArray(10)                      # array of doubles of length 10
     >>> array.set_data( numpy.arange(10) )           # set the data from a NumPy array
     >>> array.get(3)                                 # get the value at a given index
@@ -73,7 +73,7 @@ In the above, the helper function
 :py:class:`ParticleArray` with properties `x` and `y` set from given NumPy
 arrays. In general, a :py:class:`ParticleArray` can be instantiated with an
 arbitrary number of properties. Each property is stored internally as a
-:py:class:`pyzoltan.core.carray.BaseArray` of the appropriate type.
+:py:class:`cyarray.carray.BaseArray` of the appropriate type.
 
 By default, every :py:class:`ParticleArray` returned using the helper
 function will have the following properties:
@@ -434,7 +434,7 @@ distribution is given below
 .. code-block:: python
 
    # PySPH imports
-   from pyzoltan.core.carray import UIntArray
+   from cyarray.carray import UIntArray
    from pysph.base.utils import utils
    from pysph.base.kernels import CubicSpline
    from pysph.base.nnps import DomainManager

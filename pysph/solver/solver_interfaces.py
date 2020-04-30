@@ -1,9 +1,10 @@
-
 import threading
 import os
 import socket
+import sys
 try:
-    from SimpleXMLRPCServer import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
+    from SimpleXMLRPCServer import (SimpleXMLRPCServer,
+                                    SimpleXMLRPCRequestHandler)
     from SimpleHTTPServer import SimpleHTTPRequestHandler
 except ImportError:
     # Python 3.x
@@ -13,16 +14,34 @@ except ImportError:
 from multiprocessing.managers import BaseManager, BaseProxy
 
 
+def get_authkey_bytes(authkey):
+    if isinstance(authkey, bytes):
+        return authkey
+    else:
+        return authkey.encode('utf-8')
+
+
 class MultiprocessingInterface(BaseManager):
     """ A multiprocessing interface to the solver controller
 
     This object exports a controller instance proxy over the multiprocessing
     interface. Control actions can be performed by connecting to the interface
     and calling methods on the controller proxy instance """
-    def __init__(self, address=None, authkey=None, try_next_port=False):
-        BaseManager.__init__(self, address, authkey)
+    def __init__(self, address=None, authkey=None):
+        authkey = get_authkey_bytes(authkey)
+        super().__init__(address, authkey)
         self.authkey = authkey
-        self.try_next_port = try_next_port
+        self._server = None
+
+    def stop(self):
+        if self._server:
+            conn = self._Client(self._address, authkey=self._authkey)
+            try:
+                self._server.shutdown(conn)
+            finally:
+                conn.close()
+        elif hasattr(self, 'shutdown'):
+            self.shutdown()
 
     def get_controller(self):
         return self.controller
@@ -30,29 +49,22 @@ class MultiprocessingInterface(BaseManager):
     def start(self, controller):
         self.controller = controller
         self.register('get_controller', self.get_controller)
-        if not self.try_next_port:
-            self.get_server().serve_forever()
-        host, port = self.address
-        while self.try_next_port:
-            try:
-                BaseManager.__init__(self, (host,port), self.authkey)
-                self.get_server().serve_forever()
-                self.try_next_port = False
-            except socket.error as e:
-                try_next_port = False
-                import errno
-                if e.errno == errno.EADDRINUSE:
-                    port += 1
-                else:
-                    raise
+        if sys.platform == 'win32':
+            self.start()
+        else:
+            self._server = self.get_server()
+            self._server.serve_forever()
+
 
 class MultiprocessingClient(BaseManager):
     """ A client for the multiprocessing interface
 
     Override the run() method to do appropriate actions on the proxy
-    instance of the controller object or add an interface using the add_interface
-    methods similar to the Controller.add_interface method """
-    def __init__(self, address=None, authkey=None, serializer='pickle', start=True):
+    instance of the controller object or add an interface using the
+    add_interface methods similar to the Controller.add_interface method """
+    def __init__(self, address=None, authkey=None, serializer='pickle',
+                 start=True):
+        authkey = get_authkey_bytes(authkey)
         BaseManager.__init__(self, address, authkey, serializer)
         if start:
             self.start()
@@ -89,6 +101,7 @@ class MultiprocessingClient(BaseManager):
         thr.start()
         return thr
 
+
 class CrossDomainXMLRPCRequestHandler(SimpleXMLRPCRequestHandler,
                                       SimpleHTTPRequestHandler):
     """ SimpleXMLRPCRequestHandler subclass which attempts to do CORS
@@ -102,14 +115,14 @@ class CrossDomainXMLRPCRequestHandler(SimpleXMLRPCRequestHandler,
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-METHODS", "POST,GET,OPTIONS")
-        #self.send_header("Access-Control-Max-Age", "60")
+        # self.send_header("Access-Control-Max-Age", "60")
         self.send_header("Content-length", "0")
         self.end_headers()
 
     def do_GET(self):
         """ Handle http requests to serve html/image files only """
         print(self.path, self.translate_path(self.path))
-        permitted_extensions = ['.html','.png','.svg','.jpg', '.js']
+        permitted_extensions = ['.html', '.png', '.svg', '.jpg', '.js']
         if not os.path.splitext(self.path)[1] in permitted_extensions:
             self.send_error(404, 'File Not Found/Allowed')
         else:
@@ -122,6 +135,7 @@ class CrossDomainXMLRPCRequestHandler(SimpleXMLRPCRequestHandler,
         self.send_header("Access-Control-Allow-Origin", "*")
         SimpleXMLRPCRequestHandler.end_headers(self)
 
+
 class XMLRPCInterface(SimpleXMLRPCServer):
     """ An XML-RPC interface to the solver controller
 
@@ -132,7 +146,10 @@ class XMLRPCInterface(SimpleXMLRPCServer):
                  logRequests=True, allow_none=True,
                  encoding=None, bind_and_activate=True):
         SimpleXMLRPCServer.__init__(self, addr, requestHandler, logRequests,
-                    allow_none, encoding, bind_and_activate)
+                                    allow_none, encoding, bind_and_activate)
+
+    def stop(self):
+        self.server_close()
 
     def start(self, controller):
         self.register_instance(controller, allow_dotted_names=False)
@@ -146,9 +163,9 @@ class CommandlineInterface(object):
         while True:
             try:
                 try:
-                    inp = raw_input('pysph[%d]>>> '%controller.get('count'))
+                    inp = raw_input('pysph[%d]>>> ' % controller.get('count'))
                 except NameError:
-                    inp = input('pysph[%d]>>> '%controller.get('count'))
+                    inp = input('pysph[%d]>>> ' % controller.get('count'))
                 cmd = inp.strip().split()
                 try:
                     cmd, args = cmd[0], cmd[1:]
@@ -165,15 +182,15 @@ class CommandlineInterface(object):
                     finally:
                         args2.append(arg)
 
-                if cmd=='p' or cmd=='pause':
+                if cmd == 'p' or cmd == 'pause':
                     controller.pause_on_next()
-                elif cmd=='c' or cmd=='cont':
+                elif cmd == 'c' or cmd == 'cont':
                     controller.cont()
-                elif cmd=='g' or cmd=='get':
+                elif cmd == 'g' or cmd == 'get':
                     print(controller.get(args[0]))
-                elif cmd=='s' or cmd=='set':
+                elif cmd == 's' or cmd == 'set':
                     print(controller.set(args[0], args2[1]))
-                elif cmd=='q' or cmd=='quit':
+                elif cmd == 'q' or cmd == 'quit':
                     break
                 else:
                     print(getattr(controller, cmd)(*args2))
@@ -188,5 +205,3 @@ class CommandlineInterface(object):
     g | get <name>
     s | set <name> <value>
     q | quit -- quit commandline interface (solver keeps running)''')
-
-

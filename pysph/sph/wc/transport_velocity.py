@@ -59,7 +59,7 @@ class SummationDensity(Equation):
 
 
 class VolumeSummation(Equation):
-    """**Number density for volume computation**
+    r"""**Number density for volume computation**
 
     See `SummationDensity`
 
@@ -149,9 +149,28 @@ class ContinuityEquation(Equation):
     def initialize(self, d_idx, d_arho):
         d_arho[d_idx] = 0.0
 
-    def loop(self, d_idx, s_idx, d_arho, s_V, d_rho, VIJ, DWIJ):
+    def loop(self, d_idx, s_idx, d_arho, s_m, s_rho, d_rho, VIJ, DWIJ):
         vijdotdwij = VIJ[0] * DWIJ[0] + VIJ[1] * DWIJ[1] + VIJ[2] * DWIJ[2]
-        d_arho[d_idx] += d_rho[d_idx] * vijdotdwij / s_V[s_idx]
+        d_arho[d_idx] += d_rho[d_idx] * vijdotdwij * s_m[s_idx] / s_rho[s_idx]
+
+
+class ContinuitySolid(Equation):
+    """Continuity equation for the solid's ghost particles.
+
+    The key difference is that we use the ghost velocity ug, and not the
+    particle velocity u.
+
+    """
+    def loop(self, d_idx, s_idx, d_rho, d_u, d_v, d_w, d_arho,
+             s_m, s_rho, s_ug, s_vg, s_wg, DWIJ):
+        Vj = s_m[s_idx] / s_rho[s_idx]
+        rhoi = d_rho[d_idx]
+        uij = d_u[d_idx] - s_ug[s_idx]
+        vij = d_v[d_idx] - s_vg[s_idx]
+        wij = d_w[d_idx] - s_wg[s_idx]
+        vij_dot_dwij = uij*DWIJ[0] + vij*DWIJ[1] + wij*DWIJ[2]
+
+        d_arho[d_idx] += rhoi*Vj*vij_dot_dwij
 
 
 class StateEquation(Equation):

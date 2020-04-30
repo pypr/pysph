@@ -2,7 +2,7 @@
 """
 
 from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
-from pysph.sph.scheme import ADKEScheme, GasDScheme, SchemeChooser
+from pysph.sph.scheme import ADKEScheme, GasDScheme, GSPHScheme, SchemeChooser
 import numpy
 
 # Numerical constants
@@ -47,6 +47,7 @@ class Robert(ShockTubeSetup):
         self.nl = self.options.nl
         self.hdx = self.options.hdx
         ratio = self.rhor/self.rhol
+        self.xb_ratio = 2
         self.nr = ratio*self.nl
         self.dxl = 0.5/self.nl
         self.dxr = 0.5/self.nr
@@ -54,28 +55,35 @@ class Robert(ShockTubeSetup):
         self.hdx = self.hdx
 
     def create_particles(self):
-        return self.generate_particles(xmin=-0.5, xmax=1, dxl=self.dxl,
-                                       dxr=self.dxr, m=self.dxr, pl=self.pl,
-                                       pr=self.pr, h0=self.h0, bx=0.03,
-                                       gamma1=gamma1, ul=self.ul, ur=self.ur)
-
-    def create_scheme(self):
-        s.configure_solver(dt=dt, tf=tf, adaptive_timestep=False, pfreq=50)
-        return s
+        return self.generate_particles(xmin=self.xmin*self.xb_ratio,
+                                       xmax=self.xmax*self.xb_ratio,
+                                       dxl=self.dxl, dxr=self.dxr,
+                                       m=self.dxr, pl=self.pl, pr=self.pr,
+                                       h0=self.h0, bx=0.03, gamma1=gamma1,
+                                       ul=self.ul, ur=self.ur)
 
     def create_scheme(self):
         self.dt = dt
         self.tf = tf
         adke = ADKEScheme(
-            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             alpha=1, beta=2.0, k=1.0, eps=0.5, g1=0.5, g2=1.0)
 
         mpm = GasDScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            kernel_factor=2.0, alpha1=1.0, alpha2=0.1,
+            kernel_factor=1.2, alpha1=1.0, alpha2=0.1,
             beta=2.0, update_alpha1=True, update_alpha2=True
         )
-        s = SchemeChooser(default='adke', adke=adke, mpm=mpm)
+
+        gsph = GSPHScheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            kernel_factor=2.0,
+            g1=0.2, g2=0.4, rsolver=2, interpolation=1, monotonicity=2,
+            interface_zero=True, hybrid=False, blend_alpha=2.0,
+            niter=40, tol=1e-6
+        )
+
+        s = SchemeChooser(default='adke', adke=adke, mpm=mpm, gsph=gsph)
         return s
 
 

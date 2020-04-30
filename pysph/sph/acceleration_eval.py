@@ -4,9 +4,10 @@ try:
 except ImportError:
     from ordereddict import OrderedDict
 
-from pysph.cpy.config import get_config
-from pysph.sph.equation import (CythonGroup, Group, OpenCLGroup,
-                                get_arrays_used_in_equation)
+from compyle.config import get_config
+from pysph.sph.equation import (
+    CUDAGroup, CythonGroup, Group, MultiStageEquations, OpenCLGroup,
+    get_arrays_used_in_equation)
 
 
 ###############################################################################
@@ -70,6 +71,23 @@ def check_equation_array_properties(equation, particle_arrays):
             msg += "Array '%s' missing properties %s.\n" % (name, missing)
         print(msg)
         raise RuntimeError(msg)
+
+
+def make_acceleration_evals(particle_arrays, equations, kernel,
+                            mode='serial', backend=None):
+    '''Returns a list of acceleration evaluators.
+
+    If a MultiStageEquations object is given the resulting list will have
+    multiple evaluators else it will have a single one.
+    '''
+    if isinstance(equations, MultiStageEquations):
+        groups = equations.groups
+    else:
+        groups = [equations]
+    return [
+        AccelerationEval(particle_arrays, group, kernel, mode, backend)
+        for group in groups
+    ]
 
 
 ###############################################################################
@@ -157,9 +175,9 @@ class AccelerationEval(object):
         kernel: The kernel to use.
         mode: str: One of 'serial', 'mpi'.
         backend: str: indicates the backend to use.
-            one of ('opencl', 'cython', '', None)
+            one of ('opencl', 'cython', 'cuda', '', None)
         """
-        assert backend in ('opencl', 'cython', '', None)
+        assert backend in ('opencl', 'cython', 'cuda', '', None)
         self.backend = self._get_backend(backend)
         self.particle_arrays = particle_arrays
         self.equation_groups = group_equations(equations)
@@ -170,6 +188,8 @@ class AccelerationEval(object):
             self.Group = CythonGroup
         elif self.backend == 'opencl':
             self.Group = OpenCLGroup
+        elif self.backend == 'cuda':
+            self.Group = CUDAGroup
 
         all_equations = []
         for group in self.equation_groups:
@@ -195,6 +215,8 @@ class AccelerationEval(object):
             cfg = get_config()
             if cfg.use_opencl:
                 backend = 'opencl'
+            elif cfg.use_cuda:
+                backend = 'cuda'
             else:
                 backend = 'cython'
         return backend

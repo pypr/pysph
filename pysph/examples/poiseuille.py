@@ -160,7 +160,8 @@ class PoiseuilleFlow(Application):
         t, ke = get_ke_history(self.output_files, 'fluid')
         plt.clf()
         plt.plot(t, ke)
-        plt.xlabel('t'); plt.ylabel('Kinetic energy')
+        plt.xlabel('t')
+        plt.ylabel('Kinetic energy')
         fig = os.path.join(self.output_dir, "ke_history.png")
         plt.savefig(fig, dpi=300)
         return t, ke
@@ -181,14 +182,14 @@ class PoiseuilleFlow(Application):
         fx = self.fx
         nu = self.nu
 
-        ye = np.arange(-d, d+1e-3, 0.01)
-        ue = -0.5 * fx/nu * (ye**2 - d*d)
-        ye += d
+        ye = np.linspace(0, self.Ly, 100)
+        ue = 0.5 * fx/nu * ye*(self.Ly - ye)
         from matplotlib import pyplot as plt
         plt.clf()
         plt.plot(ye, ue, label="exact")
         plt.plot(y, u, 'ko', fillstyle='none', label="computed")
-        plt.xlabel('y'); plt.ylabel('u')
+        plt.xlabel('y')
+        plt.ylabel('u')
         plt.legend()
         plt.title('Velocity profile at %s'%tf)
         fig = os.path.join(self.output_dir, "comparison.png")

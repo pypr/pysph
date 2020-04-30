@@ -13,7 +13,9 @@ from mako.template import Template
 
 # Local imports.
 from pysph.sph.equation import get_array_names
-from pysph.cpy.api import CythonGenerator, get_func_definition
+from .acceleration_eval_cython_helper import get_helper_code
+from compyle.api import CythonGenerator, get_func_definition
+from compyle.cython_generator import get_parallel_range
 
 
 getfullargspec = getattr(
@@ -43,7 +45,7 @@ class IntegratorCythonHelper(object):
     def setup_compiled_module(self, module, acceleration_eval):
         # Create the compiled module.
         cython_integrator = module.Integrator(
-            acceleration_eval, self.object.steppers
+            self.object, acceleration_eval, self.object.steppers
         )
         # Setup the integrator to use this compiled module.
         self.object.set_compiled_object(cython_integrator)
@@ -53,6 +55,23 @@ class IntegratorCythonHelper(object):
     ##########################################################################
     def get_particle_array_names(self):
         return ', '.join(sorted(self.object.steppers.keys()))
+
+    def get_helper_code(self):
+        helpers = []
+        for stepper in self.object.steppers.values():
+            if hasattr(stepper, '_get_helpers_'):
+                for helper in stepper._get_helpers_():
+                    if helper not in helpers:
+                        helpers.append(helper)
+
+        code = get_helper_code(helpers)
+        return '\n'.join(code)
+
+    def get_parallel_range(self, start, stop=None, step=1, nogil=True):
+        if nogil:
+            return get_parallel_range(start, stop, step, nogil=True)
+        else:
+            return get_parallel_range(start, stop, step)
 
     def get_stepper_code(self):
         classes = {}

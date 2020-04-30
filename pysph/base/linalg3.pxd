@@ -1,3 +1,6 @@
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
+
 """Routines for eigen decomposition of symmetric 3x3 matrices.
 """
 cdef double det(double a[3][3]) nogil

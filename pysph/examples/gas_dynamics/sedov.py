@@ -30,6 +30,7 @@ alpha2 = 1.0
 beta = 2.0
 kernel_factor = 1.2
 
+
 class SedovPointExplosion(Application):
     def create_particles(self):
         fpath = os.path.join(
@@ -51,7 +52,8 @@ class SedovPointExplosion(Application):
         # volume
         fluid.h[:] = kernel_factor * (fluid.m/fluid.rho)**(1./dim)
 
-        print("Sedov's point explosion with %d particles"%(fluid.get_number_of_particles()))
+        print("Sedov's point explosion with %d particles"
+              % (fluid.get_number_of_particles()))
 
         return [fluid,]
 

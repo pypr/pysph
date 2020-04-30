@@ -11,7 +11,7 @@ from pysph.base.kernels import Gaussian, get_compiled_kernel
 import pysph.tools.geometry as G
 
 # PyZoltan CArrays
-from pyzoltan.core.carray import UIntArray
+from cyarray.carray import UIntArray
 
 # Python unit testing framework
 import unittest
@@ -177,6 +177,18 @@ class PeriodicChannel2DLinkedList(PeriodicChannel2DTestCase):
 
     def test_summation_density(self):
         "LinkedListNNPS :: test summation density"
+        self._test_summation_density()
+
+    def test_add_property_after_creation_works(self):
+        # Given
+        particles = self.particles
+        fluid = particles[0]
+
+        # When
+        fluid.add_property('junk')
+
+        # Then
+        self.nnps.update_domain()
         self._test_summation_density()
 
 

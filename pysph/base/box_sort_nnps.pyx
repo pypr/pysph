@@ -1,4 +1,4 @@
-#cython: embedsignature=True
+# cython: language_level=3, language=c++, embedsignature=True
 # Library imports.
 import numpy as np
 cimport numpy as np

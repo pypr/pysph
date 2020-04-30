@@ -3,7 +3,7 @@
 import os
 import numpy
 from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
-from pysph.sph.scheme import ADKEScheme, GasDScheme, SchemeChooser
+from pysph.sph.scheme import ADKEScheme, GasDScheme, GSPHScheme, SchemeChooser
 
 
 # Numerical constants
@@ -67,14 +67,22 @@ class Blastwave(ShockTubeSetup):
             fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
             alpha=1, beta=1, k=1.0, eps=0.5, g1=0.2, g2=0.4)
 
-        # Running this will need to implement boundary condtion first.
+        # Fix mpm scheme first
         mpm = GasDScheme(
-            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            kernel_factor=1.5, alpha1=1.0, alpha2=0.1,
+            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
+            kernel_factor=1.2, alpha1=1.0, alpha2=0.1,
             beta=2.0, update_alpha1=True, update_alpha2=True
         )
 
-        s = SchemeChooser(default='adke', adke=adke, mpm=mpm)
+        gsph = GSPHScheme(
+            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
+            kernel_factor=1.0,
+            g1=0.2, g2=0.4, rsolver=2, interpolation=1, monotonicity=1,
+            interface_zero=True, hybrid=False, blend_alpha=2.0,
+            niter=20, tol=1e-6
+        )
+
+        s = SchemeChooser(default='adke', adke=adke, gsph=gsph)
         return s
 
 

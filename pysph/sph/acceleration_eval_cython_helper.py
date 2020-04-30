@@ -2,12 +2,12 @@ from collections import defaultdict
 from os.path import dirname, join, expanduser, realpath
 
 from mako.template import Template
-from pyzoltan.core import carray
+from cyarray import carray
 
-from pysph.cpy.config import get_config
-from pysph.cpy.cython_generator import (CythonGenerator, KnownType,
-                                        get_parallel_range)
-from pysph.cpy.ext_module import ExtModule, get_platform_dir
+from compyle.config import get_config
+from compyle.cython_generator import (CythonGenerator, KnownType,
+                                      get_parallel_range)
+from compyle.ext_module import ExtModule, get_platform_dir
 
 
 ###############################################################################
@@ -166,7 +166,7 @@ class AccelerationEvalCythonHelper(object):
         # for SpatialHashNNPS
         extra_inc_dirs = [join(dirname(dirname(realpath(__file__))), 'base')]
         self._ext_mod = ExtModule(
-            code, verbose=True, root=root, depends=depends,
+            code, verbose=False, root=root, depends=depends,
             extra_inc_dirs=extra_inc_dirs
         )
         self._module = self._ext_mod.load()
@@ -272,8 +272,11 @@ class AccelerationEvalCythonHelper(object):
         else:
             return "if True: # Placeholder used for OpenMP."
 
-    def get_parallel_range(self, start, stop=None, step=1):
-        return get_parallel_range(start, stop, step)
+    def get_parallel_range(self, start, stop=None, step=1, nogil=True):
+        if nogil:
+            return get_parallel_range(start, stop, step, nogil=True)
+        else:
+            return get_parallel_range(start, stop, step)
 
     def get_particle_array_names(self):
         parrays = [pa.name for pa in self.object.particle_arrays]

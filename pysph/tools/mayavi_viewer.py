@@ -12,6 +12,7 @@ import math
 import numpy
 import os
 import os.path
+import time
 
 if not os.environ.get('ETS_TOOLKIT'):
     # Set the default toolkit to qt4 unless the user has explicitly
@@ -24,10 +25,11 @@ from traits.api import (Any, Array, Dict, HasTraits, Instance,  # noqa: E402
     on_trait_change, List, Str, Int, Range, Float, Bool, Button,
     Directory, Event, Password, Property, cached_property)
 from traitsui.api import (View, Item, Group, Handler, HSplit, ListEditor,
-    EnumEditor, TitleEditor, HGroup, ShellEditor)  # noqa: E402
+    EnumEditor, HGroup, ShellEditor)  # noqa: E402
 from mayavi.core.api import PipelineBase  # noqa: E402
-from mayavi.core.ui.api import (MayaviScene, SceneEditor, MlabSceneModel)  # noqa: E402
-from pyface.timer.api import Timer, do_later  # noqa: E402
+from mayavi.core.ui.api import (
+    MayaviScene, SceneEditor, MlabSceneModel)  # noqa: E402
+from pyface.timer.api import Timer, do_later, do_after  # noqa: E402
 from tvtk.api import tvtk  # noqa: E402
 from tvtk.array_handler import array2vtk  # noqa: E402
 
@@ -35,8 +37,8 @@ from pysph.base.particle_array import ParticleArray  # noqa: E402
 from pysph.solver.solver_interfaces import MultiprocessingClient  # noqa: E402
 from pysph.solver.utils import load, dump, output_formats  # noqa: E402
 from pysph.solver.utils import remove_irrelevant_files, _sort_key  # noqa: E402
-from pysph.tools.interpolator import (get_bounding_box, get_nx_ny_nz,  # noqa: E402
-    Interpolator)
+from pysph.tools.interpolator import (
+        get_bounding_box, get_nx_ny_nz, Interpolator)  # noqa: E402
 
 import logging  # noqa: E402
 logger = logging.getLogger()
@@ -63,6 +65,16 @@ def set_arrays(dataset, particle_array):
     dataset._update_data()
 
 
+def get_files_in_dir(pth):
+    '''Get the files in a given directory.
+    '''
+    _files = glob.glob(os.path.join(pth, '*.hdf5'))
+    if len(_files) == 0:
+        _files = glob.glob(os.path.join(pth, '*.npz'))
+        _files = [x for x in _files if os.path.basename(x) != 'results.npz']
+    return _files
+
+
 def glob_files(fname):
     """Glob for all similar files given one of them.
 
@@ -79,6 +91,14 @@ def sort_file_list(files):
     files[:] = remove_irrelevant_files(files)
     files.sort(key=_sort_key)
     return files
+
+
+def is_running(timer):
+    '''Backward compatible timer check.'''
+    if hasattr(timer, 'active'):
+        return timer.active
+    else:
+        return timer.IsRunning()
 
 
 ##############################################################################
@@ -150,7 +170,8 @@ class InterpolatorView(HasTraits):
     def _setup_interpolator(self):
         if self.interpolator is None:
             interpolator = Interpolator(
-                self.particle_arrays, num_points=self.num_points
+                self.particle_arrays, num_points=self.num_points,
+                method='shepard'
             )
             self.bounds = interpolator.bounds
             self.interpolator = interpolator
@@ -209,14 +230,16 @@ class InterpolatorView(HasTraits):
 
             if self.plot is None:
                 if interp.dim == 3:
-                    plot = mlab.pipeline.scalar_cut_plane(src)
+                    plot = mlab.pipeline.scalar_cut_plane(
+                        src, colormap='viridis'
+                    )
                 else:
-                    plot = mlab.pipeline.surface(src)
+                    plot = mlab.pipeline.surface(src, colormap='viridis')
                 self.plot = plot
                 scm = plot.module_manager.scalar_lut_manager
-                scm.set(show_legend=self.show_legend,
-                        use_default_name=False,
-                        data_name=self.scalar)
+                scm.trait_set(show_legend=self.show_legend,
+                              use_default_name=False,
+                              data_name=self.scalar)
                 self.sync_trait('show_legend', scm, mutual=True)
             else:
                 self.plot.visible = True
@@ -248,6 +271,14 @@ class ParticleArrayHelper(HasTraits):
     # The active scalar to view.
     scalar = Str('rho', desc='name of the active scalar to view')
 
+    # Formula to use for scalar.
+    formula = Str('', enter_set=True, auto_set=False,
+                  desc='formula to use for scalar (you may use np/numpy)')
+
+    # Scalar range to use.
+    range = Str('', enter_set=True, auto_set=False,
+                desc='scalar range to display (enter a tuple)')
+
     # The mlab scalar plot for this particle array.
     plot = Instance(PipelineBase)
 
@@ -268,8 +299,19 @@ class ParticleArrayHelper(HasTraits):
     # Sync'd trait with the dataset to turn on/off visibility.
     visible = Bool(True, desc='if the particle array is to be displayed')
 
+    # Sync'd trait for point size
+    point_size = Float(6.0, enter_set=True, auto_set=False,
+                       desc='the point size of the particles')
+
+    # Sync'd trait for point size
+    opacity = Float(1.0, enter_set=True, auto_set=False,
+                    desc='the opacity of the particles')
+
     # Show the time of the simulation on screen.
     show_time = Bool(False, desc='if the current time is displayed')
+
+    # Edit the colors and legends
+    edit_colors = Button('Edit colors ...')
 
     # Edit the scalars.
     edit_scalars = Button('More options ...')
@@ -287,6 +329,10 @@ class ParticleArrayHelper(HasTraits):
 
     edit_vectors = Button('More options ...')
 
+    stride = Int(1, desc='stride value for property')
+
+    component = Int(0)
+
     # Private attribute to store the Text module.
     _text = Instance(PipelineBase)
 
@@ -301,24 +347,34 @@ class ParticleArrayHelper(HasTraits):
     # arrays.
     _old_visible = Bool(True)
 
+    # The namespace in which we evaluate any formulae.
+    _eval_ns = Dict()
+
     ########################################
     # View related code.
     view = View(
-        Item(name='name',
-             show_label=False,
-             editor=TitleEditor()),
         Group(
             Group(
                 Group(
                     Item(name='visible'),
-                    Item(name='show_legend'),
+                    Item(name='show_legend', label='Legend'),
                     Item(name='scalar',
+                         enabled_when='len(formula) == 0',
                          editor=EnumEditor(name='scalar_list')),
-                    Item(name='list_all_scalars'),
-                    Item(name='show_time'),
+                    Item(name='list_all_scalars', label='All scalars'),
+                    Item(name='show_time', label='Time'),
+                    Item(name='component', enabled_when='stride > 1'),
+                    Item(name='formula'),
+                    Item(name='range'),
+                    Item(name='point_size'),
+                    Item(name='opacity'),
                     columns=2,
                 ),
-                Item(name='edit_scalars', show_label=False),
+                Group(
+                    Item(name='edit_scalars', show_label=False),
+                    Item(name='edit_colors', show_label=False),
+                    columns=2,
+                ),
                 label='Scalars',
             ),
             Group(
@@ -352,18 +408,43 @@ class ParticleArrayHelper(HasTraits):
                 pa.add_output_arrays(['vmag'])
             self.updated = True
 
+    def _eval_formula(self):
+        if len(self.formula) > 0:
+            try:
+                array = eval(self.formula, self._eval_ns)
+            except Exception:
+                return None
+            else:
+                return array
+        else:
+            return None
+
     def _get_scalar(self, pa, scalar):
         """Return the requested scalar from the given particle array.
         """
+        array = self._eval_formula()
+        if array is not None:
+            return array
+
         if scalar in self.extra_scalars:
             method_name = '_add_' + scalar
             method = getattr(self, method_name)
             method(pa)
-        return pa.get(scalar, only_real_particles=False)
+
+        self.stride = stride = pa.stride.get(scalar, 1)
+        component = max(0, min(self.component, stride - 1))
+        array = pa.get(scalar, only_real_particles=False)
+        if stride > 1:
+            return array[component::stride]
+        else:
+            return array
 
     #  Traits handlers #############################################
     def _edit_scalars_fired(self):
         self.plot.edit_traits()
+
+    def _edit_colors_fired(self):
+        self.plot.module_manager.scalar_lut_manager.edit_traits()
 
     def _edit_vectors_fired(self):
         self.plot_vectors.edit_traits()
@@ -371,6 +452,11 @@ class ParticleArrayHelper(HasTraits):
     def _particle_array_changed(self, old, pa):
         self.name = pa.name
 
+        self._eval_ns = {k: v.get_npy_array()
+                         for k, v in pa.properties.items()}
+        self._eval_ns.update({k: v.get_npy_array()
+                              for k, v in pa.constants.items()})
+        self._eval_ns.update(dict(np=numpy, numpy=numpy))
         self._list_all_scalars_changed(self.list_all_scalars)
 
         # Update the plot.
@@ -386,14 +472,18 @@ class ParticleArrayHelper(HasTraits):
             old_empty = len(old_x) == 0
         if p is None and not empty:
             src = mlab.pipeline.scalar_scatter(x, y, z, s)
-            p = mlab.pipeline.glyph(src, mode='point', scale_mode='none')
-            p.actor.property.point_size = 3
+            p = mlab.pipeline.glyph(
+                src, mode='point', scale_mode='none', colormap='viridis'
+            )
+            p.actor.property.point_size = 6
             scm = p.module_manager.scalar_lut_manager
-            scm.set(show_legend=self.show_legend,
-                    use_default_name=False,
-                    data_name=self.scalar)
+            scm.trait_set(show_legend=self.show_legend,
+                          use_default_name=False,
+                          data_name=self.scalar)
             self.sync_trait('visible', p, mutual=True)
             self.sync_trait('show_legend', scm, mutual=True)
+            self.sync_trait('point_size', p.actor.property, mutual=True)
+            self.sync_trait('opacity', p.actor.property, mutual=True)
             # set_arrays(p.mlab_source.m_data, pa)
             self.plot = p
         elif not empty:
@@ -424,18 +514,42 @@ class ParticleArrayHelper(HasTraits):
         # Setup the time.
         self._show_time_changed(self.show_time)
 
+    def _range_changed(self, value):
+        scm = self.plot.module_manager.scalar_lut_manager
+        try:
+            rng = eval(value)
+            len(rng)
+        except Exception:
+            rng = None
+
+        if rng is not None and len(rng) == 2:
+            scm.use_default_range = False
+            scm.data_range = rng
+        else:
+            scm.use_default_range = True
+
+    def _formula_changed(self, value):
+        self._scalar_changed(self.scalar)
+
     def _scalar_changed(self, value):
         p = self.plot
         if p is not None:
             p.mlab_source.scalars = self._get_scalar(
                 self.particle_array, value
             )
-            p.module_manager.scalar_lut_manager.data_name = value
+            if len(self.formula) > 0:
+                name = self.formula
+            else:
+                name = value
+            p.module_manager.scalar_lut_manager.data_name = name
+
+    def _component_changed(self, value):
+        self._scalar_changed(self.scalar)
 
     def _list_all_scalars_changed(self, list_all_scalars):
         pa = self.particle_array
         if list_all_scalars:
-            sc_list = pa.properties.keys()
+            sc_list = list(pa.properties.keys())
             self.scalar_list = sorted(set(sc_list + self.extra_scalars))
         else:
             if len(pa.output_property_arrays) > 0:
@@ -443,7 +557,7 @@ class ParticleArrayHelper(HasTraits):
                     set(pa.output_property_arrays + self.extra_scalars)
                 )
             else:
-                sc_list = pa.properties.keys()
+                sc_list = list(pa.properties.keys())
                 self.scalar_list = sorted(set(sc_list + self.extra_scalars))
 
     def _show_time_changed(self, value):
@@ -463,33 +577,37 @@ class ParticleArrayHelper(HasTraits):
                 txt.visible = False
 
     def _get_vectors_for_plot(self, vectors):
-        pa = self.particle_array
-        comps = [x.strip() for x in vectors.split(',')]
+        comps = vectors.split(',')
+        namespace = self._eval_ns
         if len(comps) == 3:
             try:
-                vec = pa.get(*comps, only_real_particles=False)
-            except AttributeError:
+                vec = eval(vectors, namespace)
+            except Exception:
                 return None
             else:
                 return vec
 
-    def _vectors_changed(self, value):
-        vec = self._get_vectors_for_plot(value)
+    def _set_vector_plot_data(self, vectors):
+        vec = self._get_vectors_for_plot(vectors)
         if vec is not None:
-            self.plot.mlab_source.set(
-                vectors=numpy.c_[vec[0], vec[1], vec[2]]
-            )
+            self.plot.mlab_source.vectors = numpy.column_stack(vec)
+
+    def _vectors_changed(self, value):
+        if self.plot_vectors is None:
+            return
+        self._set_vector_plot_data(value)
 
     def _show_vectors_changed(self, value):
         pv = self.plot_vectors
         if pv is not None:
             pv.visible = value
         elif self.plot is not None and value:
-            self._vectors_changed(self.vectors)
+            self._set_vector_plot_data(self.vectors)
             pv = self.scene.mlab.pipeline.vectors(
                 self.plot.mlab_source.m_data,
                 mask_points=self.mask_on_ratio,
-                scale_factor=self.scale_factor
+                scale_factor=self.scale_factor,
+                colormap='viridis', reset_zoom=False
             )
             self.plot_vectors = pv
 
@@ -550,9 +668,12 @@ class MayaviViewer(HasTraits):
                                  'or from saved files')
 
     shell = Button('Launch Python Shell')
-    host = Str('localhost', desc='machine to connect to')
-    port = Int(8800, desc='port to use to connect to solver')
-    authkey = Password('pysph', desc='authorization key')
+    host = Str('localhost', enter_set=True, auto_set=False,
+               desc='machine to connect to')
+    port = Int(8800, enter_set=True, auto_set=False,
+               desc='port to use to connect to solver')
+    authkey = Password('pysph', enter_set=True, auto_set=False,
+                       desc='authorization key')
     host_changed = Bool(True)
     client = Instance(MultiprocessingClient)
     controller = Property(depends_on='live_mode, host_changed')
@@ -566,7 +687,10 @@ class MayaviViewer(HasTraits):
     file_count = Range(low='_low', high='_n_files', value=0,
                        desc='the file counter')
     play = Bool(False, desc='if all files are played automatically')
-    play_delay = Float(0.2, desc='the delay between loading files')
+    play_delay = Float(0.2, enter_set=True, auto_set=False,
+                       desc='the delay between loading files')
+    play_step = Int(1, enter_set=True, auto_set=False,
+                    desc='steps between files played')
     loop = Bool(False, desc='if the animation is looped')
     # This is len(files) - 1.
     _n_files = Int(0)
@@ -575,8 +699,10 @@ class MayaviViewer(HasTraits):
     ########################################
     # Timer traits.
     timer = Instance(Timer)
-    interval = Range(0.5, 20.0, 2.0,
-                     desc='frequency in seconds with which plot is updated')
+    interval = Float(
+        5.0, enter_set=True, auto_set=False,
+        desc='suggested frequency in seconds with which plot is updated'
+    )
 
     ########################################
     # Solver info/control.
@@ -597,6 +723,8 @@ class MayaviViewer(HasTraits):
     _solver_data = Any
     _file_name = Str
     _particle_array_updated = Bool
+    _doing_update = Bool(False)
+    _poll_interval = Float(5.0)
 
     ########################################
     # The layout of the dialog created
@@ -604,24 +732,32 @@ class MayaviViewer(HasTraits):
                   Group(
                     Group(
                         Group(
-                            Item(name='directory'),
-                            Item(name='current_file'),
-                            Item(name='file_count'),
-                            HGroup(Item(name='play'),
-                                   Item(name='play_delay',
-                                        label='Delay',
-                                        resizable=True),
-                                   Item(name='loop'),
-                                   Item(name='update_files',
-                                        show_label=False),
-                                   padding=0),
+                            Group(
+                                Item(name='directory'),
+                                Item(name='current_file'),
+                                Item(name='file_count'),
+                                padding=0,
+                            ),
+                            HGroup(
+                                Item(name='play'),
+                                Item(name='play_step',
+                                     label='Step'),
+                                Item(name='play_delay',
+                                     label='Delay'),
+                                Item(name='loop'),
+                                Item(name='update_files',
+                                     show_label=False),
+                                padding=0,
+                            ),
                             padding=0,
                             label='Saved Data',
                             selected=True,
                             enabled_when='not live_mode',
                             ),
                         Group(
-                            Item(name='live_mode'),
+                            Group(
+                                Item(name='live_mode'),
+                            ),
                             Group(
                                 Item(name='host'),
                                 Item(name='port'),
@@ -630,19 +766,22 @@ class MayaviViewer(HasTraits):
                             ),
                             label='Connection',
                         ),
-                        layout='tabbed'
+                        layout='tabbed',
                     ),
                     Group(
                         Group(
-                              Item(name='current_time'),
-                              Item(name='time_step'),
-                              Item(name='iteration'),
+                              Item(name='current_time', style='readonly',
+                                   format_str='%.4e'),
                               Item(name='pause_solver',
                                    enabled_when='live_mode'
                                    ),
+                              Item(name='iteration', style='readonly'),
                               Item(name='interval',
-                                   enabled_when='not live_mode'
+                                   enabled_when='live_mode'
                                    ),
+                              Item(name='time_step', style='readonly',
+                                   format_str='%.4e'),
+                              columns=2,
                               label='Solver',
                              ),
                         Group(
@@ -696,14 +835,14 @@ class MayaviViewer(HasTraits):
 
         # Just accessing the timer will start it.
         t = self.timer
-        if not t.IsRunning():
-            t.Start(int(self.interval*1000))
+        if not is_running(t):
+            t.Start(int(self._poll_interval*1000))
 
     @on_trait_change('scene:activated')
     def update_plot(self):
 
         # No need to do this if files are being used.
-        if not self.live_mode:
+        if self._doing_update or not self.live_mode:
             return
 
         # do not update if solver is paused
@@ -717,25 +856,39 @@ class MayaviViewer(HasTraits):
         if controller is None:
             return
 
-        self.current_time = t = controller.get_t()
-        self.time_step = controller.get_dt()
-        self.iteration = controller.get_count()
+        try:
+            start = time.time()
+            self._doing_update = True
+            self.current_time = t = controller.get_t()
+            self.time_step = controller.get_dt()
+            self.iteration = controller.get_count()
 
-        arrays = []
-        for idx, name in enumerate(self.pa_names):
-            pa = controller.get_named_particle_array(name)
-            arrays.append(pa)
-            pah = self.particle_arrays[idx]
-            pah.set(particle_array=pa, time=t)
+            arrays = []
+            for idx, name in enumerate(self.pa_names):
+                pa = controller.get_named_particle_array(name)
+                arrays.append(pa)
+                pah = self.particle_arrays[idx]
+                pah.trait_set(particle_array=pa, time=t)
 
-        self.interpolator.particle_arrays = arrays
+            self.interpolator.particle_arrays = arrays
 
-        if self.record:
-            self._do_snap()
+            total = time.time() - start
+            if total*3 > self._poll_interval or total*5 < self._poll_interval:
+                self._poll_interval = max(3*total, self.interval)
+                self._interval_changed(self._poll_interval)
+            if self.record:
+                self._do_snap()
+        finally:
+            self._doing_update = False
 
     def run_script(self, path):
         """Execute a script in the namespace of the viewer.
         """
+        pas = self.particle_arrays
+        if len(pas) == 0 or pas[0].plot is None:
+            do_after(2000, self.run_script, path)
+            return
+
         with open(path) as fp:
             data = fp.read()
             ns = self._get_shell_namespace()
@@ -839,9 +992,18 @@ class MayaviViewer(HasTraits):
             for x in self.pa_names
         ]
         self.interpolator = InterpolatorView(scene=self.scene)
-        # Turn on the legend for the first particle array.
-        if len(self.particle_arrays) > 0:
-            self.particle_arrays[0].set(show_legend=True, show_time=True)
+        do_later(self.update_plot)
+
+        output_dir = self.client.controller.get_output_directory()
+        config_file = os.path.join(output_dir, 'mayavi_config.py')
+        if os.path.exists(config_file):
+            do_later(self.run_script, config_file)
+        else:
+            # Turn on the legend for the first particle array.
+            if len(self.particle_arrays) > 0:
+                self.particle_arrays[0].trait_set(
+                    show_legend=True, show_time=True
+                )
 
     def _timer_event(self):
         # catch all Exceptions else timer will stop
@@ -854,12 +1016,13 @@ class MayaviViewer(HasTraits):
         t = self.timer
         if t is None:
             return
-        if t.IsRunning():
+        if is_running(t):
             t.Stop()
-            t.Start(int(value*1000))
+            interval = max(value, self._poll_interval)
+            t.Start(int(interval*1000))
 
     def _timer_default(self):
-        return Timer(int(self.interval*1000), self._timer_event)
+        return Timer(int(self._poll_interval*1000), self._timer_event)
 
     def _pause_solver_changed(self, value):
         if self.live_mode:
@@ -877,11 +1040,12 @@ class MayaviViewer(HasTraits):
 
     def _files_changed(self, value):
         if len(value) == 0:
+            self._n_files = 0
             return
         else:
             d = os.path.dirname(os.path.abspath(value[0]))
             self.movie_directory = os.path.join(d, 'movie')
-            self.set(directory=d, trait_change_notify=False)
+            self.trait_set(directory=d, trait_change_notify=False)
         self._n_files = len(value) - 1
         self._frame_count = 0
         self._count = 0
@@ -893,18 +1057,24 @@ class MayaviViewer(HasTraits):
             self._file_count_changed(fc)
         t = self.timer
         if not self.live_mode:
-            if t.IsRunning():
+            if is_running(t):
                 t.Stop()
         else:
-            if not t.IsRunning():
+            if not is_running(t):
                 t.Stop()
-                t.Start(self.interval*1000)
+                t.Start(self._poll_interval*1000)
 
     def _file_count_changed(self, value):
         # Save out any updates for the previous file if needed.
         self._handle_particle_array_updates()
+        if not self.files:
+            return
         # Load the new file.
+        value = min(value, len(self.files) - 1)
         fname = self.files[value]
+        if not os.path.exists(fname):
+            print("File %s is missing, ignoring!" % fname)
+            return
         self._file_name = fname
         self.current_file = os.path.basename(fname)
         # Code to read the file, create particle array and setup the helper.
@@ -926,14 +1096,14 @@ class MayaviViewer(HasTraits):
                 pa = arrays[name]
                 pah = self._make_particle_array_helper(self.scene, name)
                 # Must set this after setting the scene.
-                pah.set(particle_array=pa, time=t)
+                pah.trait_set(particle_array=pa, time=t)
                 pas.append(pah)
             self.particle_arrays = pas
         else:
             for idx, name in enumerate(pa_names):
                 pa = arrays[name]
                 pah = self.particle_arrays[idx]
-                pah.set(particle_array=pa, time=t)
+                pah.trait_set(particle_array=pa, time=t)
 
         self.interpolator.particle_arrays = list(arrays.values())
 
@@ -948,11 +1118,18 @@ class MayaviViewer(HasTraits):
         t = self.timer
         if value:
             t.Stop()
-            t.callable = self._play_event
+            if hasattr(t, 'callback'):
+                t.callback = self._play_event
+            else:
+                t.callable = self._play_event
+
             t.Start(1000*self.play_delay)
         else:
             t.Stop()
-            t.callable = self._timer_event
+            if hasattr(t, 'callback'):
+                t.callback = self._timer_event
+            else:
+                t.callable = self._timer_event
 
     def _clear(self):
         self.pa_names = []
@@ -961,13 +1138,19 @@ class MayaviViewer(HasTraits):
     def _play_event(self):
         nf = self._n_files
         pc = self.file_count
-        pc += 1
+        pc += self.play_step
         if pc > nf:
             if self.loop:
                 pc = 0
             else:
                 self.timer.Stop()
                 pc = nf
+        elif pc < 0:
+            if self.loop:
+                pc = nf
+            else:
+                self.timer.Stop()
+                pc = 0
         self.file_count = pc
         self._handle_particle_array_updates()
 
@@ -981,12 +1164,17 @@ class MayaviViewer(HasTraits):
 
     def _update_files_fired(self):
         fc = self.file_count
-        files = glob_files(self.files[fc])
+        if len(self.files) == 0:
+            files = get_files_in_dir(self.directory)
+        else:
+            files = glob_files(self.files[fc])
         sort_file_list(files)
         self.files = files
-        self.file_count = fc
-        if self.play:
-            self._play_changed(self.play)
+        if len(files) > 0:
+            fc = min(len(files) - 1, fc)
+            self.file_count = fc
+            if self.play:
+                self._play_changed(self.play)
 
     def _shell_fired(self):
         ns = self._get_shell_namespace()
@@ -994,20 +1182,26 @@ class MayaviViewer(HasTraits):
         obj.edit_traits()
 
     def _get_shell_namespace(self):
-        return dict(viewer=self, particle_arrays=self.particle_arrays,
+        pas = {}
+        for i, x in enumerate(self.particle_arrays):
+            pas[i] = x
+            pas[x.name] = x
+        return dict(viewer=self, particle_arrays=pas,
                     interpolator=self.interpolator, scene=self.scene,
                     mlab=self.scene.mlab)
 
     def _directory_changed(self, d):
-        ext = os.path.splitext(self.files[-1])[1]
-        files = glob.glob(os.path.join(d, '*' + ext))
+        files = get_files_in_dir(d)
         if len(files) > 0:
             self._clear()
             sort_file_list(files)
             self.files = files
-            self.file_count = min(self.file_count, len(files))
+            self.file_count = min(self.file_count, len(files) - 1)
         else:
             pass
+        config_file = os.path.join(d, 'mayavi_config.py')
+        if os.path.exists(config_file):
+            self.run_script(config_file)
 
     def _live_mode_changed(self, value):
         if value:
@@ -1132,19 +1326,24 @@ def main(args=None):
     kw = {}
     files = []
     scripts = []
+    directory = None
     for arg in args:
         if '=' not in arg:
             if arg.endswith('.py'):
                 scripts.append(arg)
                 continue
             elif arg.endswith(output_formats):
+                try:
+                    _sort_key(arg)
+                except ValueError:
+                    print("Error: file name is not supported")
+                    print("filename format accepted is *_number.npz"
+                          " or *_number.hdf5")
+                    sys.exit(1)
                 files.extend(glob.glob(arg))
                 continue
             elif os.path.isdir(arg):
-                _files = glob.glob(os.path.join(arg, '*.hdf5'))
-                if len(_files) == 0:
-                    _files = glob.glob(os.path.join(arg, '*.npz'))
-                files.extend(_files)
+                directory = arg
                 continue
             else:
                 usage()
@@ -1153,17 +1352,21 @@ def main(args=None):
         try:
             val = eval(arg, math.__dict__)
             # this will fail if arg is a string.
-        except NameError:
+        except Exception:
             val = arg
         kw[key] = val
 
     sort_file_list(files)
-    live_mode = len(files) == 0
+    live_mode = (len(files) == 0 and directory is None)
 
     # If we set the particle arrays before the scene is activated, the arrays
     # are not displayed on screen so we use do_later to set the  files.
     m = MayaviViewer(live_mode=live_mode)
-    do_later(m.set, files=files, **kw)
+    if files:
+        kw['files'] = files
+    if directory:
+        kw['directory'] = directory
+    do_later(m.trait_set, **kw)
     for script in scripts:
         do_later(m.run_script, script)
     m.configure_traits()

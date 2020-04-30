@@ -1,15 +1,18 @@
 # Standard imports.
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import glob
 import inspect
 import json
 import logging
 import os
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from os.path import (abspath, basename, dirname, isdir, join, realpath,
                      splitext)
 import socket
 import sys
+from textwrap import dedent
 import time
+import numpy as np
+import warnings
 
 # PySPH imports.
 from pysph.base import utils
@@ -20,12 +23,13 @@ from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
     StratifiedSFCNNPS, OctreeNNPS, CompressedOctreeNNPS, ZOrderNNPS
 
 from pysph.base import kernels
-from pysph.cpy.config import get_config
+from compyle.config import get_config
 from pysph.solver.controller import CommandManager
-from pysph.solver.utils import mkdir, load, get_files
+from pysph.solver.utils import mkdir, load, get_files, get_free_port
 
 # conditional parallel imports
 from pysph import has_mpi, has_zoltan, in_parallel
+
 if in_parallel():
     from pysph.parallel.parallel_manager import ZoltanParallelManagerGeometric
     import mpi4py.MPI as mpi
@@ -121,7 +125,9 @@ class Application(object):
     10. :py:meth:`create_tools()`: Add any ``pysph.solver.tools.Tool``
         instances.
 
-    Additionally, as the appliction runs there are several convenient optional
+    11. :py:meth:`customize_output()`: Customize the output visualization.
+
+    Additionally, as the application runs there are several convenient optional
     callbacks setup:
 
     1. :py:meth:`pre_step`: Called before each time step.
@@ -133,15 +139,49 @@ class Application(object):
     Finally, it is a good idea to overload the :py:meth:`post_process` method
     to perform any post processing for the generated data.
 
+    The application instance also has several important attributes, some of
+    these are as follows:
+
+    - ``args``: command line arguments, typically ``sys.argv[1:]``.
+
+    - ``domain``: optional :py:class:`pysph.base.nnps_base.DomainManager`
+      instance.
+
+    - ``fname``: filename pattern to use when dumping output.
+
+    - ``inlet_outlet``: list of inlet/outlets.
+
+    - ``nnps``: instance of :py:class:`pysph.base.nnps_base.NNPS`.
+
+    - ``num_procs``: total number of processes running.
+
+    - ``output_dir``: Output directory.
+
+    - ``parallel_manager``: in parallel, an instance of
+      :py:class:`pysph.parallel.parallel_manager.ParallelManager`.
+
+    - ``particles``: list of
+      :py:class:`pysph.base.particle_array.ParticleArray`s.
+
+    - ``rank``: Rank of this process.
+
+    - ``scheme``: the optional :py:class:`pysph.sph.scheme.Scheme` instance.
+
+    - ``solver``: the solver instance, :py:class:`pysph.solver.solver.Solver`.
+
+    - ``tools``: a list of possible :py:class:`pysph.solver.tools.Tool`s.
+
     """
 
-    def __init__(self, fname=None, domain=None):
+    def __init__(self, fname=None, output_dir=None, domain=None):
         """ Constructor
 
         Parameters
         ----------
         fname : str
             file name to use for the output files.
+        output_dir : str
+            output directory name.
         domain : pysph.base.nnps_base.DomainManager
             A domain manager to use. This is used for periodic domains etc.
         """
@@ -180,10 +220,19 @@ class Application(object):
             'none': None
         }
 
-        self.output_dir = abspath(self._get_output_dir_from_fname())
+        if output_dir is None:
+            self.output_dir = abspath(self._get_output_dir_from_fname())
+        else:
+            self.output_dir = output_dir
         self.particles = []
         self.inlet_outlet = []
+        # The default value that is overridden by the command line
+        # options passed or in initialize.
+        self.cache_nnps = False
+        self.iom = None
 
+        # The solver interface in use.
+        self._interfaces = []
         self.initialize()
         self.scheme = self.create_scheme()
         self._setup_argparse()
@@ -341,6 +390,12 @@ class Application(object):
             type=int,
             help="Printing frequency for the output")
 
+        parser.add_argument(
+            '--reorder-freq', action="store", dest="reorder_freq",
+            default=None, type=int,
+            help="Frequency between spatially reordering particles."
+        )
+
         # --detailed-output.
         parser.add_argument(
             "--detailed-output",
@@ -371,7 +426,7 @@ class Application(object):
             "--directory",
             action="store",
             dest="output_dir",
-            default=self._get_output_dir_from_fname(),
+            default=self.output_dir,
             help="Dump output in the specified directory.")
 
         # --openmp
@@ -407,6 +462,23 @@ class Application(object):
             default=False,
             help="Use OpenCL to run the simulation.")
 
+        # --cuda
+        parser.add_argument(
+            "--cuda",
+            action="store_true",
+            dest="with_cuda",
+            default=False,
+            help="Use CUDA to run the simulation."
+        )
+
+        # --use-local-memory
+        parser.add_argument(
+            "--use-local-memory",
+            action="store_true",
+            dest="with_local_memory",
+            default=False,
+            help="Use local memory with OpenCL (Experimental)"
+        )
         # --profile
         parser.add_argument(
             "--profile",
@@ -421,7 +493,7 @@ class Application(object):
             action="store_true",
             dest="use_double",
             default=False,
-            help="Use double precision for OpenCL code.")
+            help="Use double precision for OpenCL/CUDA code.")
 
         # --kernel
         all_kernels = list_all_kernels()
@@ -432,6 +504,12 @@ class Application(object):
             default=None,
             choices=all_kernels,
             help="Use specified kernel from %s" % all_kernels)
+
+        parser.add_argument(
+            '--post-process', action="store",
+            dest="post_process", default=None,
+            help="Only perform post-processing and exit."
+        )
 
         # Restart options
         restart = parser.add_argument_group("Restart options",
@@ -462,7 +540,7 @@ class Application(object):
             dest="nnps",
             choices=[
                 'box', 'll', 'sh', 'esh', 'ci', 'sfc', 'comp_tree',
-                'strat_hash', 'strat_sfc', 'tree'
+                'strat_hash', 'strat_sfc', 'tree', 'gpu_octree'
             ],
             default='ll',
             help="Use one of box-sort ('box') or "
@@ -474,7 +552,8 @@ class Application(object):
             "the stratified hash algorithm ('strat_hash') or "
             "the stratified sfc algorithm ('strat_sfc') or "
             "the octree algorithm ('tree') or "
-            "the compressed octree algorithm ('comp_tree')")
+            "the compressed octree algorithm ('comp_tree') or "
+            "the gpu octree algorithm ('gpu_octree')")
 
         nnps_options.add_argument(
             "--spatial-hash-sub-factor",
@@ -524,7 +603,7 @@ class Application(object):
             "--cache-nnps",
             dest="cache_nnps",
             action="store_true",
-            default=False,
+            default=self.cache_nnps,
             help="Option to enable the use of neighbor caching.")
 
         nnps_options.add_argument(
@@ -667,20 +746,30 @@ class Application(object):
             action="store",
             dest="multiproc",
             metavar='[[AUTHKEY@] HOST:] PORT[+] ',
-            default="pysph@0.0.0.0:8800+",
+            default=None,
             help=("Add a python multiprocessing interface "
                   "to the solver; "
-                  "AUTHKEY=pysph, HOST=0.0.0.0, PORT=8800+ by"
-                  " default (8800+ means first available port "
-                  "number 8800 onwards)"))
+                  "AUTHKEY=pysph, HOST=0.0.0.0, PORT=8800+ when"
+                  " given 'auto' (8800+ means first available port "
+                  "number 8800 onwards);"))
 
         interfaces.add_argument(
-            "--no-multiproc",
+            "--octree-leaf-size",
+            dest="octree_leaf_size",
+            default=32,
+            help=("Specify leaf size of octree. "
+                  "Must be multiples of 32 (Experimental)")
+        )
+
+        interfaces.add_argument(
+            "--octree-elementwise-nnps",
             action="store_const",
-            dest="multiproc",
-            const=None,
-            help=("Disable multiprocessing interface "
-                  "to the solver"))
+            dest="octree_elementwise",
+            default=False,
+            const=True,
+            help=("Run NNPS for different particles "
+                  "on different threads (Experimental)")
+        )
 
         # Scheme options.
         if self.scheme is not None:
@@ -707,11 +796,27 @@ class Application(object):
 
         self.options = options
 
+    def _process_command_line(self):
+        """Process the parsed command line arguments.
+
+        This method calls the scheme's ``consume_user_options`` and
+        :py:meth:`consume_user_options` as well as the
+        :py:meth:`configure_scheme`.
+
+        """
+        options = self.options
+        if options.post_process:
+            self._message('-'*70)
+            self._message('Performing post processing alone.')
+            self.post_process(options.post_process)
+            # Exit right after this so even if the user
+            # has an app.post_process call, it doesn't call it.
+            sys.exit(0)
         # save the path where we want to dump output
         self.output_dir = abspath(options.output_dir)
         mkdir(self.output_dir)
         if self.scheme is not None:
-            self.scheme.consume_user_options(self.options)
+            self.scheme.consume_user_options(options)
         self.consume_user_options()
         if self.scheme is not None:
             self.configure_scheme()
@@ -735,7 +840,13 @@ class Application(object):
             filename = self.fname + '.log'
 
         if len(filename) > 0:
+            # This is needed if the application is launched twice,
+            # as in that case, the old handlers must be removed.
+            for handler in logging.root.handlers[:]:
+                handler.close()
+                logging.root.removeHandler(handler)
             lfn = os.path.join(self.output_dir, filename)
+            mkdir(self.output_dir)
             format = '%(levelname)s|%(asctime)s|%(name)s|%(message)s'
             logging.basicConfig(
                 level=level, format=format, filename=lfn, filemode='a')
@@ -747,8 +858,13 @@ class Application(object):
             ip = socket.gethostbyname(host)
         except socket.gaierror:
             ip = host
+        cmd = ' '.join(sys.argv)
         logger.info(
-            'Running on {host} with address {ip}'.format(host=host, ip=ip))
+            'Started as:\n{command}'.format(command=cmd)
+        )
+        logger.info(
+            'Running on {host} with address {ip}'.format(host=host, ip=ip)
+        )
 
     def _create_inlet_outlet(self, inlet_outlet_factory):
         """Create the inlets and outlets if needed.
@@ -765,7 +881,7 @@ class Application(object):
             # Hook up the inlet/outlet's update method to be called after
             # each stage.
             for obj in self.inlet_outlet:
-                solver.add_post_step_callback(obj.update)
+                solver.add_post_stage_callback(obj.update)
 
     def _create_particles(self, particle_factory, *args, **kw):
         """ Create particles given a callable `particle_factory` and any
@@ -808,6 +924,17 @@ class Application(object):
             else:
                 self.particles = particle_factory(*args, **kw)
 
+            for pa in self.particles:
+                if len(pa.x) > 0:
+                    if np.max(pa.h) < 1e-12:
+                        warnings.warn(
+                            "'h' for particle array '{}' is 0.0".format(
+                                pa.name), UserWarning)
+                    if np.max(pa.m) < 1e-12:
+                        warnings.warn(
+                            "Mass 'm' for particle array '{}' is 0.0".format(
+                                pa.name), UserWarning)
+
             # get the array info which will be b'casted to other procs
             particles_info = utils.get_particles_info(self.particles)
 
@@ -819,22 +946,39 @@ class Application(object):
         if rank != 0:
             self.particles = utils.create_dummy_particles(particles_info)
 
-    def _configure(self):
+    def _configure_global_config(self):
+        options = self.options
+        # Setup configuration options.
+        config = get_config()
+        if options.with_openmp is not None:
+            config.use_openmp = options.with_openmp
+            logger.info('Using OpenMP')
+        if options.omp_schedule is not None:
+            config.set_omp_schedule(options.omp_schedule)
+            logger.info('Using OpenMP schedule %s', options.omp_schedule)
+
+        if options.with_opencl:
+            config.use_opencl = True
+            logger.info('Using OpenCL')
+        elif options.with_cuda:
+            config.use_cuda = True
+            logger.info('Using CUDA')
+
+        if options.with_local_memory:
+            leaf_size = int(options.octree_leaf_size)
+            config.wgs = leaf_size
+            config.use_local_memory = True
+        if options.use_double:
+            config.use_double = options.use_double
+            logger.info('Using double precision')
+        if options.profile:
+            config.profile = options.profile
+
+    def _configure_solver(self):
         """Configures the application using the options from the
         command-line.
         """
         options = self.options
-        # Setup configuration options.
-        if options.with_openmp is not None:
-            get_config().use_openmp = options.with_openmp
-        if options.omp_schedule is not None:
-            get_config().set_omp_schedule(options.omp_schedule)
-        if options.with_opencl:
-            get_config().use_opencl = True
-        if options.use_double:
-            get_config().use_double = options.use_double
-        if options.profile:
-            get_config().profile = options.profile
         # setup the solver using any options
         self.solver.setup_solver(options.__dict__)
 
@@ -854,16 +998,38 @@ class Application(object):
 
         if self.nnps is None:
             cache = options.cache_nnps
+
             # create the NNPS object
-            if options.with_opencl:
-                from pysph.base.gpu_nnps import ZOrderGPUNNPS
-                nnps = ZOrderGPUNNPS(
-                    dim=solver.dim,
-                    particles=self.particles,
-                    radius_scale=kernel.radius_scale,
-                    domain=self.domain,
-                    cache=True,
-                    sort_gids=options.sort_gids)
+            if options.with_opencl or options.with_cuda:
+                if options.nnps == 'gpu_octree':
+                    leaf_size = int(options.octree_leaf_size)
+                    # if leaf_size % 32 != 0:
+                    #     raise ValueError("GPU Octree leaf size must "
+                    #                      "be a multiple of 32")
+
+                    from pysph.base.octree_gpu_nnps import OctreeGPUNNPS
+                    # Sorting enabled by default
+                    print("Using elementwise: ", options.octree_elementwise)
+                    nnps = OctreeGPUNNPS(
+                        dim=solver.dim,
+                        particles=self.particles,
+                        radius_scale=kernel.radius_scale,
+                        domain=self.domain,
+                        cache=True,
+                        sort_gids=options.sort_gids,
+                        allow_sort=True,
+                        leaf_size=leaf_size,
+                        use_elementwise=options.octree_elementwise,
+                    )
+                else:
+                    from pysph.base.gpu_nnps import ZOrderGPUNNPS
+                    nnps = ZOrderGPUNNPS(
+                        dim=solver.dim,
+                        particles=self.particles,
+                        radius_scale=kernel.radius_scale,
+                        domain=self.domain,
+                        cache=True,
+                        sort_gids=options.sort_gids)
 
             elif options.nnps == 'box':
                 nnps = BoxSortNNPS(
@@ -976,11 +1142,6 @@ class Application(object):
             self.nnps = nnps
 
         nnps = self.nnps
-        # once the NNPS has been set-up, we set the default Solver
-        # post-stage callback to the DomainManager.setup_domain
-        # method. This method is responsible to computing the new cell
-        # size and doing any periodicity checks if needed.
-        solver.add_post_stage_callback(nnps.update_domain)
 
         # inform NNPS if it's working in parallel
         if self.num_procs > 1:
@@ -1019,6 +1180,12 @@ class Application(object):
         solver.set_compress_output(options.compress_output)
         # disable_output
         solver.set_disable_output(options.disable_output)
+
+        if options.reorder_freq is None:
+            if options.with_opencl:
+                solver.set_reorder_freq(50)
+        else:
+            solver.set_reorder_freq(options.reorder_freq)
 
         # output print frequency
         if options.freq is not None:
@@ -1061,50 +1228,76 @@ class Application(object):
         self.command_manager = CommandManager(solver, self.comm)
         solver.set_command_handler(self.command_manager.execute_commands)
 
+        _used_ports = []
+        if self._interfaces:
+            self._stop_interfaces()
+            self._interfaces = []
+
         if self.rank == 0:
+            if sys.platform == 'win32':
+                auto = "pysph@127.0.0.1:8800+"
+                default_host = "127.0.0.1"
+            else:
+                auto = "pysph@0.0.0.0:8800+"
+                default_host = "0.0.0.0"
             # commandline interface
             if options.cmd_line:
                 from pysph.solver.solver_interfaces import CommandlineInterface
-                self.command_manager.add_interface(
-                    CommandlineInterface().start)
+                interface = CommandlineInterface()
+                self._interfaces.append(interface)
+                self.command_manager.add_interface(interface.start)
+                logger.info('Started Commandline interface')
 
             # XML-RPC interface
             if options.xml_rpc:
                 from pysph.solver.solver_interfaces import XMLRPCInterface
                 addr = options.xml_rpc
                 idx = addr.find(':')
-                host = "0.0.0.0" if idx == -1 else addr[:idx]
+                host = default_host if idx == -1 else addr[:idx]
                 port = int(addr[idx + 1:])
-                self.command_manager.add_interface(
-                    XMLRPCInterface((host, port)).start)
+                interface = XMLRPCInterface((host, port))
+                self._interfaces.append(interface)
+                self.command_manager.add_interface(interface.start)
+                _used_ports.append(port)
+                logger.info(
+                    'Started XML-RPC interface on %s:%d' % (host, port)
+                )
 
             # python MultiProcessing interface
             if options.multiproc:
                 from pysph.solver.solver_interfaces import (
                     MultiprocessingInterface
                 )
-                addr = options.multiproc
+                if options.multiproc == 'auto':
+                    addr = auto
+                else:
+                    addr = options.multiproc
                 idx = addr.find('@')
                 authkey = "pysph" if idx == -1 else addr[:idx]
                 addr = addr[idx + 1:]
                 idx = addr.find(':')
-                host = "0.0.0.0" if idx == -1 else addr[:idx]
+                host = default_host if idx == -1 else addr[:idx]
                 port = addr[idx + 1:]
                 if port[-1] == '+':
-                    try_next_port = True
-                    port = port[:-1]
+                    port = get_free_port(int(port[:-1]), skip=_used_ports)
                 else:
-                    try_next_port = False
-                port = int(port)
+                    port = int(port)
 
-                interface = MultiprocessingInterface((host, port),
-                                                     authkey.encode(),
-                                                     try_next_port)
-
+                interface = MultiprocessingInterface(
+                    (host, port), authkey.encode()
+                )
+                self._interfaces.append(interface)
                 self.command_manager.add_interface(interface.start)
 
-                logger.info('started multiprocessing interface on %s' %
-                            (interface.address, ))
+                logger.info('Started multiprocessing interface on %s:%d' %
+                            (host, port))
+
+    def _configure(self):
+        """Configures the application using the options from the
+        command-line.
+        """
+        self._configure_global_config()
+        self._configure_solver()
 
     def _setup_parallel_manager_and_initial_load_balance(self):
         """This will automatically distribute the particles among processors
@@ -1203,16 +1396,20 @@ class Application(object):
         if is_overloaded_method(obj.post_step):
             self.solver.add_post_step_callback(obj.post_step)
 
+    def _stop_interfaces(self):
+        for interface in self._interfaces:
+            interface.stop()
+
     def _message(self, msg):
-        if self.options.quiet:
-            return
         if self.num_procs == 1:
             logger.info(msg)
-            print(msg)
+            if not self.options.quiet:
+                print(msg)
         elif (self.num_procs > 1 and self.rank in (0, 1)):
             s = "Rank %d: %s" % (self.rank, msg)
             logger.info(s)
-            print(s)
+            if not self.options.quiet:
+                print(s)
 
     def _write_info(self, filename, **kw):
         """Write the information dictionary to given filename. Any extra
@@ -1221,7 +1418,64 @@ class Application(object):
         info = dict(
             fname=self.fname, output_dir=self.output_dir, args=self.args)
         info.update(kw)
-        json.dump(info, open(filename, 'w'))
+        with open(filename, 'w') as f:
+            json.dump(info, f)
+
+    def _log_solver_info(self, solver):
+        sep = '-'*70
+
+        pa_info = {p.name: p.get_number_of_particles()
+                   for p in solver.particles}
+        particle_info = '\n  '.join(
+            ['%s: %d' % (k, v) for k, v in pa_info.items()]
+        )
+        total = sum(pa_info.values())
+        if len(pa_info) > 1:
+            particle_info += '\n  Total: %d' % total
+        p_msg = '%s\nNo of particles:\n  %s\n%s' % (sep, particle_info, sep)
+        self._message(p_msg)
+
+        kernel_name = solver.kernel.__class__.__name__
+        kernel_info = '%s(dim=%s)' % (kernel_name, solver.dim)
+        logger.info('Using kernel:\n%s\n  %s\n%s', sep, kernel_info, sep)
+
+        nnps_name = self.nnps.__class__.__name__
+        nnps_info = '%s(dim=%s)' % (nnps_name, solver.dim)
+        logger.info('Using nnps:\n%s\n  %s\n%s', sep, nnps_info, sep)
+
+        logger.info(
+            'Using integrator:\n%s\n  %s\n%s', sep, solver.integrator, sep
+        )
+
+        equations = self.equations
+        if isinstance(equations, list):
+            eqn_info = '[\n' + ',\n'.join([str(e) for e in equations]) + '\n]'
+        else:
+            eqn_info = equations
+        logger.info('Using equations:\n%s\n%s\n%s', sep, eqn_info, sep)
+
+        logger.info("Callbacks:\n%s\n", sep)
+        logger.info(
+            "Pre-step callbacks:\n%s\n", repr(self.solver.pre_step_callbacks)
+        )
+        logger.info(
+            "Post-step callbacks:\n%s\n", repr(self.solver.post_step_callbacks)
+        )
+        logger.info(
+            "Post-stage callbacks:\n%s\n%s\n",
+            repr(self.solver.post_stage_callbacks), sep
+        )
+
+    def _mayavi_config(self, code):
+        """Write out the given code to a `mayavi_config.py` in the output
+        directory.
+
+        Note that this will call `textwrap.dedent` on the code.
+        """
+        cfg = os.path.join(self.output_dir, 'mayavi_config.py')
+        if not os.path.exists(cfg):
+            with open(cfg, 'w') as fp:
+                fp.write(dedent(code))
 
     ######################################################################
     # Public interface.
@@ -1260,7 +1514,12 @@ class Application(object):
         info_dir = dirname(fname_or_dir)
         with open(fname_or_dir, 'r') as f:
             info = json.load(f)
+
+        self.args = info.get('args', self.args)
+        self._parse_command_line(force=True)
+
         self.fname = info.get('fname', self.fname)
+
         output_dir = info.get('output_dir', self.output_dir)
         if realpath(info_dir) != realpath(output_dir):
             # Happens if someone moved the directory!
@@ -1269,8 +1528,11 @@ class Application(object):
         else:
             self.output_dir = output_dir
 
-        self.args = info.get('args', self.args)
-        self._parse_command_line(force=True)
+        # Set the output directory of the options so it is corrected as per the
+        # info file.
+        self.options.output_dir = self.output_dir
+        self._process_command_line()
+
         return info
 
     def run(self, argv=None):
@@ -1283,7 +1545,9 @@ class Application(object):
             start_time = time.time()
 
             self._parse_command_line(force=argv is not None)
+            self._process_command_line()
             self._setup_logging()
+            self._configure_global_config()
 
             self.solver = self.create_solver()
             msg = "Solver is None, you may have forgotten to return it!"
@@ -1302,16 +1566,20 @@ class Application(object):
 
             self.nnps = self.create_nnps()
 
-            self._configure()
+            self._configure_solver()
 
             self._setup_solver_callbacks(self)
             for tool in self.create_tools():
                 self.add_tool(tool)
 
+            self._log_solver_info(self.solver)
+
             end_time = time.time()
             setup_duration = end_time - start_time
             self._message("Setup took: %.5f secs" % (setup_duration))
             self._write_info(self.info_filename, completed=False, cpu_time=0)
+
+        self.customize_output()
 
         start_time = time.time()
         self.solver.solve(not self.options.quiet)
@@ -1319,10 +1587,12 @@ class Application(object):
         run_duration = end_time - start_time
         self._message("Run took: %.5f secs" % (run_duration))
         if self.options.with_opencl and self.options.profile:
-            from pysph.base.opencl import print_profile
+            from compyle.opencl import print_profile
             print_profile()
         self._write_info(
             self.info_filename, completed=True, cpu_time=run_duration)
+
+        self._stop_interfaces()
 
     def set_args(self, args):
         self.args = args
@@ -1380,7 +1650,9 @@ class Application(object):
         self.equations = equations
         solver.get_options(self.arg_parse)
         self._parse_command_line()
+        self._process_command_line()
         self._setup_logging()
+        self._configure_global_config()
 
         # Create particles either from scratch or restart
         self._create_particles(particle_factory, *args, **kwargs)
@@ -1391,7 +1663,7 @@ class Application(object):
         if nnps is not None:
             self.nnps = nnps
 
-        self._configure()
+        self._configure_solver()
 
         end_time = time.time()
         setup_duration = end_time - start_time
@@ -1412,9 +1684,9 @@ class Application(object):
         pass
 
     def configure_scheme(self):
-        """This is called after :py:meth:`consume_user_options` is called.  One can
-        configure the SPH scheme here as at this point all the command line
-        options are known.
+        """This is called after :py:meth:`consume_user_options` is called.
+        One can configure the SPH scheme here as at this point all the command
+        line options are known.
         """
         pass
 
@@ -1431,7 +1703,8 @@ class Application(object):
         pass
 
     def create_domain(self):
-        """Create a `pysph.base.nnps_base.DomainManager` and return it if needed.
+        """Create a `pysph.base.nnps_base.DomainManager` and return it if
+        needed.
 
         This is used for periodic domains etc.  Note that if the domain
         is passed to :py:meth:`__init__`, then this method is not called.
@@ -1490,6 +1763,18 @@ class Application(object):
         called after particles/inlets etc. are all setup, configured etc.
         """
         return []
+
+    def customize_output(self):
+        """Customize the output file visualization by adding any files.
+
+        For example, the pysph view command will look for a
+        ``mayavi_config.py`` file that can be used to script the viewer. You
+        can use self._mayavi_config('code') to add a default customization
+        here.
+
+        Note that this is executed before the simulation starts.
+        """
+        pass
 
     def pre_step(self, solver):
         """If overloaded, this is called automatically before each integrator

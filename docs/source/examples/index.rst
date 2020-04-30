@@ -11,6 +11,8 @@ variety of problems.
    :hidden:
 
    taylor_green.rst
+   sphere_in_vessel.rst
 
 
 * :ref:`taylor_green`: the Taylor-Green Vortex problem in 2D.
+* :ref:`sphere_in_vessel`: A sphere floating in a hydrostatic tank example.

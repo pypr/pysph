@@ -1,4 +1,5 @@
-# cython: embedsignature=True
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
 from libcpp.map cimport map
 from libcpp.pair cimport pair
 
@@ -22,6 +23,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
     cdef object overflow_cid_to_idx
     cdef object curr_cid
     cdef object max_cid_src
+    cdef object allocator
 
     cdef object helper
     cdef object radix_sort
@@ -29,6 +31,9 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
     cdef public bint sorted
     cdef bint dst_src
+
+    cdef object z_order_nbrs
+    cdef object z_order_nbr_lengths
 
     #cpdef get_spatially_ordered_indices(self, int pa_index)
 
