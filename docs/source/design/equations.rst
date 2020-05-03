@@ -617,6 +617,53 @@ that has nothing to do with the particular backend. However, since it is
 arbitrary Python, you can choose to implement the code using any approach you
 choose to do. This should be flexible enough to customize PySPH greatly.
 
+Controlling the looping over destination particles
+----------------------------------------------------
+
+Sometimes (this is pretty rare) you may want to only iterate over a subset of
+the particles. Usually, the iterations over the destinations are performed
+roughly like the following pure Python code:
+
+.. code-block:: python
+
+    for d_idx in range(n_destinations):
+        # ...
+
+The :py:class:`Group` class also takes a ``start_idx`` argument which defaults
+to 0 and a ``stop_idx`` which defaults to the total number of particles. One
+can pass either a number or a string with a property/constant whose first item
+will be used as the number. For example you could have this:
+
+.. code-block:: python
+
+    Group(
+        equations=[
+            SimpleEquation(dest='fluid', sources=['fluid'])
+        ],
+        start_idx=10, stop_idx=20
+    )
+
+This would iterate from the index number 10 to the index number 19, i.e.
+similar to using a ``range(10, 20)``. You could also do:
+
+.. code-block:: python
+
+    Group(
+        equations=[
+            SimpleEquation(dest='fluid', sources=['fluid'])
+        ],
+        stop_idx='n_body'
+    )
+
+Where ``'n_body'`` is a constant available in the destination particle array.
+
+Another instance where this could be useful is when you want to run an
+equation only on the ghost particles, i.e. when ``real`` is False. In this
+case, let us say there are 5000 real particles, we could simply pass
+``start_idx=5000, real=False`` and it will only iterate over the non-real
+particles.
+
+
 Writing integrators
 --------------------
 
