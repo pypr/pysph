@@ -183,7 +183,7 @@ buchner_exp_data = u"""
 7.360  	0.449
 """
 
-lobovsky_exp_data_p1=u"""
+lobovsky_exp_data_p1 = u"""
 0.081	0.023
 0.247	0.020
 0.412	0.017
@@ -247,7 +247,7 @@ lobovsky_exp_data_p1=u"""
 6.982	0.618
 """
 
-lobovsky_exp_data_p3=u"""
+lobovsky_exp_data_p3 = u"""
 0.098	0.006
 0.200	0.007
 0.303	0.007
@@ -369,7 +369,7 @@ lobovsky_exp_data_p3=u"""
 6.966	0.649
 """
 
-lobovsky_exp_data_p4=u"""
+lobovsky_exp_data_p4 = u"""
 0.086	0.003
 0.252	0.002
 0.418	0.002
@@ -430,7 +430,7 @@ lobovsky_exp_data_p4=u"""
 6.941	0.475
 """
 
-kleefsman_exp_data_p1=u"""
+kleefsman_exp_data_p1 = u"""
 0.38	0.014
 0.804	0.012
 1.228	0.011
@@ -480,7 +480,7 @@ kleefsman_exp_data_p1=u"""
 17.584	0.218
 """
 
-kleefsman_exp_data_p3=u"""
+kleefsman_exp_data_p3 = u"""
 0.291	0.007
 0.716	0.005
 1.141	0.005
@@ -532,12 +532,14 @@ kleefsman_exp_data_p3=u"""
 17.773	0.122
 """
 
+
 def get_martin_moyce_1():
     """Returns t*sqrt(2*g/a), z/a for the case where a = 1.125 inches
     """
     # z/a vs t*np.sqrt(2*g/a)
     t, z = np.loadtxt(StringIO(mm_data_1), unpack=True)
     return t, z
+
 
 def get_martin_moyce_2():
     """Returns t*sqrt(2*g/a), z/a for the case where a = 2.25 inches
@@ -552,12 +554,14 @@ def get_koshizuka_oka_data():
     t, z = np.loadtxt(StringIO(ko_data), unpack=True)
     return t, z
 
+
 def get_koshizuka_oka_mps_data():
     """These are computational results using the MPS scheme.
     """
     # z/L vs t*np.sqrt(2*g/L)
     t, z = np.loadtxt(StringIO(ko_mps_data), unpack=True)
     return t, z
+
 
 def get_buchner_data():
     """Pressure probe readings for a probe at (5.366*H, 0.2*H)
@@ -566,6 +570,7 @@ def get_buchner_data():
     # p/(rho*g*H) v/s t*sqrt(2*g/H)
     t, p0 = np.loadtxt(StringIO(buchner_exp_data), unpack=True)
     return t, p0
+
 
 def get_lobovsky_data():
     """Pressure probe readings for a probes at (1610, 0, 3),
@@ -577,6 +582,7 @@ def get_lobovsky_data():
     t3, p3 = np.loadtxt(StringIO(lobovsky_exp_data_p3), unpack=True)
     t4, p4 = np.loadtxt(StringIO(lobovsky_exp_data_p4), unpack=True)
     return t1, t3, t4, p1, p3, p4
+
 
 def get_kleefsman_data():
     """Pressure probe readings for a probes at (2.42, 0, 0.021),

@@ -73,7 +73,7 @@ class DamBreak2D(Application):
         )
         group.add_argument(
             '--compare-data', action="store", type=str, dest='compare_data',
-            default='koshizuka', help="Specify the experimental data to compare against",
+            default='koshizuka', help="Experimental data to compare against",
         )
 
     def consume_user_options(self):
@@ -243,11 +243,20 @@ class DamBreak2D(Application):
             container_height = 3.0*H
             container_width = 5.366*H
 
-        xt, yt = get_2d_tank(dx=self.dx, length=container_width,
-                             height=container_height, base_center=[container_width/2, 0],
-                             num_layers=nboundary_layers)
-        xf, yf = get_2d_block(dx=self.dx, length=fluid_column_width,
-                              height=fluid_column_height, center=[fluid_column_width/2, fluid_column_height/2])
+        xt, yt = get_2d_tank(
+                             dx=self.dx,
+                             length=container_width,
+                             height=container_height,
+                             base_center=[container_width/2, 0],
+                             num_layers=nboundary_layers
+                             )
+
+        xf, yf = get_2d_block(
+                              dx=self.dx,
+                              length=fluid_column_width,
+                              height=fluid_column_height,
+                              center=[fluid_column_width/2, fluid_column_height/2]
+                              )
 
         xf += self.dx
         yf += self.dx
@@ -340,7 +349,7 @@ class DamBreak2D(Application):
 
         t = []
         p0 = []
-        for sd, arrays1, arrays2  in iter_output(files, "fluid", "boundary"):
+        for sd, arrays1, arrays2 in iter_output(files, "fluid", "boundary"):
             t.append(sd["t"]*factor_x)
             interp = Interpolator([arrays1, arrays2], x=[container_width],
                                   y=[H*0.2], method=self.options.interp_method)
@@ -352,7 +361,7 @@ class DamBreak2D(Application):
         t, p0 = list(map(np.asarray, (t, p0)))
         np.savez(fname, t=t, p0=p0)
 
-        plt.scatter(data_t, data_p0, color=(0,0,0), label="Experiment (Buchner, 2002)")
+        plt.scatter(data_t, data_p0, color=(0, 0, 0), label="Experiment (Buchner, 2002)")
         plt.legend()
         plt.ylabel(r"$\frac{P}{\rho gH}$")
         plt.xlabel(r"$t \sqrt{\frac{g}{H}}$")

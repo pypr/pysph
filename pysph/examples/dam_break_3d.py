@@ -103,13 +103,15 @@ class DamBreak3D(Application):
         t = []
         p0 = []
 
-        p_x = np.repeat(self.geom.obstacle_center_x - self.geom.obstacle_length*0.5, 2)
+        x_probe = self.geom.obstacle_center_x - self.geom.obstacle_length*0.5
+        p_x = np.repeat(x_probe, 2)
         p_y = np.repeat(0, 2)
         p_z = np.array([0.021, 0.101])
 
-        for sd, arrays1, arrays2, arrays3  in iter_output(files, "fluid", "obstacle", "boundary"):
+        for sd, arrays1, arrays2, arrays3 in iter_output(files, "fluid", "obstacle", "boundary"):
             t.append(sd["t"]*factor_x)
-            interp = Interpolator([arrays1, arrays2, arrays3], x=p_x ,y=p_y, z=p_z, method="shepard")
+            interp = Interpolator([arrays1, arrays2, arrays3],
+                                  x=p_x, y=p_y, z=p_z, method="shepard")
             p0.append(interp.interpolate('p')*factor_y)
 
         fname = os.path.join(self.output_dir, 'results.npz')
@@ -136,6 +138,7 @@ class DamBreak3D(Application):
         plt.xlabel(r"$t \sqrt{\frac{g}{H}} $")
         plt.title("P3")
         plt.savefig(os.path.join(self.output_dir, 'p3_vs_t.png'))
+
 
 if __name__ == '__main__':
     app = DamBreak3D()

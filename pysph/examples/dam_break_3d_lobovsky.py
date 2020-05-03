@@ -45,11 +45,17 @@ class DamBreak3D(Application):
         dx = self.options.dx
         self.dx = dx
         self.hdx = self.options.hdx
-        self.geom = DamBreak3DGeometry(container_height=1.5*H, container_width=H/2.0,
-                                       container_length=161*H/30,  fluid_column_height=H,
-                                       fluid_column_width=H/2.0, fluid_column_length=2.0*H,
-                                       dx=dx, nboundary_layers=nboundary_layers,
-                                       hdx=self.hdx, rho0=ro, with_obstacle=False
+        self.geom = DamBreak3DGeometry(
+                                       container_height=1.5*H,
+                                       container_width=H/2.0,
+                                       container_length=161*H/30,
+                                       fluid_column_height=H,
+                                       fluid_column_width=H/2.0,
+                                       fluid_column_length=2.0*H,
+                                       dx=dx,
+                                       nboundary_layers=nboundary_layers,
+                                       hdx=self.hdx, rho0=ro,
+                                       with_obstacle=False
                                       )
         self.co = 10.0 * self.geom.get_max_speed(g=9.81)
 
@@ -110,9 +116,10 @@ class DamBreak3D(Application):
 
         from mayavi import mlab
 
-        for sd, arrays1, arrays2  in iter_output(files, "fluid", "boundary"):
+        for sd, arrays1, arrays2 in iter_output(files, "fluid", "boundary"):
             t.append(sd["t"]*factor_x)
-            interp = Interpolator([arrays1, arrays2], x=p_x ,y=p_y, z=p_z, method="shepard")
+            interp = Interpolator([arrays1, arrays2],
+                                  x=p_x, y=p_y, z=p_z, method="shepard")
             p0.append(interp.interpolate('p')*factor_y)
 
         fname = os.path.join(self.output_dir, 'results.npz')
@@ -123,7 +130,7 @@ class DamBreak3D(Application):
         p2 = p0[:, 1]
         p3 = p0[:, 2]
 
-        idx = t<=7
+        idx = t <= 7
         t = t[idx]
         p1 = p1[idx]
         p2 = p2[idx]
