@@ -249,12 +249,20 @@ class AccelerationEvalCythonHelper(object):
         return group.get_array_declarations(src, self.known_types)
 
     def get_dest_array_setup(self, dest_name, eqs_with_no_source, sources,
-                             real):
+                             group):
         src, dest_arrays = eqs_with_no_source.get_array_names()
         for g in sources.values():
             s, d = g.get_array_names()
             dest_arrays.update(d)
-        lines = ['NP_DEST = self.%s.size(real=%s)' % (dest_name, real)]
+        if group.loop_count is None:
+            lines = ['NP_DEST = self.%s.size(real=%s)' %
+                     (dest_name, group.real)]
+        elif isinstance(group.loop_count, str):
+            lines = ['NP_DEST = self.%s.%s[0]' %
+                     (dest_name, group.loop_count)]
+        else:
+            lines = ['NP_DEST = %s' % group.loop_count]
+
         lines += ['%s = dst.%s.data' % (n, n[2:])
                   for n in sorted(dest_arrays)]
         return '\n'.join(lines)
@@ -272,11 +280,15 @@ class AccelerationEvalCythonHelper(object):
         else:
             return "if True: # Placeholder used for OpenMP."
 
-    def get_parallel_range(self, start, stop=None, step=1, nogil=True):
+    def get_parallel_range(self, group, nogil=True):
+        kwargs = {}
+        if group.loop_count is not None:
+            kwargs['schedule'] = 'dynamic'
+            kwargs['chunksize'] = None
         if nogil:
-            return get_parallel_range(start, stop, step, nogil=True)
-        else:
-            return get_parallel_range(start, stop, step)
+            kwargs['nogil'] = True
+
+        return get_parallel_range("NP_DEST", **kwargs)
 
     def get_particle_array_names(self):
         parrays = [pa.name for pa in self.object.particle_arrays]
