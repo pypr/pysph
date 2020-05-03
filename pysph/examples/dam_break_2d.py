@@ -67,12 +67,22 @@ class DamBreak2D(Application):
             '--staggered-grid', action="store_true", dest='staggered_grid',
             default=False, help="Use a staggered grid for particles.",
         )
+        group.add_argument(
+            '--interp-method', action="store", type=str, dest='interp_method',
+            default='shepard', help="Specify the interpolation method.",
+        )
+        group.add_argument(
+            '--compare-data', action="store", type=str, dest='compare_data',
+            default='koshizuka', help="Specify the experimental data to compare against",
+        )
 
     def consume_user_options(self):
         self.hdx = self.options.hdx
         self.dx = self.options.dx
         self.h = self.hdx * self.dx
         self.kernel_corr = self.options.kernel_corr
+        self.interp_method = self.options.interp_method
+        self.compare_data = self.options.compare_data
         print("Using h = %f" % self.h)
 
     def configure_scheme(self):
@@ -80,6 +90,14 @@ class DamBreak2D(Application):
         kw = dict(
             tf=tf, output_at_times=[0.4, 0.6, 0.8, 1.0]
         )
+
+        if self.compare_data == "buchner":
+            global vref, co, B
+            vref = np.sqrt(2 * 9.81 * 1.0)
+            co = 10.0 * vref
+            B = co * co * ro / gamma
+            self.scheme.configure(c0=co)
+
         if self.options.scheme == 'wcsph':
             dt = 0.125 * self.h / co
             self.scheme.configure(h0=self.h, hdx=self.hdx)
@@ -215,11 +233,21 @@ class DamBreak2D(Application):
             nboundary_layers = 4
             nfluid_offset = 1
             wall_hex_pack = False
+
+        if self.compare_data == "buchner":
+            global fluid_column_height, fluid_column_width, \
+                   container_height, container_width
+            fluid_column_height = 1.0
+            H = fluid_column_height
+            fluid_column_width = 2.0*H
+            container_height = 3.0*H
+            container_width = 5.366*H
+
         xt, yt = get_2d_tank(dx=self.dx, length=container_width,
-                             height=container_height, base_center=[2, 0],
+                             height=container_height, base_center=[container_width/2, 0],
                              num_layers=nboundary_layers)
         xf, yf = get_2d_block(dx=self.dx, length=fluid_column_width,
-                              height=fluid_column_height, center=[0.5, 1])
+                              height=fluid_column_height, center=[fluid_column_width/2, fluid_column_height/2])
 
         xf += self.dx
         yf += self.dx
@@ -258,6 +286,18 @@ class DamBreak2D(Application):
         if len(self.output_files) == 0:
             return
 
+        if self.compare_data == "koshizuka":
+            self.koshizukaoka()
+        elif self.compare_data == "buchner":
+            self.buchner()
+
+    def customize_output(self):
+        self._mayavi_config('''
+        b = particle_arrays['fluid']
+        b.scalar = 'vmag'
+        ''')
+
+    def koshizukaoka(self):
         from pysph.solver.utils import iter_output
         t, x_max = [], []
         factor = np.sqrt(2.0 * 9.81 / fluid_column_width)
@@ -286,11 +326,37 @@ class DamBreak2D(Application):
         plt.savefig(os.path.join(self.output_dir, 'x_vs_t.png'), dpi=300)
         plt.close()
 
-    def customize_output(self):
-        self._mayavi_config('''
-        b = particle_arrays['fluid']
-        b.scalar = 'vmag'
-        ''')
+    def buchner(self):
+        from pysph.solver.utils import iter_output
+        import matplotlib.pyplot as plt
+        from pysph.examples import db_exp_data as dbd
+        from pysph.tools.interpolator import Interpolator
+        H = 1.0
+        factor_y = 1/(ro*g*H)
+        factor_x = np.sqrt(g/H)
+
+        data_t, data_p0 = dbd.get_buchner_data()
+        files = self.output_files
+
+        t = []
+        p0 = []
+        for sd, arrays1, arrays2  in iter_output(files, "fluid", "boundary"):
+            t.append(sd["t"]*factor_x)
+            interp = Interpolator([arrays1, arrays2], x=[container_width],
+                                  y=[H*0.2], method=self.options.interp_method)
+            p0.append(interp.interpolate('p')*factor_y)
+
+        plt.plot(t, p0, label="Computed")
+
+        fname = os.path.join(self.output_dir, 'results.npz')
+        t, p0 = list(map(np.asarray, (t, p0)))
+        np.savez(fname, t=t, p0=p0)
+
+        plt.scatter(data_t, data_p0, color=(0,0,0), label="Experiment (Buchner, 2002)")
+        plt.legend()
+        plt.ylabel(r"$\frac{P}{\rho gH}$")
+        plt.xlabel(r"$t \sqrt{\frac{g}{H}}$")
+        plt.savefig(os.path.join(self.output_dir, 'p_vs_t.png'))
 
 
 if __name__ == '__main__':
