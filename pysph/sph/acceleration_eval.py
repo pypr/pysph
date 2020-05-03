@@ -121,7 +121,7 @@ class MegaGroup(object):
     def _copy_props(self, group):
         for key in ('real', 'update_nnps', 'iterate', 'pre', 'post',
                     'max_iterations', 'min_iterations', 'has_subgroups',
-                    'loop_count'):
+                    'start_idx', 'stop_idx'):
             setattr(self, key, getattr(group, key))
 
     def _make_data(self, group):

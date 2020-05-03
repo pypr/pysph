@@ -254,14 +254,20 @@ class AccelerationEvalCythonHelper(object):
         for g in sources.values():
             s, d = g.get_array_names()
             dest_arrays.update(d)
-        if group.loop_count is None:
-            lines = ['NP_DEST = self.%s.size(real=%s)' %
-                     (dest_name, group.real)]
-        elif isinstance(group.loop_count, str):
-            lines = ['NP_DEST = self.%s.%s[0]' %
-                     (dest_name, group.loop_count)]
+        if isinstance(group.start_idx, str):
+            lines = ['D_START_IDX = self.%s.%s[0]' %
+                     (dest_name, group.start_idx)]
         else:
-            lines = ['NP_DEST = %s' % group.loop_count]
+            lines = ['D_START_IDX = %s' % group.start_idx]
+
+        if group.stop_idx is None:
+            lines += ['NP_DEST = self.%s.size(real=%s)' %
+                      (dest_name, group.real)]
+        elif isinstance(group.stop_idx, str):
+            lines += ['NP_DEST = self.%s.%s[0]' %
+                      (dest_name, group.stop_idx)]
+        else:
+            lines += ['NP_DEST = %s' % group.stop_idx]
 
         lines += ['%s = dst.%s.data' % (n, n[2:])
                   for n in sorted(dest_arrays)]
@@ -282,13 +288,13 @@ class AccelerationEvalCythonHelper(object):
 
     def get_parallel_range(self, group, nogil=True):
         kwargs = {}
-        if group.loop_count is not None:
+        if (group.stop_idx is not None) or group.start_idx:
             kwargs['schedule'] = 'dynamic'
             kwargs['chunksize'] = None
         if nogil:
             kwargs['nogil'] = True
 
-        return get_parallel_range("NP_DEST", **kwargs)
+        return get_parallel_range("D_START_IDX", "NP_DEST", **kwargs)
 
     def get_particle_array_names(self):
         parrays = [pa.name for pa in self.object.particle_arrays]
