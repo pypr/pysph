@@ -266,7 +266,7 @@ class TestMegaGroup(unittest.TestCase):
         g = Group(
             equations=[], real=False, update_nnps=True, iterate=True,
             max_iterations=20, min_iterations=2, pre=nothing, post=nothing,
-            loop_count=1
+            start_idx=1, stop_idx=2
         )
 
         # When
@@ -274,7 +274,7 @@ class TestMegaGroup(unittest.TestCase):
 
         # Then
         props = ('real update_nnps iterate max_iterations '
-                 'min_iterations pre post loop_count').split()
+                 'min_iterations pre post start_idx stop_idx').split()
         for prop in props:
             self.assertEqual(getattr(mg, prop), getattr(g, prop))
 
@@ -518,7 +518,7 @@ class TestAccelerationEval1D(unittest.TestCase):
         expect = np.asarray([7., 9., 11., 11., 11., 11., 11., 11., 9., 7.])
         self.assertListEqual(list(pa.u), list(expect))
 
-    def test_should_honor_loop_count_in_group(self):
+    def test_should_honor_start_stop_idx_in_group(self):
         # Given
         pa = self.pa
         pa.u[:] = 1.0
@@ -529,7 +529,7 @@ class TestAccelerationEval1D(unittest.TestCase):
                 equations=[
                     SimpleEquation(dest='fluid', sources=['fluid'])
                 ],
-                loop_count=1
+                start_idx=1, stop_idx=2
             )
         ]
         a_eval = self._make_accel_eval(equations)
@@ -539,14 +539,15 @@ class TestAccelerationEval1D(unittest.TestCase):
 
         # Then
         expect = np.ones_like(pa.u)
-        expect[0] = 3.0
+        expect[1] = 4.0
         self.assertListEqual(list(pa.u), list(expect))
         self.assertListEqual(list(pa.au), list(expect))
 
-    def test_should_honor_loop_count_as_str_in_group(self):
+    def test_should_honor_start_stop_idx_as_str_in_group(self):
         # Given
         pa = self.pa
-        pa.add_constant('count', 2)
+        pa.add_constant('start', 1)
+        pa.add_constant('stop', 3)
         pa.u[:] = 1.0
         pa.au[:] = 1.0
 
@@ -555,7 +556,7 @@ class TestAccelerationEval1D(unittest.TestCase):
                 equations=[
                     SimpleEquation(dest='fluid', sources=['fluid'])
                 ],
-                loop_count='count'
+                start_idx='start', stop_idx='stop'
             )
         ]
         a_eval = self._make_accel_eval(equations)
@@ -565,8 +566,8 @@ class TestAccelerationEval1D(unittest.TestCase):
 
         # Then
         expect = np.ones_like(pa.u)
-        expect[0] = 3.0
         expect[1] = 4.0
+        expect[2] = 5.0
         self.assertListEqual(list(pa.u), list(expect))
         self.assertListEqual(list(pa.au), list(expect))
 

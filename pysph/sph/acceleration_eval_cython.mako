@@ -243,7 +243,7 @@ cdef class AccelerationEval:
             getattr(self, name).set_array(pa)
 
     cpdef compute(self, double t, double dt):
-        cdef long nbr_idx, NP_SRC, NP_DEST
+        cdef long nbr_idx, NP_SRC, NP_DEST, D_START_IDX
         cdef long s_idx, d_idx
         cdef int thread_id, N_NBRS
         cdef unsigned int* NBRS

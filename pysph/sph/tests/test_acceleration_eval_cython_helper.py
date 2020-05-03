@@ -66,13 +66,13 @@ class TestAccelerationHelperCython(unittest.TestCase):
     def tearDown(self):
         set_config(None)
 
-    def test_parallel_range_unsets_chunksize_on_loop_count(self):
+    def test_parallel_range_unsets_chunksize_on_start_stop_idx(self):
         # Given
         pa = ParticleArray(name='f', m=[1.0], rho=[0.0])
 
         eqs = [Group(
             equations=[SummationDensity(dest='f', sources=['f'])],
-            loop_count=1
+            start_idx=1, stop_idx=2
         )]
         aeval = AccelerationEval([pa], eqs, kernel=CubicSpline(dim=1))
 
@@ -81,7 +81,7 @@ class TestAccelerationHelperCython(unittest.TestCase):
         result = helper.get_parallel_range(eqs[0])
 
         # Then
-        expect = ("prange(0, NP_DEST, 1, schedule='dynamic', "
+        expect = ("prange(D_START_IDX, NP_DEST, 1, schedule='dynamic', "
                   "nogil=True)")
         self.assertEqual(result, expect)
 
@@ -99,13 +99,13 @@ class TestAccelerationHelperCython(unittest.TestCase):
         result = helper.get_parallel_range(eqs[0])
 
         # Then
-        expect = ("prange(0, NP_DEST, 1, schedule='dynamic', "
+        expect = ("prange(D_START_IDX, NP_DEST, 1, schedule='dynamic', "
                   "chunksize=64, nogil=True)")
         self.assertEqual(result, expect)
 
         result = helper.get_parallel_range(eqs[0], nogil=False)
 
         # Then
-        expect = ("prange(0, NP_DEST, 1, schedule='dynamic', "
+        expect = ("prange(D_START_IDX, NP_DEST, 1, schedule='dynamic', "
                   "chunksize=64)")
         self.assertEqual(result, expect)
