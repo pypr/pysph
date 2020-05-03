@@ -448,7 +448,8 @@ class Group(object):
     pre_comp = precomputed_symbols()
 
     def __init__(self, equations, real=True, update_nnps=False, iterate=False,
-                 max_iterations=1, min_iterations=0, pre=None, post=None):
+                 max_iterations=1, min_iterations=0, pre=None, post=None,
+                 loop_count=None):
         """Constructor.
 
         Parameters
@@ -481,9 +482,15 @@ class Group(object):
             A callable which is passed no arguments that is called before
             anything in the group is executed.
 
-        pre: callable
+        post: callable
             A callable which is passed no arguments that is called after
             the group is completed.
+
+        loop_count: int or str
+            Instead of looping over all destination particles, loop over
+            the given number if an integer is passed. If a string is passed,
+            look for a property/constant and use its first value as the loop
+            count.
 
         Notes
         -----
@@ -496,6 +503,7 @@ class Group(object):
         having an older density.  This is also the case for the TaitEOS.  In
         these cases the group that computes the equation should set real to
         False.
+
         """
         self.real = real
         self.update_nnps = update_nnps
@@ -506,6 +514,7 @@ class Group(object):
         self.min_iterations = min_iterations
         self.pre = pre
         self.post = post
+        self.loop_count = loop_count
 
         only_groups = [x for x in equations if isinstance(x, Group)]
         if (len(only_groups) > 0) and (len(only_groups) != len(equations)):
@@ -528,6 +537,9 @@ class Group(object):
         cls = self.__class__.__name__
         eqs = ', \n'.join(repr(eq) for eq in self.equations)
         ignore = ['equations']
+        for prop in ['pre', 'post', 'loop_count']:
+            if getattr(self, prop) is None:
+                ignore.append(prop)
         kws = ', '.join(get_init_args(self, self.__init__, ignore))
         kws = '\n'.join(wrap(kws, width=74, subsequent_indent=' '*2,
                              break_long_words=False))
