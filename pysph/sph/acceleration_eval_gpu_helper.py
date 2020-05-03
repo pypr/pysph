@@ -192,16 +192,29 @@ class GPUAccelerationEval(object):
         self._use_double = cfg.use_double
         self._use_local_memory = cfg.use_local_memory
 
+    def _get_index(self, dest, attr):
+        if isinstance(attr, str):
+            return dest.get(attr)[0]
+        else:
+            return attr
+
     def _call_kernel(self, info, extra_args):
         nnps = self.nnps
         call = info.get('method')
         args = list(info.get('args'))
         dest = info['dest']
-        n = dest.get_number_of_particles(info.get('real', True))
-        args[1] = (n,)
+        start_idx = self._get_index(dest, info['start_idx'])
+        stop_idx = info['stop_idx']
+        if stop_idx is None:
+            n = dest.get_number_of_particles(info.get('real', True))
+        else:
+            n = self._get_index(dest, stop_idx)
+        args[1] = (n - start_idx,)
         args[3:] = [x() for x in args[3:]]
         # Argument for NP_MAX
-        extra_args[-1][...] = n - 1
+        extra_args[-2][...] = n - 1
+        # Argument for OFFSET_IDX
+        extra_args[-1][...] = start_idx
 
         if info.get('loop'):
             if self._use_local_memory:
@@ -213,7 +226,7 @@ class GPUAccelerationEval(object):
                 args[2] = gs_ls[1]
 
                 # No need for the guard variable for the local memory code.
-                args = args + extra_args[:-1] + nnps_args
+                args = args + extra_args[:-2] + nnps_args
 
                 call(*args)
                 self._queue.finish()
@@ -248,6 +261,7 @@ class GPUAccelerationEval(object):
         dtype = np.float64 if self._use_double else np.float32
         extra_args = [np.asarray(t, dtype=dtype),
                       np.asarray(dt, dtype=dtype),
+                      np.asarray(0, dtype=np.uint32),
                       np.asarray(0, dtype=np.uint32)]
         i = 0
         iter_count = 0
@@ -310,17 +324,26 @@ class CUDAAccelerationEval(GPUAccelerationEval):
         call = info.get('method')
         args = list(info.get('args'))
         dest = info['dest']
-        n = dest.get_number_of_particles(info.get('real', True))
+        start_idx = self._get_index(dest, info['start_idx'])
+        stop_idx = info['stop_idx']
+        if stop_idx is None:
+            n = dest.get_number_of_particles(info.get('real', True))
+        else:
+            n = self._get_index(dest, stop_idx)
+        n_iter = n - start_idx
+
         # args is actually [queue, None, None, actual_meaningful_args]
         # we do not need the first 3 args on CUDA.
         args = [x() for x in args[3:]]
 
         # Argument for NP_MAX
-        extra_args[-1][...] = n - 1
+        extra_args[-2][...] = n - 1
+        # Argument for OFFSET_IDX
+        extra_args[-1][...] = start_idx
 
-        gs, ls = splay(n)
+        gs, ls = splay(n_iter)
         gs, ls = int(gs[0]), int(ls[0])
-        num_blocks = (n + ls - 1) // ls
+        num_blocks = (n_iter + ls - 1) // ls
 
         #num_blocks = int((gs + ls - 1) / ls)
         num_tpb = ls
@@ -335,7 +358,7 @@ class CUDAAccelerationEval(GPUAccelerationEval):
                 args[2] = gs_ls[1]
 
                 # No need for the guard variable for the local memory code.
-                args = args + extra_args[:-1] + nnps_args
+                args = args + extra_args[:-2] + nnps_args
 
                 call(*args)
             else:
@@ -515,7 +538,10 @@ class AccelerationEvalGPUHelper(object):
                     method=method, dest=self._array_map[dest],
                     src=self._array_map[src], args=args,
                     loop=loop, src_idx=array_index[src],
-                    dst_idx=array_index[dest], type='kernel'
+                    dst_idx=array_index[dest],
+                    start_idx=item.get('start_idx'),
+                    stop_idx=item.get('stop_idx'),
+                    type='kernel'
                 )
             elif type == 'method':
                 info = dict(item)
@@ -674,7 +700,7 @@ class AccelerationEvalGPUHelper(object):
 
         sph_k_name = self.object.kernel.__class__.__name__
         code = [
-            'int d_idx = GID_0 * LDIM_0 + LID_0;',
+            'int d_idx = GID_0 * LDIM_0 + LID_0 + OFFSET_IDX;',
             '/* Guard for padded threads. */',
             'if (d_idx > NP_MAX) {return;};',
             'GLOBAL_MEM %s* SPH_KERNEL = kern;' % sph_k_name
@@ -696,13 +722,15 @@ class AccelerationEvalGPUHelper(object):
         all_args.extend(self._get_typed_args(_args))
         all_args.extend(
             ['GLOBAL_MEM {kernel}* kern'.format(kernel=sph_k_name),
-             'double t', 'double dt', 'unsigned int NP_MAX']
+             'double t', 'double dt', 'unsigned int NP_MAX',
+             'unsigned int OFFSET_IDX']
         )
 
         body = '\n'.join([' ' * 4 + x for x in code])
         self.data.append(dict(
             kernel=kernel, args=py_args, dest=dest, loop=False,
-            real=group.real, type='kernel'
+            real=group.real, start_idx=group.start_idx,
+            stop_idx=group.stop_idx, type='kernel'
         ))
 
         sig = get_kernel_definition(kernel, all_args)
@@ -838,7 +866,7 @@ class AccelerationEvalGPUHelper(object):
         all_args, py_args = [], []
         code = self._declare_precomp_vars(context)
         code.extend([
-            'unsigned int d_idx = GID_0 * LDIM_0 + LID_0;',
+            'unsigned int d_idx = GID_0 * LDIM_0 + LID_0 + OFFSET_IDX;',
             '/* Guard for padded threads. */',
             'if (d_idx > NP_MAX) {return;};',
             'unsigned int s_idx, i;',
@@ -895,12 +923,14 @@ class AccelerationEvalGPUHelper(object):
              'GLOBAL_MEM unsigned int *nbr_length',
              'GLOBAL_MEM unsigned int *start_idx',
              'GLOBAL_MEM unsigned int *neighbors',
-             'double t', 'double dt', 'unsigned int NP_MAX']
+             'double t', 'double dt', 'unsigned int NP_MAX',
+             'unsigned int OFFSET_IDX']
         )
 
         self.data.append(dict(
             kernel=kernel, args=py_args, dest=dest, source=source, loop=True,
-            real=group.real, type='kernel'
+            real=group.real, start_idx=group.start_idx,
+            stop_idx=group.stop_idx, type='kernel'
         ))
 
         sig = get_kernel_definition(kernel, all_args)
@@ -926,6 +956,10 @@ class AccelerationEvalGPUHelper(object):
         if eq_group.has_loop_all():
             raise NotImplementedError("loop_all not suported with local "
                                       "memory")
+        if group.start_idx > 0 or group.stop_idx is not None:
+            raise NotImplementedError(
+                "start/stop_idx not supported with local memory."
+            )
 
         loop_code = []
         pre = []
@@ -978,7 +1012,8 @@ class AccelerationEvalGPUHelper(object):
 
         self.data.append(dict(
             kernel=kernel, args=py_args, dest=dest, source=source, loop=True,
-            real=group.real, type='kernel'
+            real=group.real, start_idx=group.start_idx,
+            stop_idx=group.stop_idx, type='kernel'
         ))
 
         body = generate_body(setup=setup_body, loop=loop_body,
