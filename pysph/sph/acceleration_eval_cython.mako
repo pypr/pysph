@@ -1,5 +1,6 @@
 # Automatically generated, do not edit.
-#cython: cdivision=True
+# cython: cdivision=True, language_level=3
+# distutils: language=c++
 <%def name="indent(text, level=0)" buffered="True">
 % for l in text.splitlines():
 ${' '*4*level}${l}
@@ -24,7 +25,7 @@ ${indent(helper.get_pre_call(group), 0)}
 #######################################################################
 
 dst = self.${dest}
-${indent(helper.get_dest_array_setup(dest, eqs_with_no_source, sources, group.real), 0)}
+${indent(helper.get_dest_array_setup(dest, eqs_with_no_source, sources, group), 0)}
 dst_array_index = dst.index
 
 #######################################################################
@@ -36,7 +37,7 @@ ${indent(all_eqs.get_py_initialize_code(), 0)}
 #######################################################################
 % if all_eqs.has_initialize():
 # Initialization for destination ${dest}.
-for d_idx in range(NP_DEST):
+for d_idx in ${helper.get_parallel_range(group)}:
     ${indent(all_eqs.get_initialize_code(helper.object.kernel), 1)}
 % endif
 #######################################################################
@@ -45,7 +46,7 @@ for d_idx in range(NP_DEST):
 % if len(eqs_with_no_source.equations) > 0:
 % if eqs_with_no_source.has_loop():
 # SPH Equations with no sources.
-for d_idx in range(NP_DEST):
+for d_idx in ${helper.get_parallel_range(group)}:
     ${indent(eqs_with_no_source.get_loop_code(helper.object.kernel), 1)}
 % endif
 % endif
@@ -64,7 +65,7 @@ ${indent(helper.get_src_array_setup(source, eq_group), 0)}
 src_array_index = src.index
 
 % if eq_group.has_initialize_pair():
-for d_idx in range(NP_DEST):
+for d_idx in ${helper.get_parallel_range(group)}:
     ${indent(eq_group.get_initialize_pair_code(helper.object.kernel), 1)}
 % endif
 
@@ -77,7 +78,7 @@ nnps.set_context(src_array_index, dst_array_index)
 ${helper.get_parallel_block()}
     thread_id = threadid()
     ${indent(eq_group.get_variable_array_setup(), 1)}
-    for d_idx in ${helper.get_parallel_range("NP_DEST")}:
+    for d_idx in ${helper.get_parallel_range(group, nogil=False)}:
         ###############################################################
         ## Find and iterate over neighbors.
         ###############################################################
@@ -104,7 +105,7 @@ ${helper.get_parallel_block()}
 ###################################################################
 % if all_eqs.has_post_loop():
 # Post loop for destination ${dest}.
-for d_idx in range(NP_DEST):
+for d_idx in ${helper.get_parallel_range(group)}:
     ${indent(all_eqs.get_post_loop_code(helper.object.kernel), 1)}
 % endif
 
@@ -242,7 +243,7 @@ cdef class AccelerationEval:
             getattr(self, name).set_array(pa)
 
     cpdef compute(self, double t, double dt):
-        cdef long nbr_idx, NP_SRC, NP_DEST
+        cdef long nbr_idx, NP_SRC, NP_DEST, D_START_IDX
         cdef long s_idx, d_idx
         cdef int thread_id, N_NBRS
         cdef unsigned int* NBRS

@@ -1,6 +1,6 @@
 #cython: embedsignature=True
 
-from nnps_base cimport *
+from .nnps_base cimport *
 
 from libc.stdlib cimport malloc, free
 from libcpp.vector cimport vector
@@ -645,5 +645,3 @@ cdef class CompressedOctree(Octree):
             depth_max = <int>fmax(depth_max, depth_child)
 
         return 1 + depth_max
-
-

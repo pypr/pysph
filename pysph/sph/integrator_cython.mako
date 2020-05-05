@@ -1,5 +1,6 @@
 # Automatically generated, do not edit.
-#cython: cdivision=True
+# cython: cdivision=True, language_level=3
+# distuils: language=c++
 <%def name="indent(text, level=0)" buffered="True">
 % for l in text.splitlines():
 ${' '*4*level}${l}
@@ -101,7 +102,7 @@ cdef class Integrator:
         # Only iterate over real particles.
         NP_DEST = dst.size(real=True)
         ${indent(helper.get_array_setup(dest, method), 2)}
-        for d_idx in range(NP_DEST):
+        for d_idx in ${helper.get_parallel_range("NP_DEST")}:
             ${indent(helper.get_stepper_loop(dest, method), 3)}
         % endif
         % endfor

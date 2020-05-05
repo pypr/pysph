@@ -25,7 +25,7 @@ from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
 from pysph.base import kernels
 from compyle.config import get_config
 from pysph.solver.controller import CommandManager
-from pysph.solver.utils import mkdir, load, get_files
+from pysph.solver.utils import mkdir, load, get_files, get_free_port
 
 # conditional parallel imports
 from pysph import has_mpi, has_zoltan, in_parallel
@@ -231,6 +231,8 @@ class Application(object):
         self.cache_nnps = False
         self.iom = None
 
+        # The solver interface in use.
+        self._interfaces = []
         self.initialize()
         self.scheme = self.create_scheme()
         self._setup_argparse()
@@ -744,20 +746,12 @@ class Application(object):
             action="store",
             dest="multiproc",
             metavar='[[AUTHKEY@] HOST:] PORT[+] ',
-            default="pysph@0.0.0.0:8800+",
+            default=None,
             help=("Add a python multiprocessing interface "
                   "to the solver; "
-                  "AUTHKEY=pysph, HOST=0.0.0.0, PORT=8800+ by"
-                  " default (8800+ means first available port "
-                  "number 8800 onwards)"))
-
-        interfaces.add_argument(
-            "--no-multiproc",
-            action="store_const",
-            dest="multiproc",
-            const=None,
-            help=("Disable multiprocessing interface "
-                  "to the solver"))
+                  "AUTHKEY=pysph, HOST=0.0.0.0, PORT=8800+ when"
+                  " given 'auto' (8800+ means first available port "
+                  "number 8800 onwards);"))
 
         interfaces.add_argument(
             "--octree-leaf-size",
@@ -849,6 +843,7 @@ class Application(object):
             # This is needed if the application is launched twice,
             # as in that case, the old handlers must be removed.
             for handler in logging.root.handlers[:]:
+                handler.close()
                 logging.root.removeHandler(handler)
             lfn = os.path.join(self.output_dir, filename)
             mkdir(self.output_dir)
@@ -863,8 +858,13 @@ class Application(object):
             ip = socket.gethostbyname(host)
         except socket.gaierror:
             ip = host
+        cmd = ' '.join(sys.argv)
         logger.info(
-            'Running on {host} with address {ip}'.format(host=host, ip=ip))
+            'Started as:\n{command}'.format(command=cmd)
+        )
+        logger.info(
+            'Running on {host} with address {ip}'.format(host=host, ip=ip)
+        )
 
     def _create_inlet_outlet(self, inlet_outlet_factory):
         """Create the inlets and outlets if needed.
@@ -1223,56 +1223,74 @@ class Application(object):
             nnps=nnps,
             kernel=kernel,
             fixed_h=fixed_h)
-        self._log_solver_info(solver)
 
         # add solver interfaces
         self.command_manager = CommandManager(solver, self.comm)
         solver.set_command_handler(self.command_manager.execute_commands)
 
+        _used_ports = []
+        if self._interfaces:
+            self._stop_interfaces()
+            self._interfaces = []
+
         if self.rank == 0:
+            if sys.platform == 'win32':
+                auto = "pysph@127.0.0.1:8800+"
+                default_host = "127.0.0.1"
+            else:
+                auto = "pysph@0.0.0.0:8800+"
+                default_host = "0.0.0.0"
             # commandline interface
             if options.cmd_line:
                 from pysph.solver.solver_interfaces import CommandlineInterface
-                self.command_manager.add_interface(
-                    CommandlineInterface().start)
+                interface = CommandlineInterface()
+                self._interfaces.append(interface)
+                self.command_manager.add_interface(interface.start)
+                logger.info('Started Commandline interface')
 
             # XML-RPC interface
             if options.xml_rpc:
                 from pysph.solver.solver_interfaces import XMLRPCInterface
                 addr = options.xml_rpc
                 idx = addr.find(':')
-                host = "0.0.0.0" if idx == -1 else addr[:idx]
+                host = default_host if idx == -1 else addr[:idx]
                 port = int(addr[idx + 1:])
-                self.command_manager.add_interface(
-                    XMLRPCInterface((host, port)).start)
+                interface = XMLRPCInterface((host, port))
+                self._interfaces.append(interface)
+                self.command_manager.add_interface(interface.start)
+                _used_ports.append(port)
+                logger.info(
+                    'Started XML-RPC interface on %s:%d' % (host, port)
+                )
 
             # python MultiProcessing interface
             if options.multiproc:
                 from pysph.solver.solver_interfaces import (
                     MultiprocessingInterface
                 )
-                addr = options.multiproc
+                if options.multiproc == 'auto':
+                    addr = auto
+                else:
+                    addr = options.multiproc
                 idx = addr.find('@')
                 authkey = "pysph" if idx == -1 else addr[:idx]
                 addr = addr[idx + 1:]
                 idx = addr.find(':')
-                host = "0.0.0.0" if idx == -1 else addr[:idx]
+                host = default_host if idx == -1 else addr[:idx]
                 port = addr[idx + 1:]
                 if port[-1] == '+':
-                    try_next_port = True
-                    port = port[:-1]
+                    port = get_free_port(int(port[:-1]), skip=_used_ports)
                 else:
-                    try_next_port = False
-                port = int(port)
+                    port = int(port)
 
-                interface = MultiprocessingInterface((host, port),
-                                                     authkey.encode(),
-                                                     try_next_port)
-
+                interface = MultiprocessingInterface(
+                    (host, port), authkey.encode()
+                )
+                self._interfaces.append(interface)
                 self.command_manager.add_interface(interface.start)
 
-                logger.info('started multiprocessing interface on %s' %
-                            (interface.address, ))
+                logger.info('Started multiprocessing interface on %s:%d' %
+                            (host, port))
 
     def _configure(self):
         """Configures the application using the options from the
@@ -1378,6 +1396,10 @@ class Application(object):
         if is_overloaded_method(obj.post_step):
             self.solver.add_post_step_callback(obj.post_step)
 
+    def _stop_interfaces(self):
+        for interface in self._interfaces:
+            interface.stop()
+
     def _message(self, msg):
         if self.num_procs == 1:
             logger.info(msg)
@@ -1396,7 +1418,8 @@ class Application(object):
         info = dict(
             fname=self.fname, output_dir=self.output_dir, args=self.args)
         info.update(kw)
-        json.dump(info, open(filename, 'w'))
+        with open(filename, 'w') as f:
+            json.dump(info, f)
 
     def _log_solver_info(self, solver):
         sep = '-'*70
@@ -1430,6 +1453,18 @@ class Application(object):
         else:
             eqn_info = equations
         logger.info('Using equations:\n%s\n%s\n%s', sep, eqn_info, sep)
+
+        logger.info("Callbacks:\n%s\n", sep)
+        logger.info(
+            "Pre-step callbacks:\n%s\n", repr(self.solver.pre_step_callbacks)
+        )
+        logger.info(
+            "Post-step callbacks:\n%s\n", repr(self.solver.post_step_callbacks)
+        )
+        logger.info(
+            "Post-stage callbacks:\n%s\n%s\n",
+            repr(self.solver.post_stage_callbacks), sep
+        )
 
     def _mayavi_config(self, code):
         """Write out the given code to a `mayavi_config.py` in the output
@@ -1537,6 +1572,8 @@ class Application(object):
             for tool in self.create_tools():
                 self.add_tool(tool)
 
+            self._log_solver_info(self.solver)
+
             end_time = time.time()
             setup_duration = end_time - start_time
             self._message("Setup took: %.5f secs" % (setup_duration))
@@ -1554,6 +1591,8 @@ class Application(object):
             print_profile()
         self._write_info(
             self.info_filename, completed=True, cpu_time=run_duration)
+
+        self._stop_interfaces()
 
     def set_args(self, args):
         self.args = args

@@ -22,7 +22,7 @@ def check_import(backend):
         pytest.importorskip('pycuda')
 
 
-test_all_backends = pytest.mark.parametrize('backend',
+check_all_backends = pytest.mark.parametrize('backend',
                                             ['cython', 'opencl', 'cuda'])
 
 
@@ -30,7 +30,7 @@ class TestDeviceHelper(object):
     def setup(self):
         self.pa = get_particle_array(name='f', x=[0.0, 1.0], m=1.0, rho=2.0)
 
-    @test_all_backends
+    @check_all_backends
     def test_simple(self, backend):
         check_import(backend)
         self.setup()
@@ -48,7 +48,7 @@ class TestDeviceHelper(object):
         assert np.allclose(pa.rho, h.rho.get())
         assert np.allclose(pa.tag, h.tag.get())
 
-    @test_all_backends
+    @check_all_backends
     def test_push_correctly_sets_values_with_args(self, backend):
         check_import(backend)
         self.setup()
@@ -71,7 +71,7 @@ class TestDeviceHelper(object):
         assert np.allclose(pa.rho, h.rho.get())
         assert np.allclose(pa.tag, h.tag.get())
 
-    @test_all_backends
+    @check_all_backends
     def test_push_correctly_sets_values_with_no_args(self, backend):
         check_import(backend)
         self.setup()
@@ -94,7 +94,7 @@ class TestDeviceHelper(object):
         assert np.allclose(pa.rho, h.rho.get())
         assert np.allclose(pa.tag, h.tag.get())
 
-    @test_all_backends
+    @check_all_backends
     def test_pull_correctly_sets_values_with_args(self, backend):
         check_import(backend)
         self.setup()
@@ -117,7 +117,7 @@ class TestDeviceHelper(object):
         assert np.allclose(pa.rho, h.rho.get())
         assert np.allclose(pa.tag, h.tag.get())
 
-    @test_all_backends
+    @check_all_backends
     def test_pull_correctly_sets_values_with_no_args(self, backend):
         check_import(backend)
         self.setup()
@@ -140,7 +140,7 @@ class TestDeviceHelper(object):
         assert np.allclose(pa.rho, h.rho.get())
         assert np.allclose(pa.tag, h.tag.get())
 
-    @test_all_backends
+    @check_all_backends
     def test_max_provides_maximum(self, backend):
         check_import(backend)
         self.setup()
@@ -151,7 +151,7 @@ class TestDeviceHelper(object):
         # Then
         assert h.max('x') == 1.0
 
-    @test_all_backends
+    @check_all_backends
     def test_that_adding_removing_prop_to_array_updates_gpu(self, backend):
         check_import(backend)
         self.setup()
@@ -174,7 +174,7 @@ class TestDeviceHelper(object):
         assert 'test' not in h._data
         assert 'test' not in h.properties
 
-    @test_all_backends
+    @check_all_backends
     def test_resize_works(self, backend):
         check_import(backend)
         self.setup()
@@ -208,7 +208,7 @@ class TestDeviceHelper(object):
         assert np.allclose(pa.rho, h.rho.get())
         assert np.allclose(pa.tag, h.tag.get())
 
-    @test_all_backends
+    @check_all_backends
     def test_get_number_of_particles(self, backend):
         check_import(backend)
         self.setup()
@@ -228,7 +228,7 @@ class TestDeviceHelper(object):
         assert h.get_number_of_particles() == 5
         assert h.get_number_of_particles(real=True) == 3
 
-    @test_all_backends
+    @check_all_backends
     def test_align(self, backend):
         check_import(backend)
         self.setup()
@@ -256,7 +256,7 @@ class TestDeviceHelper(object):
         expect = x[::-1, :].ravel()
         assert np.all(h.force.get() == expect)
 
-    @test_all_backends
+    @check_all_backends
     def test_align_particles(self, backend):
         check_import(backend)
         self.setup()
@@ -276,7 +276,7 @@ class TestDeviceHelper(object):
         x = h.x.get()
         assert np.all(np.sort(x[:-2]) == np.array([2., 3., 5.]))
 
-    @test_all_backends
+    @check_all_backends
     def test_remove_particles(self, backend):
         check_import(backend)
         self.setup()
@@ -297,7 +297,7 @@ class TestDeviceHelper(object):
         # Then
         assert np.all(np.sort(h.x.get()) == np.array([2., 5.]))
 
-    @test_all_backends
+    @check_all_backends
     def test_remove_tagged_particles(self, backend):
         check_import(backend)
         self.setup()
@@ -316,7 +316,7 @@ class TestDeviceHelper(object):
         # Then
         assert np.all(np.sort(h.x.get()) == np.array([2., 3., 5.]))
 
-    @test_all_backends
+    @check_all_backends
     def test_add_particles(self, backend):
         check_import(backend)
         self.setup()
@@ -333,7 +333,7 @@ class TestDeviceHelper(object):
         # Then
         assert np.all(np.sort(h.x.get()) == np.array([0., 0., 0., 0., 0., 1.]))
 
-    @test_all_backends
+    @check_all_backends
     def test_extend(self, backend):
         check_import(backend)
         self.setup()
@@ -349,7 +349,7 @@ class TestDeviceHelper(object):
         # Then
         assert h.get_number_of_particles() == 6
 
-    @test_all_backends
+    @check_all_backends
     def test_append_parray(self, backend):
         check_import(backend)
         self.setup()
@@ -365,7 +365,7 @@ class TestDeviceHelper(object):
         # Then
         assert h.get_number_of_particles() == 4
 
-    @test_all_backends
+    @check_all_backends
     def test_empty_clone(self, backend):
         check_import(backend)
         self.setup()
@@ -382,7 +382,7 @@ class TestDeviceHelper(object):
         assert result_pa.gpu.get_number_of_particles() == 0
         assert result_pa.name == 'f'
 
-    @test_all_backends
+    @check_all_backends
     def test_extract_particles(self, backend):
         check_import(backend)
         self.setup()

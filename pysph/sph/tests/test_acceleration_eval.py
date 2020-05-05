@@ -265,7 +265,8 @@ class TestMegaGroup(unittest.TestCase):
 
         g = Group(
             equations=[], real=False, update_nnps=True, iterate=True,
-            max_iterations=20, min_iterations=2, pre=nothing, post=nothing
+            max_iterations=20, min_iterations=2, pre=nothing, post=nothing,
+            start_idx=1, stop_idx=2
         )
 
         # When
@@ -273,7 +274,7 @@ class TestMegaGroup(unittest.TestCase):
 
         # Then
         props = ('real update_nnps iterate max_iterations '
-                 'min_iterations pre post').split()
+                 'min_iterations pre post start_idx stop_idx').split()
         for prop in props:
             self.assertEqual(getattr(mg, prop), getattr(g, prop))
 
@@ -506,7 +507,6 @@ class TestAccelerationEval1D(unittest.TestCase):
                     SimpleEquation(dest='fluid', sources=['fluid'])
                 ],
                 pre=pre, post=post
-
             )
         ]
         a_eval = self._make_accel_eval(equations)
@@ -517,6 +517,59 @@ class TestAccelerationEval1D(unittest.TestCase):
         # Then
         expect = np.asarray([7., 9., 11., 11., 11., 11., 11., 11., 9., 7.])
         self.assertListEqual(list(pa.u), list(expect))
+
+    def test_should_honor_start_stop_idx_in_group(self):
+        # Given
+        pa = self.pa
+        pa.u[:] = 1.0
+        pa.au[:] = 1.0
+
+        equations = [
+            Group(
+                equations=[
+                    SimpleEquation(dest='fluid', sources=['fluid'])
+                ],
+                start_idx=1, stop_idx=2
+            )
+        ]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.ones_like(pa.u)
+        expect[1] = 4.0
+        self.assertListEqual(list(pa.u), list(expect))
+        self.assertListEqual(list(pa.au), list(expect))
+
+    def test_should_honor_start_stop_idx_as_str_in_group(self):
+        # Given
+        pa = self.pa
+        pa.add_constant('start', 1)
+        pa.add_constant('stop', 3)
+        pa.u[:] = 1.0
+        pa.au[:] = 1.0
+
+        equations = [
+            Group(
+                equations=[
+                    SimpleEquation(dest='fluid', sources=['fluid'])
+                ],
+                start_idx='start', stop_idx='stop'
+            )
+        ]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.ones_like(pa.u)
+        expect[1] = 4.0
+        expect[2] = 5.0
+        self.assertListEqual(list(pa.u), list(expect))
+        self.assertListEqual(list(pa.au), list(expect))
 
 
 class EqWithTime(Equation):
@@ -902,6 +955,68 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         expect = np.asarray([7., 9., 11., 11., 11., 11., 11., 11., 9., 7.])
         self.assertListEqual(list(pa.u), list(expect))
 
+    def test_should_honor_start_stop_idx_in_group_on_gpu(self):
+        # Given
+        pa = self.pa
+        pa.u[:] = 1.0
+        pa.au[:] = 1.0
+        if pa.gpu:
+            pa.gpu.push('u', 'au')
+
+        equations = [
+            Group(
+                equations=[
+                    SimpleEquation(dest='fluid', sources=['fluid'])
+                ],
+                start_idx=1, stop_idx=2
+            )
+        ]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        if pa.gpu:
+            pa.gpu.pull('u', 'au')
+        expect = np.ones_like(pa.u)
+        expect[1] = 4.0
+        self.assertListEqual(list(pa.u), list(expect))
+        self.assertListEqual(list(pa.au), list(expect))
+
+    def test_should_honor_start_stop_idx_as_str_in_group(self):
+        # Given
+        pa = self.pa
+        pa.add_constant('start', 1)
+        pa.add_constant('stop', 3)
+        pa.u[:] = 1.0
+        pa.au[:] = 1.0
+        if pa.gpu:
+            pa.gpu.push('u', 'au')
+
+        equations = [
+            Group(
+                equations=[
+                    SimpleEquation(dest='fluid', sources=['fluid'])
+                ],
+                start_idx='start', stop_idx='stop'
+            )
+        ]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        if pa.gpu:
+            pa.gpu.pull('u', 'au')
+
+        expect = np.ones_like(pa.u)
+        expect[1] = 4.0
+        expect[2] = 5.0
+        self.assertListEqual(list(pa.u), list(expect))
+        self.assertListEqual(list(pa.au), list(expect))
+
 
 class TestAccelerationEval1DGPUOctree(TestAccelerationEval1DGPU):
     def _get_nnps_cls(self):
@@ -923,6 +1038,14 @@ class TestAccelerationEval1DGPUOctreeNonCached(
 
     @pytest.mark.skip("Loop all not supported with non-cached NNPS")
     def test_should_support_loop_all_and_loop_on_gpu(self):
+        pass
+
+    @pytest.mark.skip("start/stop_idx not supported with non-cached NNPS")
+    def test_should_honor_start_stop_idx_in_group_on_gpu(self):
+        pass
+
+    @pytest.mark.skip("start/stop_idx not supported with non-cached NNPS")
+    def test_should_honor_start_stop_idx_as_str_in_group(self):
         pass
 
 

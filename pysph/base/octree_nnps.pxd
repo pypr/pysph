@@ -1,7 +1,8 @@
-#cython: embedsignature=True
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
 
-from nnps_base cimport *
-from octree cimport Octree, CompressedOctree, cOctreeNode
+from .nnps_base cimport *
+from .octree cimport Octree, CompressedOctree, cOctreeNode
 
 from libcpp.vector cimport vector
 cimport cython
@@ -31,6 +32,9 @@ cdef class OctreeNNPS(NNPS):
     ##########################################################################
     # Member functions
     ##########################################################################
+
+    cpdef get_depth(self, int pa_index)
+
     cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
 
     cpdef set_context(self, int src_index, int dst_index)
@@ -54,6 +58,3 @@ cdef class CompressedOctreeNNPS(OctreeNNPS):
     cpdef _refresh(self)
 
     cpdef _bin(self, int pa_index, UIntArray indices)
-
-
-

@@ -82,13 +82,28 @@ def get_deps(*args):
     return result
 
 
+def _get_openmp_flags():
+    """Return the OpenMP flags for the platform.
+
+    This returns two lists, [extra_compile_args], [extra_link_args]
+    """
+    # Copied from compyle.ext_module
+    if sys.platform == 'win32':
+        return ['/openmp'], []
+    elif sys.platform == 'darwin':
+        if (os.environ.get('CC') is not None and
+           os.environ.get('CXX') is not None):
+            return ['-fopenmp'], ['-fopenmp']
+        else:
+            return ['-Xpreprocessor', '-fopenmp'], ['-lomp']
+    else:
+        return ['-fopenmp'], ['-fopenmp']
+
+
 def get_openmp_flags():
     """Returns any OpenMP related flags if OpenMP is avaiable on the system.
     """
-    if sys.platform == 'win32':
-        omp_compile_flags, omp_link_flags = ['/openmp'], []
-    else:
-        omp_compile_flags, omp_link_flags = ['-fopenmp'], ['-fopenmp']
+    omp_compile_flags, omp_link_flags = _get_openmp_flags()
 
     env_var = os.environ.get('USE_OPENMP', '')
     if env_var.lower() in ("0", 'false', 'n'):
@@ -624,7 +639,7 @@ def setup_package():
     # The requirements.
     install_requires = [
         'numpy', 'mako', 'cyarray', 'compyle', 'Cython>=0.20',
-        'setuptools>=6.0', 'pytools', 'Beaker'
+        'setuptools>=42.0.0', 'pytools', 'Beaker'
     ]
     tests_require = ['pytest>=3.0', 'numpy-stl']
     if sys.version_info[:2] == (2, 6):
@@ -681,7 +696,8 @@ def setup_package():
           keywords="SPH simulation computational fluid dynamics",
           packages=find_packages(),
           package_data={
-              '': ['*.pxd', '*.mako', '*.txt.gz', '*.txt', '*.vtk.gz', '*.gz',
+              '': ['*.pxd', '*.mako', '*.txt.gz', '*.txt', '*.txt.bz2',
+                   '*.vtk.gz', '*.gz', '*.csv',
                    '*.rst', 'ndspmhd-sedov-initial-conditions.npz']
           },
           # exclude package data in installation.

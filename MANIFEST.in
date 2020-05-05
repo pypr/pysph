@@ -3,3 +3,4 @@ recursive-include docs *.*
 recursive-include pysph *.pxd *.pyx *.mako *.txt.gz *.h
 recursive-exclude pysph *.cpp
 recursive-include pysph/examples *.py *.gz ndspmhd*.npz *.rst
+recursive-include pysph/examples *.txt.bz2 *.csv *.txt

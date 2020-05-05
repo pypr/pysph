@@ -15,9 +15,12 @@ import os
 import shutil
 import sys
 from tempfile import mkdtemp
+import time
 
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
+from pysph.solver.utils import get_free_port
+from pysph.solver.solver_interfaces import MultiprocessingInterface, XMLRPCInterface
 
 
 class MockApp(Application):
@@ -98,6 +101,8 @@ class TestApplication(TestCase):
         expected = 20.0
         error_message = "Expected %f, got %f" % (expected, app.testarg)
         self.assertEqual(expected, app.testarg, error_message)
+        # No interfaces should be started by default.
+        self.assertEqual(len(app._interfaces), 0)
 
     def test_output_dir_when_moved_and_read_info_called(self):
         # Given
@@ -121,3 +126,43 @@ class TestApplication(TestCase):
         assert realpath(app.output_dir) != realpath(self.output_dir)
         assert realpath(app.output_dir) == realpath(copy_dir)
         assert app.fname == orig_fname
+
+    def test_app_stops_multi_proc_interface_at_end(self):
+        # Given
+        app = self.app
+        port = get_free_port(9000)
+
+        # When
+        args = ['--multiproc', 'auto']
+        app.run(args)
+
+        # Then
+        self.assertEqual(len(app._interfaces), 1)
+        self.assertTrue(isinstance(
+            app._interfaces[0], MultiprocessingInterface
+        ))
+        port1 = get_free_port(9000)
+        self.assertEqual(port1, port)
+
+    def test_app_stops_xml_rpc_interface_at_end(self):
+        # Given
+        app = self.app
+        port = get_free_port(9000)
+        host = '127.0.0.1'
+
+        # When
+        args = ['--xml-rpc', '%s:%s' % (host, port)]
+        app.run(args)
+
+        # Then
+        self.assertEqual(len(app._interfaces), 1)
+        self.assertTrue(isinstance(
+            app._interfaces[0], XMLRPCInterface
+        ))
+        port1 = get_free_port(9000)
+        count = 0
+        while port1 != port and count < 4:
+            time.sleep(0.5)
+            port1 = get_free_port(9000)
+            count += 1
+        self.assertEqual(port1, port)

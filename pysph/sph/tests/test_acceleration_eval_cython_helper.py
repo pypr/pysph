@@ -4,12 +4,19 @@ import unittest
 # Library imports.
 import numpy as np
 
+from compyle.api import get_config, set_config
+
 # Local library imports.
 from pysph.base.particle_array import ParticleArray
 from compyle.api import KnownType
+from pysph.base.kernels import CubicSpline
 from pysph.sph.acceleration_eval_cython_helper import (
-    get_all_array_names, get_known_types_for_arrays
+    get_all_array_names, get_known_types_for_arrays,
+    AccelerationEvalCythonHelper
 )
+from pysph.sph.acceleration_eval import AccelerationEval
+from pysph.sph.basic_equations import SummationDensity
+from pysph.sph.equation import Group
 
 
 class TestGetAllArrayNames(unittest.TestCase):
@@ -49,3 +56,56 @@ class TestGetKnownTypesForAllArrays(unittest.TestCase):
                   's_x': KnownType("double*")}
         for key in expect:
             self.assertEqual(repr(result[key]), repr(expect[key]))
+
+
+class TestAccelerationHelperCython(unittest.TestCase):
+    def setUp(self):
+        cfg = get_config()
+        cfg.use_openmp = True
+
+    def tearDown(self):
+        set_config(None)
+
+    def test_parallel_range_unsets_chunksize_on_start_stop_idx(self):
+        # Given
+        pa = ParticleArray(name='f', m=[1.0], rho=[0.0])
+
+        eqs = [Group(
+            equations=[SummationDensity(dest='f', sources=['f'])],
+            start_idx=1, stop_idx=2
+        )]
+        aeval = AccelerationEval([pa], eqs, kernel=CubicSpline(dim=1))
+
+        # When
+        helper = AccelerationEvalCythonHelper(aeval)
+        result = helper.get_parallel_range(eqs[0])
+
+        # Then
+        expect = ("prange(D_START_IDX, NP_DEST, 1, schedule='dynamic', "
+                  "nogil=True)")
+        self.assertEqual(result, expect)
+
+    def test_parallel_range_without_loop_count(self):
+        # Given
+        pa = ParticleArray(name='f', m=[1.0], rho=[0.0])
+
+        eqs = [Group(
+            equations=[SummationDensity(dest='f', sources=['f'])],
+        )]
+        aeval = AccelerationEval([pa], eqs, kernel=CubicSpline(dim=1))
+
+        # When
+        helper = AccelerationEvalCythonHelper(aeval)
+        result = helper.get_parallel_range(eqs[0])
+
+        # Then
+        expect = ("prange(D_START_IDX, NP_DEST, 1, schedule='dynamic', "
+                  "chunksize=64, nogil=True)")
+        self.assertEqual(result, expect)
+
+        result = helper.get_parallel_range(eqs[0], nogil=False)
+
+        # Then
+        expect = ("prange(D_START_IDX, NP_DEST, 1, schedule='dynamic', "
+                  "chunksize=64)")
+        self.assertEqual(result, expect)

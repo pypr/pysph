@@ -1,8 +1,8 @@
-# cython: embedsignature=True
+# cython: language_level=3, language=c++, embedsignature=True
 from libcpp.map cimport map
 from libcpp.pair cimport pair
 
-from nnps_base cimport *
+from .nnps_base cimport *
 
 ctypedef unsigned int u_int
 ctypedef map[u_int, pair[u_int, u_int]] key_to_idx_t
@@ -61,6 +61,3 @@ cdef class CellIndexingNNPS(NNPS):
     cpdef _refresh(self)
 
     cpdef _bin(self, int pa_index, UIntArray indices)
-
-
-

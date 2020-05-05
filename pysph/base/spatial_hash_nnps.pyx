@@ -1,4 +1,5 @@
-#cython: embedsignature=True
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
 
 # malloc and friends
 from libc.stdlib cimport malloc, free
@@ -116,7 +117,7 @@ cdef class SpatialHashNNPS(NNPS):
 
         cdef HashEntry* candidate_cell
         cdef vector[unsigned int] *candidates
-        
+
         find_cell_id_raw(
                 x - xmin[0],
                 y - xmin[1],
@@ -493,4 +494,3 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
                     &c_x, &c_y, &c_z
                     )
             self._add_to_hashtable(pa_index, idx, src_h_ptr[idx], c_x, c_y, c_z)
-

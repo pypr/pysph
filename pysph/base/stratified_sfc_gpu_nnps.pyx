@@ -1,4 +1,5 @@
-#cython: embedsignature=True
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
 
 # malloc and friends
 from libc.stdlib cimport malloc, free
@@ -8,7 +9,7 @@ from libcpp.pair cimport pair
 
 from cython.operator cimport dereference as deref, preincrement as inc
 
-from gpu_nnps_helper import GPUNNPSHelper
+from .gpu_nnps_helper import GPUNNPSHelper
 
 import pyopencl as cl
 import pyopencl.array

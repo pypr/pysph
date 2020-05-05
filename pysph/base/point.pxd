@@ -1,3 +1,5 @@
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
 cimport numpy
 
 cdef extern from "math.h":

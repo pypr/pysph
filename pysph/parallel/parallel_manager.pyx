@@ -26,10 +26,6 @@ cdef extern from 'math.h':
     cdef double floor(double) nogil
     cdef double fabs(double) nogil
 
-cdef extern from 'limits.h':
-    cdef int INT_MAX
-    cdef unsigned int UINT_MAX
-
 
 cpdef get_strided_indices(np.ndarray indices, int stride):
     cdef int j
@@ -466,7 +462,7 @@ cdef class ParallelManager:
         if cell_size < 1e-6:
             msg = """Cell size too small %g. Perhaps h = 0?
             Setting cell size to 1"""%(cell_size)
-            print msg
+            print(msg)
             cell_size = 1.0
         self.cell_size = cell_size
 
@@ -1007,7 +1003,7 @@ cdef class ParallelManager:
                             if ( (xij < hi) or (xij < hj) ):
                                 if nnbrs == nbrs.length:
                                     nbrs.resize( nbrs.length + 50 )
-                                    print """Neighbor search :: Extending the neighbor list to %d"""%(nbrs.length)
+                                    print('Neighbor search :: Extending the neighbor list to %d'%(nbrs.length))
 
                                 nbrs.data[ nnbrs ] = j
                                 nnbrs = nnbrs + 1
