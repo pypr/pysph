@@ -77,7 +77,7 @@ class TestOutputNumpy(TestCase):
         self.assertTrue(np.allclose(pa.y, pa1.y, atol=1e-14))
 
     def test_dump_and_load_works_with_compress(self):
-        x = np.linspace(0, 1.0, 10)
+        x = np.linspace(0, 1.0, 1000)
         y = x*2.0
         dt = 1.0
         pa = get_particle_array(name='fluid', x=x, y=y)
