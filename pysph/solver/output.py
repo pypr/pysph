@@ -11,6 +11,7 @@ from pysph.base.utils import get_particles_info, get_particle_array
 from pysph import has_h5py
 
 output_formats = ('hdf5', 'npz')
+COMPRESSION_LEVEL = 6
 
 
 def _to_str(s):
@@ -233,7 +234,8 @@ class HDFOutput(Output):
 
     def _get_compress_options(self):
         if self.compress:
-            return dict(compression="gzip", compression_opts=9)
+            return dict(compression="gzip",
+                        compression_opts=COMPRESSION_LEVEL)
         else:
             return {}
 
