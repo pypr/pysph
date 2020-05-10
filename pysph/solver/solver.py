@@ -554,7 +554,7 @@ class Solver(object):
             logger.info(msg)
 
         fname = os.path.join(self.output_directory,
-                             self.fname + '_' + str(self.count))
+                             '%s_%05d' % (self.fname, self.count))
 
         comm = None
         if self.parallel_output_mode == "collected" and self.in_parallel:
