@@ -25,7 +25,7 @@ tf = 5.0
 gz = -9.81
 
 hdx = 1.0
-rho0 = 10.0
+rho0 = 100.0
 
 
 def make_cube(lx, ly, lz, dx):
@@ -58,15 +58,17 @@ class BouncingCubes(Application):
         y = np.concatenate(y)
         z = np.concatenate(z)
         body_id = np.concatenate(body_id)
-        m = np.ones_like(x) * dx * dx * rho0
+        m = np.ones_like(x) * dx * dx * dx * rho0
         h = np.ones_like(x) * hdx * dx
 
         # Split this one cube
 
         # radius of each sphere constituting in cube
         rad_s = np.ones_like(x) * dx
-        body = get_particle_array_rigid_body(name='body', x=x, y=y, z=z, h=h,
-                                             m=m, body_id=body_id, rad_s=rad_s)
+        body = get_particle_array_rigid_body(
+            name='body', x=x, y=y, z=z, h=h, rho=rho0,
+            m=m, body_id=body_id, rad_s=rad_s
+        )
 
         body.vc[0] = 5.0
         body.vc[2] = -5.0
@@ -76,8 +78,8 @@ class BouncingCubes(Application):
 
         # Create the tank.
         nx, ny, nz = 40, 40, 40
-        dx = 1.0 / (nx - 1)
-        xmin, xmax, ymin, ymax, zmin, zmax = -2, 2, -2, 2, -2, 2
+        xmin, xmax, ymin, ymax, zmin, zmax = -2.1, 2.1, -2.1, 2.1, -2.1, 2.1
+        dx = (xmax - xmin) / (nx - 1)
         x, y, z = np.mgrid[xmin:xmax:nx * 1j, ymin:ymax:ny * 1j, zmin:zmax:nz *
                            1j]
         interior = ((x < 1.8) & (x > -1.8)) & ((y < 1.8) & (y > -1.8)) & (
@@ -86,13 +88,13 @@ class BouncingCubes(Application):
         x = x[tank].flat
         y = y[tank].flat
         z = z[tank].flat
-        m = np.ones_like(x) * dx * dx * rho0
+        m = np.ones_like(x) * dx * dx * dx * rho0
         h = np.ones_like(x) * hdx * dx
 
         # radius of each sphere constituting in cube
         rad_s = np.ones_like(x) * dx
         tank = get_particle_array_rigid_body(name='tank', x=x, y=y, z=z, h=h,
-                                             m=m, rad_s=rad_s)
+                                             m=m, rad_s=rad_s, rho=rho0)
         tank.total_mass[0] = np.sum(m)
 
         return [body, tank]
