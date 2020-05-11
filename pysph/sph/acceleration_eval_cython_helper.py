@@ -1,5 +1,6 @@
 from collections import defaultdict
 from os.path import dirname, join, expanduser, realpath
+from textwrap import dedent
 
 from mako.template import Template
 from cyarray import carray
@@ -300,8 +301,33 @@ class AccelerationEvalCythonHelper(object):
         parrays = [pa.name for pa in self.object.particle_arrays]
         return ', '.join(parrays)
 
+    def get_condition_call(self, group):
+        return self._group_map[group] + '.condition(t, dt)'
+
     def get_pre_call(self, group):
         return self._group_map[group] + '.pre()'
 
     def get_post_call(self, group):
         return self._group_map[group] + '.post()'
+
+    def get_iteration_init(self, group):
+        lines = [
+            'max_iterations = %d' % group.max_iterations,
+            'min_iterations = %d' % group.min_iterations,
+            '_iteration_count = 1',
+            'while True:'
+        ]
+        return '\n'.join(lines)
+
+    def get_iteration_check(self, group):
+        src = dedent('''\
+            ###############################################################
+            ## Break the iteration for the group.
+            ###############################################################
+            if ((_iteration_count >= min_iterations)
+               and (%s or (_iteration_count == max_iterations))):
+                _iteration_count = 1
+                break
+            _iteration_count += 1
+        ''' % group.get_converged_condition())
+        return src

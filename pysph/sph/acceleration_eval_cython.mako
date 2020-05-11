@@ -275,34 +275,34 @@ cdef class AccelerationEval:
         % if len(group.data) > 0: # No equations in this group.
         # ---------------------------------------------------------------------
         # Group ${g_idx}.
-        % if group.iterate:
-        max_iterations = ${group.max_iterations}
-        min_iterations = ${group.min_iterations}
-        _iteration_count = 1
-        while True:
+        % if group.condition is not None:
+        if ${helper.get_condition_call(group)}:
+        <%
+        indent_lvl = 3
+        %>
         % else:
-        if True:
+        <%
+        indent_lvl = 2
+        %>
         % endif
+        % if group.iterate:
+        ${indent(helper.get_iteration_init(group), indent_lvl)}
+        <%
+        indent_lvl += 1
+        %>
+        % endif
+        % if group.has_subgroups:
+        % for sg_idx, sub_group in enumerate(group.data):
+        ${indent("# Doing subgroup " + str(sg_idx), indent_lvl)}
+        ${indent(do_group(helper, sub_group, indent_lvl), indent_lvl)}
+        % endfor
 
-            % if group.has_subgroups:
-            % for sg_idx, sub_group in enumerate(group.data):
-            # Doing subgroup ${sg_idx}
-            ${indent(do_group(helper, sub_group, 3), 3)}
-            % endfor
-
-            % else:
-            ${indent(do_group(helper, group, 3), 3)}
-            % endif
-            #######################################################################
-            ## Break the iteration for the group.
-            #######################################################################
-            % if group.iterate:
-            # Check for convergence or timeout
-            if (_iteration_count >= min_iterations) and (${group.get_converged_condition()} or (_iteration_count == max_iterations)):
-                _iteration_count = 1
-                break
-            _iteration_count += 1
-            % endif
+        % else:
+        ${indent(do_group(helper, group, indent_lvl), indent_lvl)}
+        % endif
+        % if group.iterate:
+        ${indent(helper.get_iteration_check(group), indent_lvl)}
+        % endif
 
         # Group ${g_idx} done.
         # ---------------------------------------------------------------------
