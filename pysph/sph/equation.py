@@ -449,7 +449,7 @@ class Group(object):
 
     def __init__(self, equations, real=True, update_nnps=False, iterate=False,
                  max_iterations=1, min_iterations=0, pre=None, post=None,
-                 start_idx=0, stop_idx=None):
+                 condition=None, start_idx=0, stop_idx=None):
         """Constructor.
 
         Parameters
@@ -486,6 +486,12 @@ class Group(object):
             A callable which is passed no arguments that is called after
             the group is completed.
 
+        condition: callable
+            A callable that is passed (t, dt). If this callable returns True,
+            the group is executed, otherwise it is not. If condition is None,
+            the group is always executed. Note that this should work even if
+            the group has many destination arrays.
+
         start_idx: int or str
             Start looping from this destination index. Starts from the given
             number if an integer is passed. If a string is look for a
@@ -521,6 +527,7 @@ class Group(object):
         self.min_iterations = min_iterations
         self.pre = pre
         self.post = post
+        self.condition = condition
         self.start_idx = start_idx
         self.stop_idx = stop_idx
 
@@ -547,7 +554,7 @@ class Group(object):
         ignore = ['equations']
         if self.start_idx != 0:
             ignore.append('start_idx')
-        for prop in ['pre', 'post', 'stop_idx']:
+        for prop in ['pre', 'post', 'condition', 'stop_idx']:
             if getattr(self, prop) is None:
                 ignore.append(prop)
         kws = ', '.join(get_init_args(self, self.__init__, ignore))
