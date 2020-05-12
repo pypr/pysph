@@ -590,6 +590,8 @@ class TestAccelerationEval1D(unittest.TestCase):
         pa = self.pa
         pa.add_constant('reduce_calls', 0)
         pa.au[:] = 0.0
+        if pa.gpu:
+            pa.gpu.push('au')
         call_data = []
 
         def cond(t, dt):
@@ -605,6 +607,16 @@ class TestAccelerationEval1D(unittest.TestCase):
             ),
             Group(
                 equations=[
+                    Group(
+                        equations=[
+                            DumbEquation(dest='fluid', sources=['fluid'])
+                        ],
+                        condition=cond
+                    )
+                ]
+            ),
+            Group(
+                equations=[
                     DumbEquation(dest='fluid', sources=['fluid'])
                 ],
             )
@@ -615,11 +627,15 @@ class TestAccelerationEval1D(unittest.TestCase):
         a_eval.compute(0.0, 0.1)
 
         # Then
+        if pa.gpu:
+            pa.gpu.pull('au')
+
         expect = np.ones_like(pa.au)*7
         expect[0] = expect[-1] = 5
         expect[1] = expect[-2] = 6
-        self.assertEqual(len(call_data), 1)
+        self.assertEqual(len(call_data), 2)
         self.assertEqual(call_data[0], (0.0, 0.1))
+        self.assertEqual(call_data[1], (0.0, 0.1))
         self.assertListEqual(list(pa.au), list(expect))
 
 
@@ -1066,6 +1082,59 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         expect[1] = 4.0
         expect[2] = 5.0
         self.assertListEqual(list(pa.u), list(expect))
+        self.assertListEqual(list(pa.au), list(expect))
+
+    def test_group_honors_condition_on_gpu(self):
+        # Given
+        pa = self.pa
+        pa.add_constant('reduce_calls', 0)
+        pa.au[:] = 0.0
+        if pa.gpu:
+            pa.gpu.push('au')
+        call_data = []
+
+        def cond(t, dt):
+            call_data.append((t, dt))
+            return False
+
+        equations = [
+            Group(
+                equations=[
+                    DumbEquation(dest='fluid', sources=['fluid'])
+                ],
+                condition=cond
+            ),
+            Group(
+                equations=[
+                    Group(
+                        equations=[
+                            DumbEquation(dest='fluid', sources=['fluid'])
+                        ],
+                        condition=cond
+                    )
+                ]
+            ),
+            Group(
+                equations=[
+                    DumbEquation(dest='fluid', sources=['fluid'])
+                ],
+            )
+        ]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.0, 0.1)
+
+        # Then
+        if pa.gpu:
+            pa.gpu.pull('au')
+
+        expect = np.ones_like(pa.au)*7
+        expect[0] = expect[-1] = 5
+        expect[1] = expect[-2] = 6
+        self.assertEqual(len(call_data), 2)
+        self.assertEqual(call_data[0], (0.0, 0.1))
+        self.assertEqual(call_data[1], (0.0, 0.1))
         self.assertListEqual(list(pa.au), list(expect))
 
 

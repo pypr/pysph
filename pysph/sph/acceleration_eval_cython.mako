@@ -291,15 +291,30 @@ cdef class AccelerationEval:
         indent_lvl += 1
         %>
         % endif
+        ## ---------------------
+        ## ---- Subgroups start
         % if group.has_subgroups:
         % for sg_idx, sub_group in enumerate(group.data):
         ${indent("# Doing subgroup " + str(sg_idx), indent_lvl)}
-        ${indent(do_group(helper, sub_group, indent_lvl), indent_lvl)}
-        % endfor
-
-        % else:
-        ${indent(do_group(helper, group, indent_lvl), indent_lvl)}
+        % if sub_group.condition is not None:
+        if ${helper.get_condition_call(sub_group)}:
+        <%
+        indent_lvl += 1
+        %>
         % endif
+        ${indent(do_group(helper, sub_group, indent_lvl), indent_lvl)}
+        % if sub_group.condition is not None:
+        <%
+        indent_lvl -= 1
+        %>
+        % endif
+        % endfor # (for sg_idx, sub_group in enumerate(group.data))
+        ## ---- Subgroups done
+        ## ---------------------
+        % else:  # No subgroups
+        ${indent(do_group(helper, group, indent_lvl), indent_lvl)}
+        % endif  # (if group.has_subgroups)
+        ## Check the iteration conditions
         % if group.iterate:
         ${indent(helper.get_iteration_check(group), indent_lvl)}
         % endif

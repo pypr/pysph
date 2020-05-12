@@ -286,6 +286,11 @@ class GPUAccelerationEval(object):
                 func(*info.get('args'))
             elif type == 'kernel':
                 self._call_kernel(info, extra_args)
+            elif type == 'check_condition':
+                group = info['group']
+                if not group.condition(t, dt):
+                    # Condition failed so skip group.
+                    i = info['jump']
             elif type == 'start_iteration':
                 iter_count = 0
                 iter_start = i
@@ -521,8 +526,12 @@ class AccelerationEvalGPUHelper(object):
         calls = []
         prg = self.program
         array_index = self._array_index
+        # Track the condition and end_group to facilitate group conditions.
+        condition_stack = []
+        count = 0
         for item in self.data:
             type = item.get('type')
+            info = {}
             if type == 'kernel':
                 kernel = item.get('kernel')
                 method = getattr(prg, kernel)
@@ -560,9 +569,24 @@ class AccelerationEvalGPUHelper(object):
                 group = item['group']
                 equations = get_equations_with_converged(group._orig_group)
                 info = dict(type=type, equations=equations, group=group)
+            elif type == 'check_condition':
+                info = dict(item)
+                info['jump'] = None
+                condition_stack.append(info)
+            elif type == 'end_group':
+                group = item['group']
+                if group.condition is not None:
+                    cond_info = condition_stack.pop()
+                    # count is the location of the next call.
+                    # We decrement it here as the counter is incremented
+                    # in the helper.
+                    cond_info['jump'] = count - 1
+                info = {}
             else:
                 raise RuntimeError('Unknown type %s' % type)
-            calls.append(info)
+            if info:
+                calls.append(info)
+                count += 1
         return calls
 
     ##########################################################################
@@ -1026,6 +1050,16 @@ class AccelerationEvalGPUHelper(object):
                 sig=sig, body=body
             )
         )
+
+    def check_condition(self, group):
+        self.data.append(dict(
+            type='check_condition', group=group
+        ))
+
+    def end_group(self, group):
+        self.data.append(dict(
+            type='end_group', group=group
+        ))
 
     def start_iteration(self, group):
         self.data.append(dict(
