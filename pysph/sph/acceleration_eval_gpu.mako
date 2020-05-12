@@ -74,6 +74,7 @@ ${helper.get_post_loop_kernel(g_idx, sg_idx, group, dest, all_eqs)}
 % if group.post:
 <% helper.call_post(group) %>
 % endif
+<% helper.end_group(group) %>
 </%def>
 
 #define abs fabs
@@ -89,6 +90,9 @@ ${helper.get_header()}
 % if len(group.data) > 0:
 // ------------------------------------------------------------------
 // Group${g_idx}
+% if group.condition is not None:
+<% helper.check_condition(group) %>
+% endif
 #######################################################################
 ## Start iteration if needed.
 #######################################################################
@@ -101,6 +105,9 @@ ${helper.get_header()}
 % if group.has_subgroups:
 % for sg_idx, sub_group in enumerate(group.data):
 // Subgroup ${sg_idx}
+% if sub_group.condition is not None:
+<% helper.check_condition(sub_group) %>
+% endif
 ${do_group(helper, g_idx, sg_idx, sub_group)}
 % endfor ## sg_idx
 % else:
