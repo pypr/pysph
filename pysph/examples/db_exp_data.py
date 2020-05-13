@@ -1,28 +1,34 @@
 """Experimental data for the dam break problem.
 
-The data is extracted from:
+The data is extracted from plots in the following references:
 
 Martin and Moyce 1952
 "An Experimental Study of the Collapse of Liquid Columns on a Rigid Horizontal
 Plane", J. C. Martin and W. J. Moyce, Philososphical Transactions of the Royal
 Society of London Series A, 244, 312--324 (1952).
+DOI:10.1098/rsta.1952.0007
 
 "Moving-Particle Semi-Implicit Method for Fragmentation of Incompressible
 fluid", S. Koshizuka and Y. Oka, Nuclear Science and Engineering, 123,
 421--434 (1996).
+DOI:10.13182/NSE96-A24205
 
 "B.Buchner, Green Water on Ship - Type Off shore Structures, Ph.D.thesis,
 TU Delft, Delft University of Technology (2002)."
+URL: https://repository.tudelft.nl/islandora/object/uuid%3Af0c0bd67-d52a-4b79-8451-1279629a5b80
 
-" L.Lobovsky, E.BotiaVera, F.Castellana, J.Mas-Soler, A.SoutoIglesias,
+"L.Lobovsky, E.Botia-Vera, F.Castellana, J.Mas-Soler, A.Souto-Iglesias,
 Experimental investigation of dynamic pressure loads during dam break,
 J. Fluids Struct. 48 (2014) 407–434."
+DOI:10.1016/j.jfluidstructs.2014.03.009
 
 and
 
 "K.M.T. Kleefsman, G.Fekken, A.E.P.Veldman, B.Iwanowski, B.Buchner,
 A volume-of-fluid based simulation method for wave impact problems,
 J. Com-put.Phys.206 (1)(2005)363–393."
+DOI:10.1016/j.jcp.2004.12.007
+
 """
 
 import numpy as np
