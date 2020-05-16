@@ -3,7 +3,7 @@
 The case is as described in "L.Lobovsky, E.Botia-Vera,
  F.Castellana, J.Mas-Soler, A.Souto-Iglesias,
 Experimental investigation of dynamic pressure loads during dam break,
-J. Fluids Struct. 48 (2014) 407–434."
+J. Fluids Struct. 48 (2014) 407-434."
 
 DOI:10.1016/j.jfluidstructs.2014.03.009
 """

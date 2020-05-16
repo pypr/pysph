@@ -19,14 +19,14 @@ URL: https://repository.tudelft.nl/islandora/object/uuid%3Af0c0bd67-d52a-4b79-84
 
 "L.Lobovsky, E.Botia-Vera, F.Castellana, J.Mas-Soler, A.Souto-Iglesias,
 Experimental investigation of dynamic pressure loads during dam break,
-J. Fluids Struct. 48 (2014) 407–434."
+J. Fluids Struct. 48 (2014) 407-434."
 DOI:10.1016/j.jfluidstructs.2014.03.009
 
 and
 
 "K.M.T. Kleefsman, G.Fekken, A.E.P.Veldman, B.Iwanowski, B.Buchner,
 A volume-of-fluid based simulation method for wave impact problems,
-J. Com-put.Phys.206 (1)(2005)363–393."
+J. Com-put.Phys.206 (1)(2005)363-393."
 DOI:10.1016/j.jcp.2004.12.007
 
 """
