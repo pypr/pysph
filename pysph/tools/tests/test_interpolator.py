@@ -207,7 +207,7 @@ class TestInterpolator(unittest.TestCase):
     def test_should_work_when_arrays_have_different_props(self):
         # Given
         pa1 = self._make_2d_grid()
-        pa1.add_property('junk', default=2.0)
+        pa1.add_property('junk', default=2.0, type='int')
         pa2 = self._make_2d_grid('solid')
 
         # When.
