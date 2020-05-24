@@ -304,9 +304,7 @@ cdef class ZOrderNNPS(NNPS):
         cdef uint64_t* iter_keys
         cdef int* iter_key_to_idx
 
-        cdef uint32_t* sorted_cids = <uint32_t*> malloc(
-                curr_num_particles*sizeof(uint32_t))
-
+        cdef uint32_t curr_pid = current_pids[0]
         for j from 0<=j<pa_index:
             iter_cids = self.cids[j]
             iter_keys = self.keys[j]
@@ -325,9 +323,10 @@ cdef class ZOrderNNPS(NNPS):
             found_cid = curr_cid
             curr_cid += 1
 
-        sorted_cids[0] = found_cid
+        current_cids[curr_pid] = found_cid
 
         for i from 0<i<curr_num_particles:
+            curr_pid = current_pids[i]
             if(current_keys[i] != current_keys[i-1]):
                 found_ptr = NULL
                 found_cid = UINT_MAX
@@ -350,12 +349,7 @@ cdef class ZOrderNNPS(NNPS):
                     found_cid = curr_cid
                     curr_cid += 1
 
-            sorted_cids[i] = found_cid
-
-        for i from 0<=i<curr_num_particles:
-            pid = current_pids[i]
-            current_cids[pid] = sorted_cids[i]
-        free(sorted_cids)
+            current_cids[curr_pid] = found_cid
 
         return curr_cid
 
