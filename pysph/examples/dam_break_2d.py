@@ -73,6 +73,7 @@ class DamBreak2D(Application):
         self.dx = self.options.dx
         self.h = self.hdx * self.dx
         self.kernel_corr = self.options.kernel_corr
+        self.co = co
         print("Using h = %f" % self.h)
 
     def configure_scheme(self):
@@ -80,6 +81,8 @@ class DamBreak2D(Application):
         kw = dict(
             tf=tf, output_at_times=[0.4, 0.6, 0.8, 1.0]
         )
+        co = self.co
+        B = co * co * ro / gamma
         if self.options.scheme == 'wcsph':
             dt = 0.125 * self.h / co
             self.scheme.configure(h0=self.h, hdx=self.hdx)
@@ -234,6 +237,10 @@ class DamBreak2D(Application):
             # away from the wall, so displacing it by a tiny amount helps.
             fluid.x += self.dx / 4
 
+        self.kernel_corrections(fluid, boundary)
+        return [fluid, boundary]
+
+    def kernel_corrections(self, fluid, boundary):
         # Adding extra properties for kernel correction
         corr = self.kernel_corr
         if corr == 'kernel-corr' or corr == 'mixed-corr':
@@ -250,8 +257,6 @@ class DamBreak2D(Application):
             for prop in ['gradai', 'bi']:
                 fluid.add_property(prop, stride=3)
                 boundary.add_property(prop, stride=3)
-
-        return [fluid, boundary]
 
     def post_process(self, info_fname):
         self.read_info(info_fname)

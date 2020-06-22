@@ -617,6 +617,41 @@ that has nothing to do with the particular backend. However, since it is
 arbitrary Python, you can choose to implement the code using any approach you
 choose to do. This should be flexible enough to customize PySPH greatly.
 
+
+Conditional execution of groups
+--------------------------------
+
+A :py:class:`Group` takes a keyword argument called ``condition`` which can be
+any Python callable (function/method). This callable is passed the values of
+``t, dt``. If the function returns ``True`` then the group is executed,
+otherwise it is not. This is useful in situations when you say want to run a
+specific set of equations only every 20 iterations. Or you want to move an
+object only at a specified time. Here is a quick pseudo-example, we define the
+``Group`` as below::
+
+    def check_time(t, dt):
+        if int(t/dt) % 20 == 0:
+            return True
+        else:
+            return False
+
+    equations = [
+        Group( ... ),
+        Group(
+            equations=[
+                ShepardDensityFilter(dest='fluid', sources=['fluid'])
+            ],
+            condition=check_time
+        )
+    ]
+
+In the above pseudo-code the idea is that only when the ``check_time`` returns
+``True`` will the density filter group be executed. You can also pass a method
+instead of a function. The only condition is that it should accept the two
+arguments ``t, dt``.
+
+
+
 Controlling the looping over destination particles
 ----------------------------------------------------
 
