@@ -334,7 +334,11 @@ class Interpolator(object):
         """
         assert isinstance(comp, int), 'Error: only interger value is allowed'
         for array in self.particle_arrays:
-            data = array.get(prop, only_real_particles=False)
+            if prop not in array.properties:
+                data = 0.0
+            else:
+                data = array.get(prop, only_real_particles=False)
+
             array.get('temp_prop', only_real_particles=False)[:] = data
 
         self.func_eval.compute(0.0, 0.1)  # These are junk arguments.
@@ -463,24 +467,9 @@ class Interpolator(object):
 
     def _set_particle_arrays(self, particle_arrays):
         self.particle_arrays = particle_arrays
-        self._make_all_arrays_have_same_props(particle_arrays)
         for array in self.particle_arrays:
             if 'temp_prop' not in array.properties:
                 array.add_property('temp_prop')
-
-    def _make_all_arrays_have_same_props(self, particle_arrays):
-        """Make sure all arrays have the same props.
-        """
-        all_props = reduce(
-            set.union, [set(x.properties.keys()) for x in particle_arrays]
-        )
-        for array in particle_arrays:
-            all_props.update(array.properties.keys())
-
-        for array in particle_arrays:
-            array_props = set(array.properties.keys())
-            for prop in (all_props - array_props):
-                array.add_property(prop)
 
 
 def main(fname, prop, npoint):

@@ -25,7 +25,7 @@ ${indent(helper.get_pre_call(group), 0)}
 #######################################################################
 
 dst = self.${dest}
-${indent(helper.get_dest_array_setup(dest, eqs_with_no_source, sources, group.real), 0)}
+${indent(helper.get_dest_array_setup(dest, eqs_with_no_source, sources, group), 0)}
 dst_array_index = dst.index
 
 #######################################################################
@@ -37,7 +37,7 @@ ${indent(all_eqs.get_py_initialize_code(), 0)}
 #######################################################################
 % if all_eqs.has_initialize():
 # Initialization for destination ${dest}.
-for d_idx in ${helper.get_parallel_range("NP_DEST")}:
+for d_idx in ${helper.get_parallel_range(group)}:
     ${indent(all_eqs.get_initialize_code(helper.object.kernel), 1)}
 % endif
 #######################################################################
@@ -46,7 +46,7 @@ for d_idx in ${helper.get_parallel_range("NP_DEST")}:
 % if len(eqs_with_no_source.equations) > 0:
 % if eqs_with_no_source.has_loop():
 # SPH Equations with no sources.
-for d_idx in ${helper.get_parallel_range("NP_DEST")}:
+for d_idx in ${helper.get_parallel_range(group)}:
     ${indent(eqs_with_no_source.get_loop_code(helper.object.kernel), 1)}
 % endif
 % endif
@@ -65,7 +65,7 @@ ${indent(helper.get_src_array_setup(source, eq_group), 0)}
 src_array_index = src.index
 
 % if eq_group.has_initialize_pair():
-for d_idx in ${helper.get_parallel_range("NP_DEST")}:
+for d_idx in ${helper.get_parallel_range(group)}:
     ${indent(eq_group.get_initialize_pair_code(helper.object.kernel), 1)}
 % endif
 
@@ -78,7 +78,7 @@ nnps.set_context(src_array_index, dst_array_index)
 ${helper.get_parallel_block()}
     thread_id = threadid()
     ${indent(eq_group.get_variable_array_setup(), 1)}
-    for d_idx in ${helper.get_parallel_range("NP_DEST", nogil=False)}:
+    for d_idx in ${helper.get_parallel_range(group, nogil=False)}:
         ###############################################################
         ## Find and iterate over neighbors.
         ###############################################################
@@ -105,7 +105,7 @@ ${helper.get_parallel_block()}
 ###################################################################
 % if all_eqs.has_post_loop():
 # Post loop for destination ${dest}.
-for d_idx in ${helper.get_parallel_range("NP_DEST")}:
+for d_idx in ${helper.get_parallel_range(group)}:
     ${indent(all_eqs.get_post_loop_code(helper.object.kernel), 1)}
 % endif
 
@@ -243,7 +243,7 @@ cdef class AccelerationEval:
             getattr(self, name).set_array(pa)
 
     cpdef compute(self, double t, double dt):
-        cdef long nbr_idx, NP_SRC, NP_DEST
+        cdef long nbr_idx, NP_SRC, NP_DEST, D_START_IDX
         cdef long s_idx, d_idx
         cdef int thread_id, N_NBRS
         cdef unsigned int* NBRS
@@ -275,34 +275,49 @@ cdef class AccelerationEval:
         % if len(group.data) > 0: # No equations in this group.
         # ---------------------------------------------------------------------
         # Group ${g_idx}.
-        % if group.iterate:
-        max_iterations = ${group.max_iterations}
-        min_iterations = ${group.min_iterations}
-        _iteration_count = 1
-        while True:
+        % if group.condition is not None:
+        if ${helper.get_condition_call(group)}:
+        <%
+        indent_lvl = 3
+        %>
         % else:
-        if True:
+        <%
+        indent_lvl = 2
+        %>
         % endif
-
-            % if group.has_subgroups:
-            % for sg_idx, sub_group in enumerate(group.data):
-            # Doing subgroup ${sg_idx}
-            ${indent(do_group(helper, sub_group, 3), 3)}
-            % endfor
-
-            % else:
-            ${indent(do_group(helper, group, 3), 3)}
-            % endif
-            #######################################################################
-            ## Break the iteration for the group.
-            #######################################################################
-            % if group.iterate:
-            # Check for convergence or timeout
-            if (_iteration_count >= min_iterations) and (${group.get_converged_condition()} or (_iteration_count == max_iterations)):
-                _iteration_count = 1
-                break
-            _iteration_count += 1
-            % endif
+        % if group.iterate:
+        ${indent(helper.get_iteration_init(group), indent_lvl)}
+        <%
+        indent_lvl += 1
+        %>
+        % endif
+        ## ---------------------
+        ## ---- Subgroups start
+        % if group.has_subgroups:
+        % for sg_idx, sub_group in enumerate(group.data):
+        ${indent("# Doing subgroup " + str(sg_idx), indent_lvl)}
+        % if sub_group.condition is not None:
+        if ${helper.get_condition_call(sub_group)}:
+        <%
+        indent_lvl += 1
+        %>
+        % endif
+        ${indent(do_group(helper, sub_group, indent_lvl), indent_lvl)}
+        % if sub_group.condition is not None:
+        <%
+        indent_lvl -= 1
+        %>
+        % endif
+        % endfor # (for sg_idx, sub_group in enumerate(group.data))
+        ## ---- Subgroups done
+        ## ---------------------
+        % else:  # No subgroups
+        ${indent(do_group(helper, group, indent_lvl), indent_lvl)}
+        % endif  # (if group.has_subgroups)
+        ## Check the iteration conditions
+        % if group.iterate:
+        ${indent(helper.get_iteration_check(group), indent_lvl)}
+        % endif
 
         # Group ${g_idx} done.
         # ---------------------------------------------------------------------

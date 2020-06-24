@@ -448,7 +448,8 @@ class Group(object):
     pre_comp = precomputed_symbols()
 
     def __init__(self, equations, real=True, update_nnps=False, iterate=False,
-                 max_iterations=1, min_iterations=0, pre=None, post=None):
+                 max_iterations=1, min_iterations=0, pre=None, post=None,
+                 condition=None, start_idx=0, stop_idx=None):
         """Constructor.
 
         Parameters
@@ -481,9 +482,28 @@ class Group(object):
             A callable which is passed no arguments that is called before
             anything in the group is executed.
 
-        pre: callable
+        post: callable
             A callable which is passed no arguments that is called after
             the group is completed.
+
+        condition: callable
+            A callable that is passed (t, dt). If this callable returns True,
+            the group is executed, otherwise it is not. If condition is None,
+            the group is always executed. Note that this should work even if
+            the group has many destination arrays.
+
+        start_idx: int or str
+            Start looping from this destination index. Starts from the given
+            number if an integer is passed. If a string is look for a
+            property/constant and use its first value as the loop count.
+
+        stop_idx: int or str
+            Loop up to this destination index instead of over all possible
+            values. Defaults to all particles. Ends at the given number if an
+            integer is passed. If a string is passed, look for a
+            property/constant and use its first value as the loop count. Note
+            that this works like a range stop parameter so the last value is
+            not included.
 
         Notes
         -----
@@ -496,6 +516,7 @@ class Group(object):
         having an older density.  This is also the case for the TaitEOS.  In
         these cases the group that computes the equation should set real to
         False.
+
         """
         self.real = real
         self.update_nnps = update_nnps
@@ -506,6 +527,9 @@ class Group(object):
         self.min_iterations = min_iterations
         self.pre = pre
         self.post = post
+        self.condition = condition
+        self.start_idx = start_idx
+        self.stop_idx = stop_idx
 
         only_groups = [x for x in equations if isinstance(x, Group)]
         if (len(only_groups) > 0) and (len(only_groups) != len(equations)):
@@ -528,6 +552,11 @@ class Group(object):
         cls = self.__class__.__name__
         eqs = ', \n'.join(repr(eq) for eq in self.equations)
         ignore = ['equations']
+        if self.start_idx != 0:
+            ignore.append('start_idx')
+        for prop in ['pre', 'post', 'condition', 'stop_idx']:
+            if getattr(self, prop) is None:
+                ignore.append(prop)
         kws = ', '.join(get_init_args(self, self.__init__, ignore))
         kws = '\n'.join(wrap(kws, width=74, subsequent_indent=' '*2,
                              break_long_words=False))

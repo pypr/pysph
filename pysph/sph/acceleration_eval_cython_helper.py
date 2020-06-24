@@ -1,5 +1,6 @@
 from collections import defaultdict
 from os.path import dirname, join, expanduser, realpath
+from textwrap import dedent
 
 from mako.template import Template
 from cyarray import carray
@@ -249,12 +250,26 @@ class AccelerationEvalCythonHelper(object):
         return group.get_array_declarations(src, self.known_types)
 
     def get_dest_array_setup(self, dest_name, eqs_with_no_source, sources,
-                             real):
+                             group):
         src, dest_arrays = eqs_with_no_source.get_array_names()
         for g in sources.values():
             s, d = g.get_array_names()
             dest_arrays.update(d)
-        lines = ['NP_DEST = self.%s.size(real=%s)' % (dest_name, real)]
+        if isinstance(group.start_idx, str):
+            lines = ['D_START_IDX = self.%s.%s[0]' %
+                     (dest_name, group.start_idx)]
+        else:
+            lines = ['D_START_IDX = %s' % group.start_idx]
+
+        if group.stop_idx is None:
+            lines += ['NP_DEST = self.%s.size(real=%s)' %
+                      (dest_name, group.real)]
+        elif isinstance(group.stop_idx, str):
+            lines += ['NP_DEST = self.%s.%s[0]' %
+                      (dest_name, group.stop_idx)]
+        else:
+            lines += ['NP_DEST = %s' % group.stop_idx]
+
         lines += ['%s = dst.%s.data' % (n, n[2:])
                   for n in sorted(dest_arrays)]
         return '\n'.join(lines)
@@ -272,18 +287,47 @@ class AccelerationEvalCythonHelper(object):
         else:
             return "if True: # Placeholder used for OpenMP."
 
-    def get_parallel_range(self, start, stop=None, step=1, nogil=True):
+    def get_parallel_range(self, group, nogil=True):
+        kwargs = {}
+        if (group.stop_idx is not None) or group.start_idx:
+            kwargs['schedule'] = 'dynamic'
+            kwargs['chunksize'] = None
         if nogil:
-            return get_parallel_range(start, stop, step, nogil=True)
-        else:
-            return get_parallel_range(start, stop, step)
+            kwargs['nogil'] = True
+
+        return get_parallel_range("D_START_IDX", "NP_DEST", **kwargs)
 
     def get_particle_array_names(self):
         parrays = [pa.name for pa in self.object.particle_arrays]
         return ', '.join(parrays)
+
+    def get_condition_call(self, group):
+        return self._group_map[group] + '.condition(t, dt)'
 
     def get_pre_call(self, group):
         return self._group_map[group] + '.pre()'
 
     def get_post_call(self, group):
         return self._group_map[group] + '.post()'
+
+    def get_iteration_init(self, group):
+        lines = [
+            'max_iterations = %d' % group.max_iterations,
+            'min_iterations = %d' % group.min_iterations,
+            '_iteration_count = 1',
+            'while True:'
+        ]
+        return '\n'.join(lines)
+
+    def get_iteration_check(self, group):
+        src = dedent('''\
+            ###############################################################
+            ## Break the iteration for the group.
+            ###############################################################
+            if ((_iteration_count >= min_iterations)
+               and (%s or (_iteration_count == max_iterations))):
+                _iteration_count = 1
+                break
+            _iteration_count += 1
+        ''' % group.get_converged_condition())
+        return src

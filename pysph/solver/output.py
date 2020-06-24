@@ -11,6 +11,7 @@ from pysph.base.utils import get_particles_info, get_particle_array
 from pysph import has_h5py
 
 output_formats = ('hdf5', 'npz')
+COMPRESSION_LEVEL = 6
 
 
 def _to_str(s):
@@ -231,25 +232,26 @@ class HDFOutput(Output):
             constants[_to_str(const_name)] = numpy.array(const_data)
         return constants
 
+    def _get_compress_options(self):
+        if self.compress:
+            return dict(compression="gzip",
+                        compression_opts=COMPRESSION_LEVEL)
+        else:
+            return {}
+
     def _set_constants(self, pdata, ptype_grp):
         pconstants = pdata['constants']
         constGroup = ptype_grp.create_group('constants')
+        c_kw = self._get_compress_options()
         for constName, constArray in pconstants.items():
-            constGroup.create_dataset(constName, data=constArray)
+            constGroup.create_dataset(constName, data=constArray, **c_kw)
 
     def _set_properties(self, pdata, ptype_grp, data):
+        c_kw = self._get_compress_options()
         for propname, attributes in pdata['properties'].items():
             if propname in data:
                 array = data[propname]
-                if self.compress:
-                    prop = ptype_grp.create_dataset(
-                            propname, data=array)
-                else:
-                    prop = ptype_grp.create_dataset(
-                            propname, data=array,
-                            compression="gzip", compression_opts=9
-                            )
-
+                prop = ptype_grp.create_dataset(propname, data=array, **c_kw)
                 prop.attrs['stored'] = True
             else:
                 prop = ptype_grp.create_dataset(propname, (0,))
