@@ -16,7 +16,7 @@ import numpy as np
 
 from pysph.base.utils import get_particle_array
 from pysph.tools.geometry import remove_overlap_particles
-from pysph.base.kernels import Gaussian
+from pysph.base.kernels import CubicSpline
 from pysph.examples._db_geometry import DamBreak3DGeometry
 from pysph.solver.application import Application
 from pysph.sph.integrator import EPECIntegrator
@@ -27,8 +27,8 @@ dim = 3
 tf = 1.4
 
 H = 0.3
-dx = H/20
-nboundary_layers = 1
+dx = H/25
+nboundary_layers = 2
 hdx = 1.32
 ro = 1000.0
 h0 = dx * hdx
@@ -57,10 +57,12 @@ class DamBreak3D(Application):
         self.h0 = self.hdx * self.dx
         self.geom = DamBreak3DGeometry(
             container_height=0.4, container_width=0.61, container_length=1.6,
-            fluid_column_height=0.3, fluid_column_width=0.61, fluid_column_length=0.4,
-            obstacle_center_x=0.96, obstacle_center_y=0,
-            obstacle_length=0.12, obstacle_height=0.75, obstacle_width=0.12,
-            nboundary_layers=2, with_obstacle=True, dx=dx, hdx=hdx, rho0=ro
+            fluid_column_height=0.3, fluid_column_width=0.61,
+            fluid_column_length=0.4, obstacle_center_x=0.96,
+            obstacle_center_y=0, obstacle_length=0.12,
+            obstacle_height=0.75, obstacle_width=0.12,
+            nboundary_layers=nboundary_layers, with_obstacle=True,
+            dx=dx, hdx=hdx, rho0=ro
         )
         self.co = c0
 
@@ -75,7 +77,7 @@ class DamBreak3D(Application):
     def configure_scheme(self):
         s = self.scheme
         hdx = self.hdx
-        kernel = Gaussian(dim=dim)
+        kernel = CubicSpline(dim=dim)
         h0 = self.dx * hdx
         s.configure(h0=h0, hdx=hdx)
         dt = 0.125 * h0 / c0
@@ -158,6 +160,7 @@ class DamBreak3D(Application):
         plt.xlim(left, 1.4)
         plt.savefig(os.path.join(self.output_dir, 'v_vs_t.png'))
         plt.show()
+
 
 if __name__ == '__main__':
     app = DamBreak3D()

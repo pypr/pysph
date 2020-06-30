@@ -547,7 +547,7 @@ kleefsman_exp_data_p3 = u"""
 17.773	0.122
 """
 
-#data extracted from Figure 17
+# data extracted from Figure 17
 yeh_and_petroff_v_data = u"""
 0.009	2.127
 0.013	2.211
@@ -695,7 +695,7 @@ yeh_and_petroff_v_data = u"""
 1.338	0.118
 """
 
-#data extracted from Figure 18
+# data extracted from Figure 18
 yeh_and_petroff_force_data = u"""
 -0.002	-4.375
 0.002	-0.446
