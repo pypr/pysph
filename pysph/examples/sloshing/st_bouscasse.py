@@ -29,9 +29,9 @@ from pysph.tools.geometry import get_2d_tank, get_2d_block
 from pysph.sph.wc.edac import EDACScheme, EDACStep
 
 
-L = 1
-h = 0.03 * L
-A = 2.333 * h
+L = 1  # Length of tank
+h = 0.03 * L  # Height of water
+amp = 2.333 * h  # Amplitude of oscillation
 
 u_max = 1.3
 c0 = 10.0 * u_max
@@ -52,18 +52,20 @@ omega = omega_r*1.231
 
 class HorizontalExcitation(Equation):
     def __init__(self, dest, sources):
-        super(HorizontalExcitation, self).__init__(dest, sources)
-
-    def initialize(self, d_idx, d_au, t, d_rho):
         L = 1
         h = 0.03 * L
-        A = 2.333 * h
+        self.amp = 2.333 * h
 
         k = pi/L
         omega_r = sqrt(9.81*k*tanh(k*h))
-        omega = omega_r*1.231
+        self.omega = omega_r*1.231
+        super(HorizontalExcitation, self).__init__(dest, sources)
 
-        d_au[d_idx] += A * (omega) * (omega) * sin(omega*t)
+    def initialize(self, d_idx, d_au, t, d_rho):
+        amp = self.amp
+        omega = self.omega
+
+        d_au[d_idx] += amp * (omega) * (omega) * sin(omega*t)
 
 
 class SloshingTank(Application):
@@ -102,7 +104,7 @@ class SloshingTank(Application):
         solid = get_particle_array(name='solid', x=xt, y=yt, h=h0,
                                    m=m, rho=rho)
 
-        fluid.u = -A * omega * np.ones_like(xf)
+        fluid.u = -amp * omega * np.ones_like(xf)
 
         self.scheme.setup_properties([fluid, solid])
         particles = [fluid, solid]
@@ -126,7 +128,9 @@ class SloshingTank(Application):
 
     def create_equations(self):
         eqns = self.scheme.get_equations()
-        eqns[1].equations.insert(-1, HorizontalExcitation(dest='fluid', sources=None))
+        eqns[1].equations.insert(
+            -1, HorizontalExcitation(dest='fluid', sources=None)
+            )
         return eqns
 
     def post_process(self, info_fname):
@@ -150,7 +154,9 @@ class SloshingTank(Application):
             x_left = arrays2.x.min()
             probe_x = x_left + 0.05 + self.dx * (n_layers - 1)
             probe_y = np.linspace(0, arrays1.y.max(), 50)
-            probe = get_particle_array(x=probe_x*np.ones_like(probe_y), y=probe_y)
+            probe = get_particle_array(
+                x=probe_x*np.ones_like(probe_y), y=probe_y
+                )
             pa_list = [arrays1, probe]
             nps = nnps.LinkedListNNPS(dim=2, particles=pa_list, radius_scale=1)
             src_index, dst_index = 0, 1

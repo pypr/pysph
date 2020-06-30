@@ -31,7 +31,7 @@ DOI:10.1016/j.jcp.2004.12.007
 and
 
 "Peter E. Raad, Razvan Bidoae, The three-dimensional
-Eulerian–Lagrangian marker and micro cell method
+Eulerian-Lagrangian marker and micro cell method
 for the simulation of free surface flows, Journal of Computational Physics,
 Volume 203, Issue 2, 2005, Pages 668-699,
 ISSN 0021-9991"
@@ -547,7 +547,7 @@ kleefsman_exp_data_p3 = u"""
 17.773	0.122
 """
 
-#data extracted from Figure 17
+# data extracted from Figure 17
 yeh_and_petroff_v_data = u"""
 0.009	2.127
 0.013	2.211
@@ -695,7 +695,7 @@ yeh_and_petroff_v_data = u"""
 1.338	0.118
 """
 
-#data extracted from Figure 18
+# data extracted from Figure 18
 yeh_and_petroff_force_data = u"""
 -0.002	-4.375
 0.002	-0.446
