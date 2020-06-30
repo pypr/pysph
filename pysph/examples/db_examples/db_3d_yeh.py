@@ -3,7 +3,7 @@
 The case is based of an experiment done by Yeh and Petroff,
 University of Washington.
 Refer to "Peter E. Raad, Razvan Bidoae, The three-dimensional
-Eulerian–Lagrangian marker and micro cell method
+Eulerian-Lagrangian marker and micro cell method
 for the simulation of free surface flows, Journal of Computational Physics,
 Volume 203, Issue 2, 2005, Pages 668-699,
 ISSN 0021-9991"

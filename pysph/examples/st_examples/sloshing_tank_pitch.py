@@ -1,6 +1,6 @@
 """Dam break flow against a tall structure
 
-The case is from "Hakan Akyildız, N. Erdem Ünal,
+The case is from "Hakan Akyildiz, N. Erdem Unal,
 Sloshing in a three-dimensional rectangular tank:
 Numerical simulation and experimental validation,
 Ocean Engineering, Volume 33, Issue 16,

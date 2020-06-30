@@ -8,7 +8,7 @@ modal analysis of nonlinear sloshing in a rectangular tank with finite
 water depth. Journal of Fluid Mechanics, 407:201234, 2000."
 DOI: https://doi.org/10.1017/S0022112099007569
 
-The case is from "Hakan Akyildız, N. Erdem Ünal,
+The case is from "Hakan Akyildiz, N. Erdem Unal,
 Sloshing in a three-dimensional rectangular tank:
 Numerical simulation and experimental validation,
 Ocean Engineering, Volume 33, Issue 16,
@@ -203,7 +203,7 @@ faltinsen = u"""
 9.892	-0.0639
 """
 
-# Data extracted from Figure 5, Akyildız and Ünal, 2006
+# Data extracted from Figure 5, Akyildiz and Unal, 2006
 # Probe 2
 au_pitch_2 = u"""
 0.036	3.226
@@ -235,7 +235,7 @@ au_pitch_2 = u"""
 9.803	3.404
 """
 
-# Data extracted from Figure 5, Akyildız and Ünal, 2006
+# Data extracted from Figure 5, Akyildiz and Unal, 2006
 # Probe 8
 au_pitch_8 = u"""
 0.339	0.24
