@@ -14,7 +14,6 @@ from math import sin, pi, cos
 
 import os
 import numpy as np
-import csv
 
 # PySPH imports
 from pysph.base.utils import get_particle_array
@@ -45,14 +44,21 @@ alpha = 0.1
 beta = 0.0
 gamma = 7.0
 
+length = 0.92
+width = 0.46
+height = 0.62
+n_layers = 3
+
 
 class PitchingMotion(Equation):
     def __init__(self, dest, sources):
+        self.theta_0 = 4 * pi/180
+        self.omega_r = 2
         super(PitchingMotion, self).__init__(dest, sources)
 
-    def loop(self, d_idx, d_au, d_aw, t, d_z, d_x):
-        theta_0 = 4 * pi/180
-        omega_r = 2
+    def initialize(self, d_idx, d_au, d_aw, t, d_z, d_x):
+        theta_0 = self.theta_0
+        omega_r = self.omega_r
 
         omega = theta_0*omega_r*cos(omega_r*t)
         alpha = -theta_0*omega_r*omega_r*sin(omega_r*t)
@@ -96,7 +102,7 @@ class OneStageRigidBodyStep(IntegratorStep):
         d_v[d_idx] += dt * d_av[d_idx]
         d_w[d_idx] += dt * d_aw[d_idx]
 
-        # upadte positions using time-centered velocity
+        # update positions using time-centered velocity
         d_x[d_idx] += dt * 0.5 * (d_u[d_idx] + d_u0[d_idx])
         d_y[d_idx] += dt * 0.5 * (d_v[d_idx] + d_v0[d_idx])
         d_z[d_idx] += dt * 0.5 * (d_w[d_idx] + d_w0[d_idx])
@@ -129,15 +135,16 @@ class SloshingTankPitch(Application):
 
     def create_particles(self):
         geom = DamBreak3DGeometry(
-            container_height=0.62, container_width=0.46, container_length=0.92,
-            fluid_column_height=0.62*0.75, fluid_column_width=0.46,
-            fluid_column_length=0.92, nboundary_layers=3, with_obstacle=False,
+            container_height=height, container_width=width,
+            container_length=length, fluid_column_height=height*0.75,
+            fluid_column_width=width, fluid_column_length=length,
+            nboundary_layers=n_layers, with_obstacle=False,
             dx=self.dx, hdx=self.hdx, rho0=rho
         )
 
         [fluid, boundary] = geom.create_particles()
-        fluid.x = fluid.x - 0.46
-        boundary.x = boundary.x - 0.46
+        fluid.x = fluid.x - length*0.5
+        boundary.x = boundary.x - length*0.5
 
         # Setting up intital velocity of the tank
         theta_0 = 4 * pi/180

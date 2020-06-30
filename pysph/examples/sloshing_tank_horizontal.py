@@ -16,7 +16,6 @@ from math import cos, pi, exp
 
 import os
 import numpy as np
-import csv
 
 # PySPH imports
 from pysph.base.utils import get_particle_array
@@ -48,16 +47,22 @@ alpha = 0.1
 beta = 0.0
 gamma = 7.0
 
+length = 1.73
+h_tank = 1.15
+h_liquid = 0.6
+
 
 class HorizontalExcitation(Equation):
     def __init__(self, dest, sources):
+        self.amp = 0.032
+        self.T = 1.3
         super(HorizontalExcitation, self).__init__(dest, sources)
 
-    def loop(self, d_idx, d_au, t):
-        A = 0.032
-        T = 1.3
+    def initialize(self, d_idx, d_au, t):
+        amp = self.amp
+        T = self.T
 
-        d_au[d_idx] = -A * (2*pi/T) * (2*pi/T) * cos(2*pi*t/T)
+        d_au[d_idx] = -amp * (2*pi/T) * (2*pi/T) * cos(2*pi*t/T)
 
 
 class SloshingTank(Application):
@@ -81,11 +86,11 @@ class SloshingTank(Application):
         h0 = self.hdx * self.dx
         m = rho * dx * dx
 
-        xt, yt = get_2d_tank(dx=dx, length=1.73, height=1.15,
+        xt, yt = get_2d_tank(dx=dx, length=length, height=h_tank,
                              num_layers=n_layers, base_center=[0.0, -dx])
 
-        xf, yf = get_2d_block(dx=dx, length=1.73 - 2*dx,
-                              height=0.6, center=[0.0, 0.3])
+        xf, yf = get_2d_block(dx=dx, length=length - 2*dx,
+                              height=h_liquid, center=[0.0, h_liquid*0.5])
 
         fluid = get_particle_array(name='fluid', x=xf, y=yf, h=h0,
                                    m=m, rho=rho)
@@ -112,7 +117,7 @@ class SloshingTank(Application):
 
     def create_scheme(self):
         s = WCSPHScheme(
-            ['fluid'], ['solid'], dim=2, rho0=1000, c0=c0,
+            ['fluid'], ['solid'], dim=2, rho0=rho, c0=c0,
             h0=h0, hdx=hdx, gy=-9.81, alpha=alpha,
             beta=beta, gamma=gamma, hg_correction=True,
             tensile_correction=False
@@ -170,7 +175,7 @@ class SloshingTank(Application):
             wave_height.append(wh)
 
         wave_height = np.array(wave_height)
-        wave_height = wave_height - 0.6
+        wave_height = wave_height - h_liquid
 
         import pysph.examples.st_exp_data as st
 
