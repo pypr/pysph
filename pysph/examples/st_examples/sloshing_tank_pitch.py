@@ -49,11 +49,14 @@ width = 0.46
 height = 0.62
 n_layers = 3
 
+theta_0 = 4 * pi/180
+omega_r = 2
+
 
 class PitchingMotion(Equation):
-    def __init__(self, dest, sources):
-        self.theta_0 = 4 * pi/180
-        self.omega_r = 2
+    def __init__(self, dest, sources, theta_0, omega_r):
+        self.theta_0 = theta_0
+        self.omega_r = omega_r
         super(PitchingMotion, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_au, d_aw, t, d_z, d_x):
@@ -147,8 +150,6 @@ class SloshingTankPitch(Application):
         boundary.x = boundary.x - length*0.5
 
         # Setting up intital velocity of the tank
-        theta_0 = 4 * pi/180
-        omega_r = 2
         omega0 = theta_0 * omega_r
         boundary.u, boundary.w = boundary.z*omega0, -boundary.x*omega0
 
@@ -185,7 +186,8 @@ class SloshingTankPitch(Application):
         equation_1 = Group(
             equations=[
                 PitchingMotion(
-                    dest='boundary', sources=None),
+                    dest='boundary', sources=None,
+                    theta_0=theta_0, omega_r=omega_r),
             ], real=False
         )
 

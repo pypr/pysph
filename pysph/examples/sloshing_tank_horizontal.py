@@ -51,16 +51,21 @@ length = 1.73
 h_tank = 1.15
 h_liquid = 0.6
 
+amp = 0.032
+T = 1.3
+
 
 class HorizontalExcitation(Equation):
-    def __init__(self, dest, sources):
-        self.amp = 0.032
-        self.T = 1.3
+    def __init__(self, dest, sources, amp, T):
+        self.amp = amp
+        self.T = T
+        self.pi = pi
         super(HorizontalExcitation, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_au, t):
         amp = self.amp
         T = self.T
+        pi = self.pi
 
         d_au[d_idx] = -amp * (2*pi/T) * (2*pi/T) * cos(2*pi*t/T)
 
@@ -129,7 +134,7 @@ class SloshingTank(Application):
         equation_1 = Group(
             equations=[
                 HorizontalExcitation(
-                    dest='solid', sources=None),
+                    dest='solid', sources=None, amp=amp, T=T),
             ], real=False
         )
 
