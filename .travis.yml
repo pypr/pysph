@@ -23,7 +23,7 @@ install:
 
     - conda create -q -n testenv python=$TRAVIS_PYTHON_VERSION numpy cython h5py
     - conda activate testenv
-    - conda install -c conda-forge pocl pyopencl==2020.1 pytools==2020.2
+    - conda install -c conda-forge pocl==1.4 pyopencl==2020.1 pytools==2020.2
     - python -c 'import pyopencl as cl'
     - pip install -r requirements.txt
     - pip install -e ".[dev]"
