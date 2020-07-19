@@ -114,6 +114,7 @@ cdef class StratifiedSFCNNPS(NNPS):
         cdef int** current_key_to_idx
         cdef int** current_key_to_nbr_idx
         cdef int** current_key_to_nbr_length
+        cdef double** current_hmax
         cdef int i, j
         for i from 0<=i<self.narrays:
             current_pids = self.pids[i]
@@ -121,16 +122,19 @@ cdef class StratifiedSFCNNPS(NNPS):
             current_key_to_idx = self.key_to_idx[i]
             current_key_to_nbr_idx = self.key_to_nbr_idx[i]
             current_key_to_nbr_length = self.key_to_nbr_length[i]
+            current_hmax = self.hmax[i]
             del self.nbr_boxes[i]
             for j from 0<=j<self.num_levels:
                 free(current_key_to_idx[j])
                 free(current_key_to_nbr_idx[j])
                 free(current_key_to_nbr_length[j])
+                free(current_hmax[j])
             free(current_pids)
             free(current_keys)
             free(current_key_to_idx)
             free(current_key_to_nbr_idx)
             free(current_key_to_nbr_length)
+            free(current_hmax)
             free(self.cell_sizes[i])
             free(self.num_cells[i])
         free(self.pids)
@@ -140,6 +144,9 @@ cdef class StratifiedSFCNNPS(NNPS):
         free(self.key_to_nbr_idx)
         free(self.key_to_nbr_length)
         free(self.nbr_boxes)
+        free(self.hmax)
+        free(self.total_mask_len)
+        free(self.max_keys)
 
     #### Public protocol ################################################
 
