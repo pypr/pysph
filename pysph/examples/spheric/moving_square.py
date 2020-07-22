@@ -121,7 +121,7 @@ class MovingSquare(Application):
         obstacle.add_property('V')
 
         # extrapolated velocities for the fluid
-        for name in ['uf', 'vf', 'wf']:
+        for name in ['uf', 'vf', 'wf', 'Fwx', 'Fwy', 'Fwz']:
             solid.add_property(name)
             obstacle.add_property(name)
 

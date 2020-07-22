@@ -480,10 +480,10 @@ cdef class ParticleArray:
             index_list = LongArray(indices.size)
             index_list.set_data(indices)
 
-        cdef str msg
+        cdef str msg, name
         cdef numpy.ndarray sorted_indices
         cdef BaseArray prop_array
-        cdef int num_arrays, i
+        cdef int num_arrays, i, stride
         cdef list property_arrays
 
         if index_list.length > self.get_number_of_particles():

@@ -94,6 +94,8 @@ basic examples.  Some of the formulations available are:
    pp. 124--149)
 -  `Akinci <http://doi.acm.org/10.1145/2185520.2185558>`_ (Akinci et al. ACM
    Trans. Graph., 2012, pp. 62:1--62:8)
+-  `Direct Fiber Simulation <https://doi.org/10.3390/jcs4020077>`_ for
+   fiber suspensions (Meyer et al. 2020, JCS, 4(2), pp. 77)
 
 Boundary conditions from the following papers are implemented:
 

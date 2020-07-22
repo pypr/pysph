@@ -1,17 +1,18 @@
 """ An implementation of a general solver base class """
 from __future__ import print_function
+
+import logging
 # System library imports.
 import os
+
 import numpy
 
 # PySPH imports
 from pysph.base.kernels import CubicSpline
+from pysph.solver.utils import ProgressBar, dump, load
 from pysph.sph.acceleration_eval import make_acceleration_evals
 from pysph.sph.sph_compiler import SPHCompiler
 
-from pysph.solver.utils import ProgressBar, load, dump
-
-import logging
 logger = logging.getLogger(__name__)
 
 EPSILON = numpy.finfo(float).eps*2
@@ -24,7 +25,8 @@ class Solver(object):
                  n_damp=0, tf=1.0, dt=1e-3,
                  adaptive_timestep=False, cfl=0.3,
                  output_at_times=(),
-                 fixed_h=False, **kwargs):
+                 fixed_h=False,
+                 **kwargs):
         """**Constructor**
 
         Any additional keyword args are used to set the values of any
@@ -62,6 +64,9 @@ class Solver(object):
 
         pfreq : int
             Output files dumping frequency.
+
+        N : int
+            Total number of dumps
 
         output_at_times : list/array
             Optional list of output times to force dump the output file
@@ -112,6 +117,9 @@ class Solver(object):
 
         # default output printing frequency
         self.pfreq = 100
+
+        # default value for total number of dumps --> overrides pfreq
+        self.N = 0
 
         # Compress generated files.
         self.compress_output = False
@@ -696,6 +704,8 @@ class Solver(object):
 
         # dump output if the iteration number is a multiple of the printing
         # frequency.
+        if self.N > 0:
+            self.pfreq = int(self.tf/(self.N*self.dt))
         dump = self.count % self.pfreq == 0
 
         # Consider the other cases if user has requested output at a specified

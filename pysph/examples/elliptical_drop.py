@@ -116,13 +116,13 @@ class EllipticalDrop(Application):
             scheme.configure(h0=self.hdx*self.dx)
             scheme.configure_solver(
                 kernel=kernel, integrator_cls=EPECIntegrator, dt=dt, tf=tf,
-                adaptive_timestep=True, cfl=0.3, n_damp=50,
+                adaptive_timestep=False, cfl=0.3, n_damp=50,
                 output_at_times=[0.0008, 0.0038]
             )
         elif self.options.scheme == 'iisph':
             scheme.configure_solver(
                 kernel=kernel, dt=dt, tf=tf,
-                adaptive_timestep=True,
+                adaptive_timestep=False,
                 output_at_times=[0.0008, 0.0038]
             )
 

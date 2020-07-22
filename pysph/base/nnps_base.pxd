@@ -138,7 +138,7 @@ cpdef UIntArray arange_uint(int start, int stop=*)
 
 # Basic particle array wrapper used for NNPS
 cdef class NNPSParticleArrayWrapper:
-    cdef public DoubleArray x,y,z,h
+    cdef public DoubleArray x,y,z,u,v,w,h
     cdef public UIntArray gid
     cdef public IntArray tag
     cdef public ParticleArray pa
@@ -164,6 +164,10 @@ cdef class DomainManagerBase:
     cdef public double ytranslate
     cdef public double ztranslate
 
+    cdef public double gamma_yx
+    cdef public double gamma_zx
+    cdef public double gamma_zy
+
     cdef public int dim
     cdef public bint periodic_in_x, periodic_in_y, periodic_in_z
     cdef public bint is_periodic
@@ -180,7 +184,13 @@ cdef class DomainManagerBase:
     cdef public double radius_scale  # Radius scale for kernel
     cdef public double n_layers      # Number of layers of ghost particles
 
-    #cdef double dbl_max              # Maximum value of double
+    cdef public double t             # Time for Lees-Edwards BC
+    cdef public double dt            # Time step for Lees-Edwards BC
+    cdef public int calls_per_step   # Number of calls per step
+    cdef public int loops            # loop counter
+
+    cdef double dbl_max              # Maximum value of double
+
 
     # remove ghost particles from a previous iteration
     cpdef _remove_ghosts(self)
@@ -198,6 +208,10 @@ cdef class CPUDomainManager(DomainManagerBase):
 
     # Convenience function to add a value to a carray
     cdef _add_to_array(self, DoubleArray arr, double disp, int start=*)
+
+    # Functions to shift ghost particle periodically in a direction
+    cdef _shift_periodic(self, DoubleArray arr, double disp, double min_pos,
+                         double max_pos, int start=*)
 
     # Convenience function to multiply a value to a carray
     cdef _mul_to_array(self, DoubleArray arr, double val)

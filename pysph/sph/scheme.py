@@ -355,7 +355,7 @@ class WCSPHScheme(Scheme):
         self.configure(**data)
 
     def get_timestep(self, cfl=0.5):
-        return cfl*self.h0/self.c0
+        return cfl * self.h0 / self.c0
 
     def configure_solver(self, kernel=None, integrator_cls=None,
                          extra_steppers=None, **kw):
@@ -560,9 +560,9 @@ class TVFScheme(Scheme):
         self.configure(**data)
 
     def get_timestep(self, cfl=0.25):
-        dt_cfl = cfl * self.h0/self.c0
+        dt_cfl = cfl * self.h0 / self.c0
         if self.nu > 1e-12:
-            dt_viscous = 0.125 * self.h0**2/self.nu
+            dt_viscous = 0.125 * self.h0**2 / self.nu
         else:
             dt_viscous = 1.0
         dt_force = 1.0
@@ -702,6 +702,273 @@ class TVFScheme(Scheme):
             pa.set_output_arrays(output_props)
 
 
+class BeadChainScheme(Scheme):
+    def __init__(self, fluids, solids, fibers, dim, k=0.0, lim=0.5,
+                 tag=100, gx=0.0, gy=0.0, gz=0.0, alpha=0.0, tdamp=0.0,
+                 direct=True):
+        self.fluids = fluids
+        self.solids = solids
+        self.fibers = fibers
+        self.dim = dim
+        self.solver = None
+        self.rho0 = None
+        self.c0 = None
+        self.pb = None
+        self.p0 = None
+        self.nu = None
+        self.h0 = None
+        self.dx = None
+        self.E = None
+        self.A = None
+        self.Ip = None
+        self.J = None
+        self.d = None
+        self.lim = lim
+        self.k = k
+        self.tag = tag
+        self.gx = gx
+        self.gy = gy
+        self.gz = gz
+        self.alpha = alpha
+        self.tdamp = tdamp
+        self.direct = direct
+
+    def add_user_options(self, group):
+        group.add_argument(
+            "--tdamp", action="store", type=float, dest="tdamp",
+            default=self.tdamp,
+            help="Time for which the accelerations are damped."
+        )
+
+    def consume_user_options(self, options):
+        vars = ['tdamp']
+        data = dict((var, getattr(options, var)) for var in vars)
+        self.configure(**data)
+
+    def get_timestep(self):
+        from math import sqrt
+        dt_cfl = 0.4 * self.h0 / (1.1 * self.c0)
+        dt_viscous = 0.125 * self.h0**2 / self.nu
+        g = sqrt(self.gx**2 + self.gy**2 + self.gz**2)
+        dt_force = 0.25 * sqrt(self.h0 / (g + 0.001))
+        dt_tension = 0.5 * self.dx * sqrt(self.rho0 / self.E)
+        dt_bending = 0.5 * self.dx**2 * sqrt(self.rho0 * self.A /
+                                             (self.E * 2 * self.Ip))
+        print("dt_cfl: %g" % dt_cfl)
+        print("dt_viscous: %g" % dt_viscous)
+        print("dt_force: %g" % dt_force)
+        print("dt_tension: %g" % dt_tension)
+        print("dt_bending: %g" % dt_bending)
+
+        fiber_dt = min(dt_tension, dt_bending)
+        dt = min(dt_cfl, dt_viscous, dt_force)
+
+        if self.direct:
+            dt = min(dt_cfl, dt_viscous, dt_force, dt_tension, dt_bending)
+            if (dt / fiber_dt) > 10:
+                print("Time step ratio is %g." % (dt / fiber_dt))
+                print("You might want to speed up the simulation using an")
+                print("inner loop. Set it up as")
+                print("def create_tools(self):")
+                print("return [FiberIntegrator(self.particles,")
+                print("                        self.scheme,")
+                print("                        self.domain,")
+                print("                        D=<extra damping>)]")
+        else:
+            dt = min(dt_cfl, dt_viscous, dt_force)
+            print("Time step ratio is %g" % (dt / fiber_dt))
+        return [dt, fiber_dt]
+
+    def configure_solver(self, kernel=None, integrator_cls=None,
+                         extra_steppers=None, **kw):
+        """Configure the solver to be generated.
+
+        Parameters
+        ----------
+        kernel : Kernel instance.
+            Kernel to use, if none is passed a default one is used.
+        integrator_cls : pysph.sph.integrator.Integrator
+            Integrator class to use, use sensible default if none is
+            passed.
+        extra_steppers : dict
+            Additional integration stepper instances as a dict.
+        **kw : extra arguments
+            Any additional keyword args are passed to the solver instance.
+
+        """
+        from pysph.base.kernels import CubicSpline
+        from pysph.sph.integrator_step import TransportVelocityStep
+        from pysph.sph.integrator import EPECIntegrator
+        if kernel is None:
+            kernel = CubicSpline(dim=self.dim)
+        steppers = {}
+        if extra_steppers is not None:
+            steppers.update(extra_steppers)
+
+        step_cls = TransportVelocityStep
+        for f in self.fluids + self.fibers:
+            if f not in steppers:
+                steppers[f] = step_cls()
+
+        cls = integrator_cls if integrator_cls is not None else EPECIntegrator
+        integrator = cls(**steppers)
+
+        [self.dt, self.fiber_dt] = self.get_timestep()
+
+        from pysph.solver.solver import Solver
+        self.solver = Solver(dim=self.dim, integrator=integrator,
+                             kernel=kernel, dt=self.dt, **kw)
+
+    def get_equations(self):
+        from pysph.sph.equation import Group
+        from pysph.sph.wc.transport_velocity import (
+            SummationDensity, StateEquation, MomentumEquationPressureGradient,
+            MomentumEquationViscosity, MomentumEquationArtificialStress,
+            SolidWallPressureBC, SolidWallNoSlipBC, SetWallVelocity,
+            FiberViscousTraction)
+        from pysph.sph.fiber.utils import (
+            HoldPoints, VelocityGradient, ComputeDistance, Contact)
+        from pysph.sph.fiber.beadchain import (EBGVelocityReset, Friction,
+                                               Tension, Bending)
+
+        equations = []
+        all = self.fluids + self.solids + self.fibers
+
+        g1 = []
+        for fluid in self.fluids:
+            g1.append(SummationDensity(dest=fluid, sources=all))
+
+        for fiber in self.fibers:
+            g1.append(EBGVelocityReset(dest=fiber, sources=None))
+        equations.append(Group(equations=g1, real=False))
+
+        g2 = []
+        for fluid in self.fluids:
+            g2.append(StateEquation(
+                dest=fluid, sources=None, p0=self.p0, rho0=self.rho0, b=1.0))
+
+        for solid in self.solids:
+            g2.append(SetWallVelocity(dest=solid, sources=self.fluids))
+
+        for fiber in self.fibers:
+            g2.append(SetWallVelocity(dest=fiber, sources=self.fluids))
+
+        equations.append(Group(equations=g2, real=False))
+
+        g3 = []
+        for solid in self.solids:
+            g3.append(SolidWallPressureBC(
+                dest=solid, sources=self.fluids, b=1.0,
+                rho0=self.rho0, p0=self.p0, gx=self.gx, gy=self.gy,
+                gz=self.gz))
+        for fiber in self.fibers:
+            g3.append(SolidWallPressureBC(
+                dest=fiber, sources=self.fluids, b=1.0,
+                rho0=self.rho0, p0=self.p0, gx=self.gx, gy=self.gy,
+                gz=self.gz))
+
+        equations.append(Group(equations=g3, real=False))
+
+        g4 = []
+        for fiber in self.fibers:
+            g4.append(ComputeDistance(dest=fiber, sources=[fiber]))
+            g4.append(VelocityGradient(dest=fiber, sources=all))
+
+        equations.append(Group(equations=g4))
+
+        g5 = []
+        for fluid in self.fluids:
+            g5.append(MomentumEquationPressureGradient(
+                dest=fluid, sources=all, pb=self.pb, gx=self.gx, gy=self.gy,
+                gz=self.gz, tdamp=self.tdamp))
+            if self.nu > 0.0:
+                g5.append(MomentumEquationViscosity(
+                    dest=fluid, sources=self.fluids, nu=self.nu))
+                g5.append(SolidWallNoSlipBC(
+                    dest=fluid, sources=self.solids + self.fibers,
+                    nu=self.nu))
+                g5.append(MomentumEquationArtificialStress(
+                    dest=fluid, sources=self.fluids))
+
+        for fiber in self.fibers:
+            g5.append(MomentumEquationPressureGradient(
+                dest=fiber, sources=all, pb=0.0, gx=self.gx, gy=self.gy,
+                gz=self.gz, tdamp=self.tdamp))
+            if self.nu > 0.0:
+                g5.append(FiberViscousTraction(
+                    dest=fiber, sources=self.fluids, nu=self.nu))
+            if self.direct:
+                g5.append(Tension(dest=fiber,
+                                  sources=None,
+                                  ea=self.E*self.A))
+                g5.append(Bending(dest=fiber,
+                                  sources=None,
+                                  ei=self.E*self.Ip))
+                g5.append(Contact(dest=fiber,
+                                  sources=self.fibers,
+                                  E=self.E,
+                                  d=self.d,
+                                  dim=self.dim,
+                                  k=self.k,
+                                  lim=self.lim,
+                                  eta0=self.rho0*self.nu,
+                                  dt=self.dt))
+
+            g5.append(Friction(
+                dest=fiber, sources=None, J=self.J, dx=self.dx,
+                mu=self.nu * self.rho0, d=self.d))
+
+        equations.append(Group(equations=g5))
+
+        g6 = []
+        for fiber in self.fibers:
+            g6.append(HoldPoints(dest=fiber, sources=None, tag=100))
+
+        equations.append(Group(equations=g6))
+
+        return equations
+
+    def setup_properties(self, particles, clean=True):
+        particle_arrays = dict([(p.name, p) for p in particles])
+
+        props = ('V', 'wf', 'uf', 'vf', 'wg', 'wij', 'vg', 'ug',
+                 'awhat', 'avhat', 'auhat', 'vhat', 'what', 'uhat', 'vmag2',
+                 'arho', 'rho0', 'holdtag')
+        fprops = ('lprev', 'lnext',
+                  'phi0', 'fidx', 'phifrac', 'phi0', 'fractag', 'holdtag',
+                  'rxnext', 'rynext', 'rznext', 'rnext',
+                  'rxprev', 'ryprev', 'rzprev', 'rprev',
+                  'Fx', 'Fy', 'Fz',
+                  'eu', 'ev', 'ew',
+                  'ex', 'ey', 'ez'
+                  'dudx', 'dudy', 'dudz',
+                  'dvdx', 'dvdy', 'dvdz',
+                  'dwdx', 'dwdy', 'dwdz')
+        output_props = ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'm', 'p',
+                        'pid', 'gid']
+
+        for fluid in self.fluids:
+            pa = particle_arrays[fluid]
+            for name in props:
+                fluid.add_property(name)
+            self._ensure_properties(pa, props, clean)
+            pa.set_output_arrays(output_props)
+
+        for solid in self.solids:
+            pa = particle_arrays[solid]
+            for name in props:
+                solid.add_property(name)
+            self._ensure_properties(pa, props, clean)
+            pa.set_output_arrays(output_props)
+
+        for fiber in self.fibers:
+            pa = particle_arrays[fiber]
+            for name in props + fprops:
+                fiber.add_property(name)
+            self._ensure_properties(pa, props, clean)
+            pa.set_output_arrays(output_props)
+
+
 class AdamiHuAdamsScheme(TVFScheme):
     """This is a scheme similiar to that in the paper:
 
@@ -742,7 +1009,7 @@ class AdamiHuAdamsScheme(TVFScheme):
         )
 
     def attributes_changed(self):
-        self.B = self.c0*self.c0*self.rho0/self.gamma
+        self.B = self.c0 * self.c0 * self.rho0 / self.gamma
 
     def consume_user_options(self, options):
         vars = ['alpha', 'tdamp', 'gamma']
@@ -1190,9 +1457,9 @@ class GSPHScheme(Scheme):
         self.g1 = g1
         self.g2 = g2
         self.rsolver = rsolver
-        self.interpolation = interpolation
+        self.Ipnterpolation = interpolation
         self.monotonicity = monotonicity
-        self.interface_zero = interface_zero
+        self.Ipnterface_zero = interface_zero
         self.hybrid = hybrid
         self.blend_alpha = blend_alpha
         self.tf = tf
@@ -1387,8 +1654,8 @@ class GSPHScheme(Scheme):
             g4.append(GSPHAcceleration(
                 dest=fluid, sources=all_pa, g1=self.g1,
                 g2=self.g2, monotonicity=self.monotonicity,
-                rsolver=self.rsolver, interpolation=self.interpolation,
-                interface_zero=self.interface_zero,
+                rsolver=self.rsolver, interpolation=self.Ipnterpolation,
+                interface_zero=self.Ipnterface_zero,
                 hybrid=self.hybrid, blend_alpha=self.blend_alpha,
                 gamma=self.gamma, niter=self.niter, tol=self.tol
             ))
@@ -1494,7 +1761,7 @@ class ADKEScheme(Scheme):
 
         g4 = []
         for fluid in self.fluids:
-            g4.append(SummationDensity(fluid, self.fluids+self.solids))
+            g4.append(SummationDensity(fluid, self.fluids + self.solids))
         equations.append(Group(g4))
 
         g5 = []
@@ -1503,7 +1770,7 @@ class ADKEScheme(Scheme):
         equations.append(Group(equations=g5))
 
         g6 = []
-        for elem in self.fluids+self.solids:
+        for elem in self.fluids + self.solids:
             g6.append(IdealGasEOS(elem, sources=None, gamma=self.gamma))
         equations.append(Group(equations=g6))
 
@@ -1574,10 +1841,10 @@ class ADKEScheme(Scheme):
         import numpy
         particle_arrays = dict([(p.name, p) for p in particles])
         required_props = [
-                'x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm', 'cs', 'p',
-                'e', 'au', 'av', 'aw', 'arho', 'ae', 'am', 'ah', 'x0', 'y0',
-                'z0', 'u0', 'v0', 'w0', 'rho0', 'e0', 'h0', 'div',  'h0',
-                'wij', 'htmp', 'logrho']
+            'x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm', 'cs', 'p',
+            'e', 'au', 'av', 'aw', 'arho', 'ae', 'am', 'ah', 'x0', 'y0',
+            'z0', 'u0', 'v0', 'w0', 'rho0', 'e0', 'h0', 'div', 'h0',
+            'wij', 'htmp', 'logrho']
 
         dummy = get_particle_array(additional_props=required_props,
                                    name='junk')

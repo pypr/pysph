@@ -164,7 +164,7 @@ class KHITVF(Application):
 
         # dummy velocities for the wall
         # required for the no-slip BC
-        for name in ['ug', 'vg', 'wg']:
+        for name in ['ug','vg','wg', 'Fwx', 'Fwy', 'Fwz']:
             wall.add_property(name)
 
         print("2D KHI with %d fluid particles and %d wall particles" % (
