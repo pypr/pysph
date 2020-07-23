@@ -224,10 +224,25 @@ cdef class NNPSParticleArrayWrapper:
         self.x = pa.get_carray('x')
         self.y = pa.get_carray('y')
         self.z = pa.get_carray('z')
-        self.u = pa.get_carray('u')
-        self.v = pa.get_carray('v')
-        self.w = pa.get_carray('w')
         self.h = pa.get_carray('h')
+        if PyDict_Contains(pa.properties, 'u') == 1:
+          self.u = pa.get_carray('u')
+        else:
+          self.u = DoubleArray()
+          for i in range(self.x.length):
+              self.u.append(0.0)
+        if PyDict_Contains(pa.properties, 'v') == 1:
+          self.v = pa.get_carray('v')
+        else:
+          self.v = DoubleArray()
+          for i in range(self.y.length):
+              self.v.append(0.0)
+        if PyDict_Contains(pa.properties, 'w') == 1:
+          self.w = pa.get_carray('w')
+        else:
+          self.w = DoubleArray()
+          for i in range(self.z.length):
+              self.w.append(0.0)
 
         self.gid = pa.get_carray('gid')
         self.tag = pa.get_carray('tag')
