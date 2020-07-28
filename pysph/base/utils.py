@@ -4,11 +4,11 @@ except ImportError:
     from ordereddict import OrderedDict
 
 import numpy
+from .particle_array import ParticleArray, \
+    get_local_tag, get_remote_tag, get_ghost_tag
 
 from cyarray.api import LongArray
 
-from .particle_array import (ParticleArray, get_ghost_tag, get_local_tag,
-                             get_remote_tag)
 
 UINT_MAX = (1 << 32) - 1
 
@@ -345,8 +345,8 @@ def get_particle_array_tvf_solid(constants=None, **props):
     get_particle_array
 
     """
-    tv_props = ['V', 'wij', 'uf', 'vf', 'wf', 'ug', 'vg', 'wg',
-                'Fwx', 'Fwy', 'Fwz']
+    tv_props = ['u0', 'v0', 'w0', 'V', 'wij', 'ax', 'ay', 'az',
+                'uf', 'vf', 'wf', 'ug', 'vg', 'wg']
 
     pa = get_particle_array(
         constants=constants, additional_props=tv_props, **props

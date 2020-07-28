@@ -1,8 +1,8 @@
 """ An implementation of a general solver base class """
 from __future__ import print_function
 
-import logging
 # System library imports.
+import logging
 import os
 
 import numpy
@@ -64,9 +64,6 @@ class Solver(object):
 
         pfreq : int
             Output files dumping frequency.
-
-        N : int
-            Total number of dumps
 
         output_at_times : list/array
             Optional list of output times to force dump the output file

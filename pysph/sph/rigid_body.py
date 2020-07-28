@@ -290,19 +290,11 @@ class ViscosityRigidBody(Equation):
         self.rho0 = rho0
         super(ViscosityRigidBody, self).__init__(dest, sources)
 
-    def initialize(self, d_idx, d_au, d_av, d_aw, s_idx, s_fx, s_fy, s_fz,):
-        d_au[d_idx] = 0.0
-        d_av[d_idx] = 0.0
-        d_aw[d_idx] = 0.0
-        # s_fx[s_idx] = 0.0
-        # s_fy[s_idx] = 0.0
-        # s_fz[s_idx] = 0.0
-
     def loop(self, d_idx, d_m, d_au, d_av, d_aw, d_rho,
              s_idx, s_V, s_fx, s_fy, s_fz,
              EPS, VIJ, XIJ, R2IJ, DWIJ):
         phi_b = self.rho0/(s_V[s_idx]*d_rho[d_idx])
-        vijdotxij = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
+        vijdotxij = min(VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2], 0.0)
 
         fac = self.nu*phi_b*vijdotxij/(R2IJ + EPS)
         ax = fac*DWIJ[0]
@@ -327,14 +319,6 @@ class PressureRigidBody(Equation):
     def __init__(self, dest, sources, rho0):
         self.rho0 = rho0
         super(PressureRigidBody, self).__init__(dest, sources)
-
-    def initialize(self, d_idx, d_au, d_av, d_aw, s_idx, s_fx, s_fy, s_fz,):
-        d_au[d_idx] = 0.0
-        d_av[d_idx] = 0.0
-        d_aw[d_idx] = 0.0
-        # s_fx[s_idx] = 0.0
-        # s_fy[s_idx] = 0.0
-        # s_fz[s_idx] = 0.0
 
     def loop(self, d_idx, d_m, d_rho, d_au, d_av, d_aw,  d_p,
              s_idx, s_V, s_fx, s_fy, s_fz, DWIJ):
