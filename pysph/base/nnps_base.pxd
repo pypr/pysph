@@ -189,7 +189,7 @@ cdef class DomainManagerBase:
     cdef public int calls_per_step   # Number of calls per step
     cdef public int loops            # loop counter
 
-    cdef double dbl_max              # Maximum value of double
+    #cdef double dbl_max              # Maximum value of double
 
 
     # remove ghost particles from a previous iteration

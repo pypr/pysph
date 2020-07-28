@@ -1,18 +1,17 @@
 """ An implementation of a general solver base class """
 from __future__ import print_function
-
 # System library imports.
-import logging
 import os
-
 import numpy
 
 # PySPH imports
 from pysph.base.kernels import CubicSpline
-from pysph.solver.utils import ProgressBar, dump, load
 from pysph.sph.acceleration_eval import make_acceleration_evals
 from pysph.sph.sph_compiler import SPHCompiler
 
+from pysph.solver.utils import ProgressBar, load, dump
+
+import logging
 logger = logging.getLogger(__name__)
 
 EPSILON = numpy.finfo(float).eps*2

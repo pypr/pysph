@@ -9,7 +9,6 @@ from .particle_array import ParticleArray, \
 
 from cyarray.api import LongArray
 
-
 UINT_MAX = (1 << 32) - 1
 
 

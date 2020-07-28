@@ -17,5 +17,3 @@ dist/
 .tox/
 *.out
 *_output
-._.DS_Store
-.DS_Store

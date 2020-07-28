@@ -14,9 +14,8 @@ References
 
 """
 
-from math import pi, sin
-
 from pysph.sph.equation import Equation
+from math import pi, sin
 
 # constants
 M_PI = pi
@@ -98,7 +97,6 @@ class SetWallVelocity(Equation):
     *filtered* velocity variables :math:`uf, vf, wf`.
 
     """
-
     def initialize(self, d_idx, d_uf, d_vf, d_wf, d_wij):
         d_uf[d_idx] = 0.0
         d_vf[d_idx] = 0.0
@@ -615,6 +613,7 @@ class SolidWallNoSlipBC(Equation):
              d_au, d_av, d_aw,
              s_ug, s_vg, s_wg,
              DWIJ, R2IJ, EPS, XIJ):
+
         # averaged shear viscosity Eq. (6).
         etai = self.nu * d_rho[d_idx]
         etaj = self.nu * s_rho[s_idx]
