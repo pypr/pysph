@@ -353,7 +353,7 @@ def get_particle_array_tvf_solid(constants=None, **props):
     )
     pa.set_output_arrays(
         ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p', 'h', 'm', 'V',
-         'pid', 'gid', 'tag', 'Fwx', 'Fwy', 'Fwz']
+         'pid', 'gid', 'tag']
     )
     return pa
 
@@ -554,15 +554,13 @@ def get_particle_array_beadchain_solid(constants=None, **props):
                    'uhat', 'vhat', 'what',
                    'dudx', 'dudy', 'dudz',
                    'dvdx', 'dvdy', 'dvdz',
-                   'dwdx', 'dwdy', 'dwdz',
-                   'Fwx', 'Fwy', 'Fwz']
+                   'dwdx', 'dwdy', 'dwdz']
 
     pa = get_particle_array(
         constants=constants, additional_props=solid_props, **props
     )
     pa.set_output_arrays(['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'm', 'h', 'p',
-                          'pid', 'gid', 'V', 'ug', 'vg', 'wg',
-                          'Fwx', 'Fwy', 'Fwz'])
+                          'pid', 'gid', 'V', 'ug', 'vg', 'wg'])
 
     return pa
 
@@ -625,7 +623,7 @@ def get_particle_array_beadchain_fiber(constants=None, **props):
                    'dwdx', 'dwdy', 'dwdz', 'Fx', 'Fy', 'Fz', 'ex',
                    'ey', 'ez', 'lprev', 'lnext',
                    'rxnext', 'rynext', 'rznext', 'rnext', 'rxprev', 'ryprev',
-                   'rzprev', 'rprev', 'fidx', 'Fwx', 'Fwy', 'Fwz']
+                   'rzprev', 'rprev', 'fidx']
 
     pa = get_particle_array(
         constants=constants, additional_props=fiber_props, **props
@@ -640,7 +638,6 @@ def get_particle_array_beadchain_fiber(constants=None, **props):
                           'lprev', 'lnext',
                           'dudx', 'dudy', 'dudz',
                           'dvdx', 'dvdy', 'dvdz',
-                          'dwdx', 'dwdy', 'dwdz',
-                          'Fwx', 'Fwy', 'Fwz'])
+                          'dwdx', 'dwdy', 'dwdz'])
 
     return pa
