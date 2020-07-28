@@ -6,8 +6,8 @@
 
 Reference
 ---------
-N. Meyer et. al "Parameter Identification of Fiber Orientation Models Based on Direct
-Fiber Simulation with Smoothed Particle Hydrodynamics",
+N. Meyer et. al "Parameter Identification of Fiber Orientation Models Based on
+Direct fiber Simulation with Smoothed Particle Hydrodynamics",
 Journal of Composites Science, 2020, 4, 77; doi:10.3390/jcs4020077
 """
 
@@ -323,7 +323,7 @@ class Channel(Application):
 
         # labels
         plt.xlabel('Strains $tG$')
-        plt.ylabel('Rotation angle $\phi$')
+        plt.ylabel(r'Rotation angle $\phi$')
         plt.legend(['SPH Simulation', 'Jeffery (Zhang)'])
         plt.grid()
         x1, x2, y1, y2 = plt.axis()

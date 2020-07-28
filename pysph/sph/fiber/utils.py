@@ -3,8 +3,9 @@
 Reference
 ---------
 
-    .. [Meyer2020] N. Meyer et. al "Parameter Identification of Fiber Orientation
-    Models Based on Direct Fiber Simulation with Smoothed Particle Hydrodynamics",
+    .. [Meyer2020] N. Meyer et. al "Parameter Identification of Fiber
+    Orientation Models Based on Direct Fiber Simulation with Smoothed
+    Particle Hydrodynamics",
     Journal of Composites Science, 2020, 4, 77; doi:10.3390/jcs4020077
 
 """
@@ -180,8 +181,9 @@ class Damping(Equation):
     """Damp particle motion.
 
     Particles are damped. Difference to ArtificialDamping: This damps real
-    particle velocities and therefore affects not only the fiber iteration. In this
-    contect it may be used to test fiber contact in a damped environment.
+    particle velocities and therefore affects not only the fiber iteration.
+    In this context it may be used to test fiber contact in a damped
+    environment.
     """
 
     def __init__(self, dest, sources, d):
@@ -247,9 +249,9 @@ class SimpleContact(Equation):
 class Contact(Equation):
     """This class computes fiber repulsion to stop penetration.
 
-    Itcomputes the force between two spheres based on Hertz pressure between two
-    cylinders. This Equation requires a computation of ditances by the Bending
-    equation.
+    It computes the force between two spheres based on Hertz pressure
+    between two cylinders. This Equation requires a computation of
+    distances by the Bending equation.
 
     See eq. (27)-(34) in [Meyer2020].
     """
@@ -365,7 +367,8 @@ class Contact(Equation):
                 self.compute_contact_force(VIJ[0], VIJ[1], VIJ[2], w, d)
             elif alpha > 0.0:
                 pass
-                # self.compute_lubrication_force(VIJ[0], VIJ[1], VIJ[2], w, d, alpha)
+                # self.compute_lubrication_force(
+                #   VIJ[0], VIJ[1], VIJ[2], w, d, alpha)
             else:
                 self.Fx = 0.0
                 self.Fy = 0.0

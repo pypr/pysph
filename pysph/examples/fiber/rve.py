@@ -6,8 +6,8 @@ Mini RVE
 
 Reference
 ---------
-N. Meyer et. al "Parameter Identification of Fiber Orientation Models Based on Direct
-Fiber Simulation with Smoothed Particle Hydrodynamics",
+N. Meyer et. al "Parameter Identification of Fiber Orientation Models Based on
+Direct Fiber Simulation with Smoothed Particle Hydrodynamics",
 Journal of Composites Science, 2020, 4, 77; doi:10.3390/jcs4020077
 """
 import itertools
@@ -149,12 +149,14 @@ class RVE(Application):
         # inertia properties
         mass = 3.0 * self.rho0 * self.dx * self.A
         self.J = (
-            1.0 / 4.0 * mass * R ** 2.0 + 1.0 / 12.0 * mass * (3.0 * self.dx) ** 2.0
+            1.0 / 4.0 * mass * R ** 2.0
+            + 1.0 / 12.0 * mass * (3.0 * self.dx) ** 2.0
         )
 
         # stiffness from dimensionless stiffness
         self.E = (
-            4.0 / np.pi * (self.options.S * self.options.mu * self.options.G * self.ar)
+            4.0 / np.pi * (
+                self.options.S * self.options.mu * self.options.G * self.ar)
         )
 
         # The speed of sound c0 is computed as 10 times the maximum velocity.
@@ -166,7 +168,9 @@ class RVE(Application):
         self.pb = self.p0
 
         # Simulation time
-        self.t = self.options.rot * np.pi * (self.ar + 1.0 / self.ar) / self.options.G
+        self.t = (
+            self.options.rot * np.pi * (self.ar + 1.0 / self.ar)
+            / self.options.G)
         print("Simulated time is %g s" % self.t)
 
         # Determine number of fibers to be generated
@@ -177,10 +181,10 @@ class RVE(Application):
     def configure_scheme(self):
         """Set up scheme and solver.
 
-        The flag 'direct' means that elastic equations and contact equations are solved
-        together with all other equations. If the fiber is very stiff, one may use a
-        subcycle to integrate fiber positions. Therefore, set 'direct=False' and
-        uncomment the FiberIntegrator tool.
+        The flag 'direct' means that elastic equations and contact equations
+        are solved together with all other equations. If the fiber is very
+        stiff, one may use a subcycle to integrate fiber positions. Therefore,
+        set 'direct=False' and uncomment the FiberIntegrator tool.
         """
         self.scheme.configure(
             rho0=self.rho0,
@@ -256,7 +260,8 @@ class RVE(Application):
                 # periodic extending above
                 if xx + self.L / 2 > self.C:
                     if (
-                        (fx[i] < (xx + self.L / 2 - self.C) or fx[i] > xx - self.L / 2)
+                        (fx[i] < (xx + self.L / 2 - self.C)
+                            or fx[i] > xx - self.L / 2)
                         and fy[i] < yy + self.dx / 2
                         and fy[i] > yy - self.dx / 2
                         and fz[i] < zz + self.dx / 2
@@ -266,7 +271,8 @@ class RVE(Application):
                 # periodic extending below
                 elif xx - self.L / 2 < 0:
                     if (
-                        (fx[i] < xx + self.L / 2 or fx[i] > (xx - self.L / 2 + self.C))
+                        (fx[i] < xx + self.L / 2
+                            or fx[i] > (xx - self.L / 2 + self.C))
                         and fy[i] < yy + self.dx / 2
                         and fy[i] > yy - self.dx / 2
                         and fz[i] < zz + self.dx / 2
@@ -313,7 +319,14 @@ class RVE(Application):
         # Finally create all particle arrays. Note that fluid particles are
         # removed in the area, where the fiber is placed.
         fluid = get_particle_array_beadchain_fluid(
-            name="fluid", x=fx, y=fy, z=fz, m=mass, rho=self.rho0, h=self.h0, V=V
+            name="fluid",
+            x=fx,
+            y=fy,
+            z=fz,
+            m=mass,
+            rho=self.rho0,
+            h=self.h0,
+            V=V
         )
         fluid.remove_particles(indices)
 
@@ -411,7 +424,9 @@ class RVE(Application):
                 # extrating all arrays.
                 directions = []
                 fiber = data["arrays"]["fibers"]
-                startpoints = [i * (self.options.lf - 1) for i in range(0, self.n)]
+                startpoints = [
+                    i * (self.options.lf - 1) for i in range(0, self.n)
+                ]
                 endpoints = [
                     i * (self.options.lf - 1) - 1 for i in range(1, self.n + 1)
                 ]
