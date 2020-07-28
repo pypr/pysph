@@ -1457,9 +1457,9 @@ class GSPHScheme(Scheme):
         self.g1 = g1
         self.g2 = g2
         self.rsolver = rsolver
-        self.Ipnterpolation = interpolation
+        self.interpolation = interpolation
         self.monotonicity = monotonicity
-        self.Ipnterface_zero = interface_zero
+        self.interface_zero = interface_zero
         self.hybrid = hybrid
         self.blend_alpha = blend_alpha
         self.tf = tf
@@ -1654,8 +1654,8 @@ class GSPHScheme(Scheme):
             g4.append(GSPHAcceleration(
                 dest=fluid, sources=all_pa, g1=self.g1,
                 g2=self.g2, monotonicity=self.monotonicity,
-                rsolver=self.rsolver, interpolation=self.Ipnterpolation,
-                interface_zero=self.Ipnterface_zero,
+                rsolver=self.rsolver, interpolation=self.interpolation,
+                interface_zero=self.interface_zero,
                 hybrid=self.hybrid, blend_alpha=self.blend_alpha,
                 gamma=self.gamma, niter=self.niter, tol=self.tol
             ))
