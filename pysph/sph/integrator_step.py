@@ -58,7 +58,7 @@ class EBGStep(IntegratorStep):
 # `RK2Step` class
 ###############################################################################
 class RK2Step(IntegratorStep):
-    """General 2nd order Runge-Kutta Integrator
+    r"""General 2nd order Runge-Kutta Integrator
 
     In the predictor step the particles are advanced to `t + dt/2`. The
     particles are then advanced with the new force computed at this position.
