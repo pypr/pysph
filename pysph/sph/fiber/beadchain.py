@@ -10,7 +10,8 @@ Reference
 
 """
 
-from math import acos, pi, sin, sqrt
+from math import acos, sin, sqrt
+from numpy import pi as M_PI
 
 from pysph.sph.equation import Equation
 
@@ -237,7 +238,7 @@ class Friction(Equation):
 
             # ensuring that [sx sy sz] is not parallel to [1 0 0]
             if abs(s2) > 1E-14 or abs(s3) > 1E-14:
-                fac = (3.*self.dx*self.d**2/4.*self.mu*pi)/(s2**2+s3**2)
+                fac = (3.*self.dx*self.d**2/4.*self.mu*M_PI)/(s2**2+s3**2)
 
                 Mx = fac*((s1*s2**2*s3+s1*s3**3)*d_dvdx[d_idx]
                           + (-s1**2*s2*s3+s2*s3)*d_dvdy[d_idx]
@@ -258,7 +259,7 @@ class Friction(Equation):
                           + (-s1*s2**3-s1*s2*s3**2)*d_dvdy[d_idx]
                           + (-s1*s2**2*s3-s1*s3**3)*d_dvdz[d_idx])
             else:
-                fac = (3.*self.dx*self.d**2/4.*self.mu*pi)/(s1**2+s3**2)
+                fac = (3.*self.dx*self.d**2/4.*self.mu*M_PI)/(s1**2+s3**2)
 
                 Mx = fac*((-s1*s2**2*s3+s1*s3)*d_dvdx[d_idx]
                           + (s1**2*s2*s3+s2*s3**3)*d_dvdy[d_idx]
