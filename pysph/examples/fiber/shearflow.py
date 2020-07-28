@@ -22,7 +22,6 @@ from pysph.base.utils import (get_particle_array_beadchain_fiber,
 from pysph.solver.application import Application
 from pysph.solver.utils import load, remove_irrelevant_files
 from pysph.sph.scheme import BeadChainScheme
-from scipy.integrate import odeint
 
 # from pysph.solver.tools import FiberIntegrator
 
@@ -280,7 +279,12 @@ class Channel(Application):
 
         It is employing a iteration over all time steps.
         """
-        from matplotlib import pyplot as plt
+        try:
+            from matplotlib import pyplot as plt
+            from scipy.integrate import odeint
+        except ImportError:
+            print("Postprocessing requires scipy and matplotlib.")
+            return
         # empty list for time and orientation angle
         t = []
         angle = []
