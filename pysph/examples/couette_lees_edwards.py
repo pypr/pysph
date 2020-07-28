@@ -1,8 +1,9 @@
 """Couette flow with Lees-Edwards boundary conditions.
 
 This is using the transport velocity formulation and Lees-Edwards Boundary
-Conditions (300 seconds) to form a shearflow without walls. The shearflow is superposed
-with a constant lateral velocity to test particle transition across the boundary.
+Conditions (300 seconds) to form a shearflow without walls. The shearflow is
+superposed with a constant lateral velocity to test particle transition across
+the boundary.
 """
 
 import numpy as np
@@ -48,9 +49,9 @@ class CouetteFlow(Application):
     def create_domain(self):
         """Create a DomainManager with Lees-Edwards BCs.
 
-        Both directions are set as periodic and the value gamma_yx ist set to the
-        shear rate to shift particles crossing the x-boundary. As the BC has to keep
-        track of time, the time step is passed as well.
+        Both directions are set as periodic and the value gamma_yx ist set to
+        the shear rate to shift particles crossing the x-boundary. As the BC
+        has to keep track of time, the time step is passed as well.
         """
         return DomainManager(
             xmin=0,
@@ -103,7 +104,15 @@ class CouetteFlow(Application):
 
     def create_scheme(self):
         s = TVFScheme(
-            ["fluid"], [], dim=2, rho0=rho0, c0=c0, nu=nu, p0=p0, pb=p0, h0=dx * hdx
+            ["fluid"],
+            [],
+            dim=2,
+            rho0=rho0,
+            c0=c0,
+            nu=nu,
+            p0=p0,
+            pb=p0,
+            h0=dx * hdx
         )
         s.configure_solver(tf=tf, dt=dt, output_only_real=False)
         return s

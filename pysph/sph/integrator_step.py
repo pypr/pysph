@@ -11,8 +11,9 @@ class IntegratorStep(object):
     """Subclass this and implement the methods ``initialize``, ``stage1`` etc.
     Use the same conventions as the equations.
     """
+
     def __repr__(self):
-        return '%s()'%(self.__class__.__name__)
+        return '%s()' % (self.__class__.__name__)
 
 
 ###############################################################################
@@ -21,7 +22,7 @@ class IntegratorStep(object):
 class EulerStep(IntegratorStep):
     """Fast but inaccurate integrator. Use this for testing"""
     def stage1(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, d_x, d_y,
-                  d_z, d_rho, d_arho, dt):
+               d_z, d_rho, d_arho, dt):
         d_u[d_idx] += dt*d_au[d_idx]
         d_v[d_idx] += dt*d_av[d_idx]
         d_w[d_idx] += dt*d_aw[d_idx]
@@ -32,13 +33,14 @@ class EulerStep(IntegratorStep):
 
         d_rho[d_idx] += dt*d_arho[d_idx]
 
+
 ###############################################################################
 # `EBGStep` class
 ###############################################################################
 class EBGStep(IntegratorStep):
     """Euler integrator using alternative velocity for EBG."""
     def stage1(self, d_idx, d_eu, d_ev, d_ew, d_au, d_av, d_aw, d_x, d_y,
-                  d_z, d_ex, d_ey, d_ez, dt):
+               d_z, d_ex, d_ey, d_ez, dt):
         d_eu[d_idx] += dt*d_au[d_idx]
         d_ev[d_idx] += dt*d_av[d_idx]
         d_ew[d_idx] += dt*d_aw[d_idx]
@@ -50,6 +52,7 @@ class EBGStep(IntegratorStep):
         d_ex[d_idx] += dt*d_eu[d_idx]
         d_ey[d_idx] += dt*d_ev[d_idx]
         d_ez[d_idx] += dt*d_ew[d_idx]
+
 
 ###############################################################################
 # `RK2Step` class
@@ -79,8 +82,7 @@ class RK2Step(IntegratorStep):
         d_w0[d_idx] = d_w[d_idx]
 
     def stage1(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
-                            d_u0, d_v0, d_w0, d_u, d_v, d_w,
-                            d_au, d_av, d_aw, dt):
+               d_u0, d_v0, d_w0, d_u, d_v, d_w, d_au, d_av, d_aw, dt):
         dtb2 = 0.5*dt
         d_u[d_idx] = d_u0[d_idx] + dtb2*d_au[d_idx]
         d_v[d_idx] = d_v0[d_idx] + dtb2*d_av[d_idx]
@@ -91,8 +93,7 @@ class RK2Step(IntegratorStep):
         d_z[d_idx] = d_z0[d_idx] + dtb2 * d_w[d_idx]
 
     def stage2(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
-                            d_u0, d_v0, d_w0, d_u, d_v, d_w,
-                            d_au, d_av, d_aw, dt):
+               d_u0, d_v0, d_w0, d_u, d_v, d_w, d_au, d_av, d_aw, dt):
 
         d_u[d_idx] = d_u0[d_idx] + dt * d_au[d_idx]
         d_v[d_idx] = d_v0[d_idx] + dt * d_av[d_idx]
@@ -132,8 +133,8 @@ class WCSPHStep(IntegratorStep):
         d_rho0[d_idx] = d_rho[d_idx]
 
     def stage1(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
-                   d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, d_au, d_av,
-                   d_aw, d_ax, d_ay, d_az, d_arho, dt):
+               d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, d_au, d_av,
+               d_aw, d_ax, d_ay, d_az, d_arho, dt):
         dtb2 = 0.5*dt
         d_u[d_idx] = d_u0[d_idx] + dtb2*d_au[d_idx]
         d_v[d_idx] = d_v0[d_idx] + dtb2*d_av[d_idx]
@@ -147,8 +148,8 @@ class WCSPHStep(IntegratorStep):
         d_rho[d_idx] = d_rho0[d_idx] + dtb2 * d_arho[d_idx]
 
     def stage2(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
-                   d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, d_au, d_av,
-                   d_aw, d_ax, d_ay, d_az, d_arho, dt):
+               d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, d_au, d_av,
+               d_aw, d_ax, d_ay, d_az, d_arho, dt):
 
         d_u[d_idx] = d_u0[d_idx] + dt*d_au[d_idx]
         d_v[d_idx] = d_v0[d_idx] + dt*d_av[d_idx]
@@ -160,6 +161,7 @@ class WCSPHStep(IntegratorStep):
 
         # Update densities and smoothing lengths from the accelerations
         d_rho[d_idx] = d_rho0[d_idx] + dt * d_arho[d_idx]
+
 
 ###############################################################################
 # `WCSPHTVDRK3` Integrator
@@ -206,17 +208,18 @@ class WCSPHTVDRK3Step(IntegratorStep):
                d_aw, d_ax, d_ay, d_az, d_arho, dt):
 
         # update velocities
-        d_u[d_idx] = 0.75*d_u0[d_idx] + 0.25*( d_u[d_idx] + dt * d_au[d_idx] )
-        d_v[d_idx] = 0.75*d_v0[d_idx] + 0.25*( d_v[d_idx] + dt * d_av[d_idx] )
-        d_w[d_idx] = 0.75*d_w0[d_idx] + 0.25*( d_w[d_idx] + dt * d_aw[d_idx] )
+        d_u[d_idx] = 0.75*d_u0[d_idx] + 0.25*(d_u[d_idx] + dt * d_au[d_idx])
+        d_v[d_idx] = 0.75*d_v0[d_idx] + 0.25*(d_v[d_idx] + dt * d_av[d_idx])
+        d_w[d_idx] = 0.75*d_w0[d_idx] + 0.25*(d_w[d_idx] + dt * d_aw[d_idx])
 
         # update positions
-        d_x[d_idx] = 0.75*d_x0[d_idx] + 0.25*( d_x[d_idx] + dt * d_ax[d_idx] )
-        d_y[d_idx] = 0.75*d_y0[d_idx] + 0.25*( d_y[d_idx] + dt * d_ay[d_idx] )
-        d_z[d_idx] = 0.75*d_z0[d_idx] + 0.25*( d_z[d_idx] + dt * d_az[d_idx] )
+        d_x[d_idx] = 0.75*d_x0[d_idx] + 0.25*(d_x[d_idx] + dt * d_ax[d_idx])
+        d_y[d_idx] = 0.75*d_y0[d_idx] + 0.25*(d_y[d_idx] + dt * d_ay[d_idx])
+        d_z[d_idx] = 0.75*d_z0[d_idx] + 0.25*(d_z[d_idx] + dt * d_az[d_idx])
 
         # Update density
-        d_rho[d_idx] = 0.75*d_rho0[d_idx] + 0.25*( d_rho[d_idx] + dt * d_arho[d_idx] )
+        d_rho[d_idx] = 0.75*d_rho0[d_idx] + 0.25*(
+            d_rho[d_idx] + dt * d_arho[d_idx])
 
     def stage3(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
                d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, d_au, d_av,
@@ -226,17 +229,19 @@ class WCSPHTVDRK3Step(IntegratorStep):
         twoby3 = 2./3.
 
         # update velocities
-        d_u[d_idx] = oneby3*d_u0[d_idx] + twoby3*( d_u[d_idx] + dt * d_au[d_idx] )
-        d_v[d_idx] = oneby3*d_v0[d_idx] + twoby3*( d_v[d_idx] + dt * d_av[d_idx] )
-        d_w[d_idx] = oneby3*d_w0[d_idx] + twoby3*( d_w[d_idx] + dt * d_aw[d_idx] )
+        d_u[d_idx] = oneby3*d_u0[d_idx] + twoby3*(d_u[d_idx] + dt*d_au[d_idx])
+        d_v[d_idx] = oneby3*d_v0[d_idx] + twoby3*(d_v[d_idx] + dt*d_av[d_idx])
+        d_w[d_idx] = oneby3*d_w0[d_idx] + twoby3*(d_w[d_idx] + dt*d_aw[d_idx])
 
         # update positions
-        d_x[d_idx] = oneby3*d_x0[d_idx] + twoby3*( d_x[d_idx] + dt * d_ax[d_idx] )
-        d_y[d_idx] = oneby3*d_y0[d_idx] + twoby3*( d_y[d_idx] + dt * d_ay[d_idx] )
-        d_z[d_idx] = oneby3*d_z0[d_idx] + twoby3*( d_z[d_idx] + dt * d_az[d_idx] )
+        d_x[d_idx] = oneby3*d_x0[d_idx] + twoby3*(d_x[d_idx] + dt*d_ax[d_idx])
+        d_y[d_idx] = oneby3*d_y0[d_idx] + twoby3*(d_y[d_idx] + dt*d_ay[d_idx])
+        d_z[d_idx] = oneby3*d_z0[d_idx] + twoby3*(d_z[d_idx] + dt*d_az[d_idx])
 
         # Update density
-        d_rho[d_idx] = oneby3*d_rho0[d_idx] + twoby3*( d_rho[d_idx] + dt * d_arho[d_idx] )
+        d_rho[d_idx] = oneby3*d_rho0[d_idx] + twoby3*(
+            d_rho[d_idx] + dt*d_arho[d_idx])
+
 
 ###############################################################################
 # `SolidMechStep` class
@@ -267,12 +272,12 @@ class SolidMechStep(IntegratorStep):
         d_s220[d_idx] = d_s22[d_idx]
 
     def stage1(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
-                  d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, d_au, d_av,
-                  d_aw, d_ax, d_ay, d_az, d_arho, d_e, d_e0, d_ae,
-                  d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
-                  d_s000, d_s010, d_s020, d_s110, d_s120, d_s220,
-                  d_as00, d_as01, d_as02, d_as11, d_as12, d_as22,
-                  dt):
+               d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, d_au, d_av,
+               d_aw, d_ax, d_ay, d_az, d_arho, d_e, d_e0, d_ae,
+               d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
+               d_s000, d_s010, d_s020, d_s110, d_s120, d_s220,
+               d_as00, d_as01, d_as02, d_as11, d_as12, d_as22,
+               dt):
         dtb2 = 0.5*dt
         d_u[d_idx] = d_u0[d_idx] + dtb2*d_au[d_idx]
         d_v[d_idx] = d_v0[d_idx] + dtb2*d_av[d_idx]
@@ -295,12 +300,12 @@ class SolidMechStep(IntegratorStep):
         d_s22[d_idx] = d_s220[d_idx] + dtb2 * d_as22[d_idx]
 
     def stage2(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
-                  d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, d_au, d_av,
-                  d_aw, d_ax, d_ay, d_az, d_arho, d_e, d_ae, d_e0,
-                  d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
-                  d_s000, d_s010, d_s020, d_s110, d_s120, d_s220,
-                  d_as00, d_as01, d_as02, d_as11, d_as12, d_as22,
-                  dt):
+               d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, d_au, d_av,
+               d_aw, d_ax, d_ay, d_az, d_arho, d_e, d_ae, d_e0,
+               d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
+               d_s000, d_s010, d_s020, d_s110, d_s120, d_s220,
+               d_as00, d_as01, d_as02, d_as11, d_as12, d_as22,
+               dt):
 
         d_u[d_idx] = d_u0[d_idx] + dt*d_au[d_idx]
         d_v[d_idx] = d_v0[d_idx] + dt*d_av[d_idx]
@@ -322,6 +327,7 @@ class SolidMechStep(IntegratorStep):
         d_s12[d_idx] = d_s120[d_idx] + dt * d_as12[d_idx]
         d_s22[d_idx] = d_s220[d_idx] + dt * d_as22[d_idx]
 
+
 ###############################################################################
 # `TransportVelocityStep` class
 ###############################################################################
@@ -337,7 +343,7 @@ class TransportVelocityStep(IntegratorStep):
         pass
 
     def stage1(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, d_uhat, d_auhat,
-                d_vhat, d_avhat, d_what, d_awhat, d_x, d_y, d_z, dt):
+               d_vhat, d_avhat, d_what, d_awhat, d_x, d_y, d_z, dt):
         dtb2 = 0.5*dt
 
         # velocity update eqn (14)
@@ -367,6 +373,7 @@ class TransportVelocityStep(IntegratorStep):
         d_vmag2[d_idx] = (d_u[d_idx]*d_u[d_idx] + d_v[d_idx]*d_v[d_idx] +
                           d_w[d_idx]*d_w[d_idx])
 
+
 ###############################################################################
 # `AdamiVerletStep` class
 ###############################################################################
@@ -382,7 +389,8 @@ class AdamiVerletStep(IntegratorStep):
     def initialize(self):
         pass
 
-    def stage1(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, d_x, d_y, d_z, dt):
+    def stage1(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw,
+               d_x, d_y, d_z, dt):
         dtb2 = 0.5*dt
 
         # velocity predictor eqn (14)
@@ -415,6 +423,7 @@ class AdamiVerletStep(IntegratorStep):
         # magnitude of velocity squared
         d_vmag2[d_idx] = (d_u[d_idx]*d_u[d_idx] + d_v[d_idx]*d_v[d_idx] +
                           d_w[d_idx]*d_w[d_idx])
+
 
 ###############################################################################
 # `GasDFluidStep` class
@@ -537,7 +546,6 @@ class ADKEStep(IntegratorStep):
 
         d_rho0[d_idx] = d_rho[d_idx]
 
-
     def stage1(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
                d_u0, d_v0, d_w0, d_u, d_v, d_w, d_e0, d_e, d_au, d_av,
                d_aw, d_ae, d_rho, d_rho0, d_arho, dt):
@@ -568,7 +576,6 @@ class ADKEStep(IntegratorStep):
 
         # Update densities and smoothing lengths from the accelerations
         d_e[d_idx] = d_e0[d_idx] + dt * d_ae[d_idx]
-
 
 
 ###############################################################################
@@ -624,6 +631,7 @@ class TwoStageRigidBodyStep(IntegratorStep):
         d_y[d_idx] = d_y0[d_idx] + dt * 0.5 * (d_v[d_idx] + d_v0[d_idx])
         d_z[d_idx] = d_z0[d_idx] + dt * 0.5 * (d_w[d_idx] + d_w0[d_idx])
 
+
 ###############################################################################
 # `OneStageRigidBodyStep` class
 ###############################################################################
@@ -641,13 +649,13 @@ class OneStageRigidBodyStep(IntegratorStep):
         d_z0[d_idx] = d_z[d_idx]
 
     def stage1(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
-                d_u, d_v, d_w, d_u0, d_v0, d_w0, d_au, d_av, d_aw,
-                dt):
+               d_u, d_v, d_w, d_u0, d_v0, d_w0, d_au, d_av, d_aw,
+               dt):
         pass
 
     def stage2(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
-                d_u, d_v, d_w, d_u0, d_v0, d_w0, d_au, d_av, d_aw,
-                dt):
+               d_u, d_v, d_w, d_u0, d_v0, d_w0, d_au, d_av, d_aw,
+               dt):
 
         # update velocities
         d_u[d_idx] += dt * d_au[d_idx]
@@ -752,6 +760,7 @@ class VelocityVerletSymplecticWCSPHStep(IntegratorStep):
         d_v[d_idx] += dtb2 * d_av[d_idx]
         d_w[d_idx] += dtb2 * d_aw[d_idx]
 
+
 ###############################################################################
 # `InletOutletStep` class
 ###############################################################################
@@ -774,14 +783,13 @@ class InletOutletStep(IntegratorStep):
         d_z[d_idx] += dtb2 * d_w[d_idx]
 
 
-
 ###############################################################################
 class LeapFrogStep(IntegratorStep):
 
     r"""Using this stepper with XSPH as implemented in
     `pysph.base.basic_equations.XSPHCorrection` is not directly possible and
-    requires a nicer implementation where the correction alone is added to ``ax,
-    ay, az``.
+    requires a nicer implementation where the correction alone is added to
+    ``ax, ay, az``.
     """
 
     def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_ax, d_ay, d_az,
@@ -810,8 +818,8 @@ class PEFRLStep(IntegratorStep):
 
     r"""Using this stepper with XSPH as implemented in
     `pysph.base.basic_equations.XSPHCorrection` is not directly possible and
-    requires a nicer implementation where the correction alone is added to ``ax,
-    ay, az``.
+    requires a nicer implementation where the correction alone is added to
+    ``ax, ay, az``.
     """
 
     def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_ax, d_ay,
