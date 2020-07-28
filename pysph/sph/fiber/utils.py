@@ -9,8 +9,8 @@ Reference
     Journal of Composites Science, 2020, 4, 77; doi:10.3390/jcs4020077
 
 """
-
-from math import acos, pi, sin, sqrt
+from math import acos, sin, sqrt
+from numpy import pi as M_PI
 
 from pysph.sph.equation import Equation
 
@@ -442,7 +442,7 @@ class Contact(Equation):
             self.project_center_center(XIJ, dx, dy, dz, sx, sy, sz)
         else:
             self.compute_center_point_props(XIJ, dx, dy, dz)
-            alpha = pi/2.
+            alpha = M_PI/2.
 
         return alpha
 
@@ -518,7 +518,7 @@ class Contact(Equation):
         self.Fz = w*(F*self.nz - self.k*F*vrz/v_rel)
 
     def compute_lubrication_force(self, vx=0.0, vy=0.0, vz=0.0, w=0.0, d=1.0,
-                                  alpha=pi/2):
+                                  alpha=M_PI/2):
         """Compute the lubrication force at interaction point."""
         # limit extreme forces
         d = min(d, -0.01*self.d)
@@ -528,11 +528,11 @@ class Contact(Equation):
 
         if abs(alpha) > 0.1:
             A = R**2/abs(sin(alpha))
-            F = 12.*A*pi*self.eta0*v_dot_n/d
+            F = 12.*A*M_PI*self.eta0*v_dot_n/d
         else:
             # Lindstroem limit to treat parallel cylinders (singularity!)
-            A0 = 3.*pi*sqrt(2.)/8.
-            A1 = 207*pi*sqrt(2.)/160.
+            A0 = 3.*M_PI*sqrt(2.)/8.
+            A1 = 207*M_PI*sqrt(2.)/160.
             L = self.d
             F = -L*self.eta0*v_dot_n*(A0-A1*d/R)*(-d/R)**(-3./2.)
 
