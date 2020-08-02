@@ -11,6 +11,10 @@ ctypedef map[u_int, pair[u_int, u_int]] key_to_idx_t
 cdef extern from "math.h":
     double log2(double) nogil
 
+cdef extern from "z_order.h":
+    ctypedef unsigned long long uint64_t
+    ctypedef unsigned int uint32_t
+
 cdef class ZOrderGPUNNPS(GPUNNPS):
     cdef NNPSParticleArrayWrapper src, dst # Current source and destination.
 
@@ -19,6 +23,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
     cdef public list cids
     cdef public list cid_to_idx
     cdef public list max_cid
+    cdef public list cell_lengths
+    cdef public list cell_start_indices
     cdef public object dst_to_src
     cdef object overflow_cid_to_idx
     cdef object curr_cid

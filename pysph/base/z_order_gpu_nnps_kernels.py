@@ -20,6 +20,34 @@ def fill_pids(i, x, y, z, cell_size, xmin, ymin, zmin, keys, pids):
 
 
 @annotate
+def count_cells(i, keys, cell_size, cell_lengths,
+                sort_offsets):
+    key = keys[i]
+    idx = atomic_inc(cell_lengths[key])
+    sort_offsets[i] = idx
+
+
+@annotate
+def sort_indices(i, keys, sort_offsets, start_indices, sorted_indices,
+                 sorted_keys):
+    key = keys[i]
+    offset = sort_offsets[i]
+    start_idx = start_indices[key]
+    sorted_indices[start_idx + offset] = i
+    sorted_keys[start_idx + offset] = key
+
+
+@annotate
+def input_start_indices(i, counts):
+    return 0 if i == 0 else counts[i - 1]
+
+
+@annotate
+def output_start_indices(i, item, indices):
+    indices[i] = item
+
+
+@annotate
 def inp_fill_unique_cids(i, keys, cids):
     return 1 if i != 0 and keys[i] != keys[i - 1] else 0
 

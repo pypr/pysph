@@ -87,6 +87,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.dst_to_src = Array(np.uint32, backend=self.backend)
         self.overflow_cid_to_idx = Array(np.int32, backend=self.backend)
 
+        self.cell_lengths = [None] * self.narrays
+        self.cell_start_indices = [None] * self.narrays
         self.z_order_nbrs = [None] * 2
         self.z_order_nbr_lengths = [None] * 2
 
@@ -116,18 +118,33 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 self.xmin[0], self.xmin[1], self.xmin[2],
                 self.pid_keys[pa_index], self.pids[pa_index])
 
-        cdef double max_length = fmax(fmax((self.xmax[0] - self.xmin[0]),
-            (self.xmax[1] - self.xmin[1])), (self.xmax[2] - self.xmin[2]))
+        cdef uint64_t max_key = 1 + array.maximum(self.pid_keys[pa_index])
 
-        cdef int max_num_cells = (<int> ceil(max_length/self.hmin))
+        self.cell_lengths[pa_index] = array.zeros(max_key, np.int32, 
+                                                  backend=self.backend)
+        self.cell_start_indices[pa_index] = array.zeros_like(
+            self.cell_lengths[pa_index])
+        sorted_indices = array.zeros(pa_gpu.get_number_of_particles(), np.int32, 
+                                     backend=self.backend)
+        sorted_keys = array.zeros(pa_gpu.get_number_of_particles(), np.uint64, 
+                                     backend=self.backend)
 
-        cdef int max_num_bits = 3*(<int> ceil(log2(max_num_cells)))
+        count_cells_knl = get_elwise(count_cells, self.backend)
+        start_indices_knl = get_scan(input_start_indices, output_start_indices,
+                                     np.int32, self.backend)
+        sort_knl = get_elwise(sort_indices, self.backend)
 
-        sorted_keys, sorted_indices = array.sort_by_keys(
-            [self.pid_keys[pa_index], self.pids[pa_index]],
-            key_bits=max_num_bits,
-            backend=self.backend
-        )
+        sort_offsets = array.zeros(pa_gpu.get_number_of_particles(), np.int32,
+                                   backend=self.backend)
+
+        count_cells_knl(self.pid_keys[pa_index], self.cell_size, 
+                        self.cell_lengths[pa_index], sort_offsets)
+        start_indices_knl(counts=self.cell_lengths[pa_index], 
+                          indices=self.cell_start_indices[pa_index])
+        sort_knl(self.pid_keys[pa_index], sort_offsets, 
+                 self.cell_start_indices[pa_index],
+                 sorted_indices, sorted_keys)
+
         self.pids[pa_index].set_data(sorted_indices)
         self.pid_keys[pa_index].set_data(sorted_keys)
 
