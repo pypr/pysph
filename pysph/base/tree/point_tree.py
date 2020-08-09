@@ -23,7 +23,7 @@ class IncompatibleTreesException(Exception):
     pass
 
 
-@named_profile('neighbor_count_prefix_sum')
+@named_profile('neighbor_count_prefix_sum', backend='opencl')
 @memoize
 def _get_neighbor_count_prefix_sum_kernel(ctx):
     return GenericScanKernel(ctx, np.int32,
@@ -386,7 +386,8 @@ class PointTree(Tree):
             params['node_operation'], params['output_expr'],
             preamble=_get_macros_preamble(self.c_type, self.sorted, self.dim)
         )
-        set_node_bounds = profile_kernel(set_node_bounds, 'set_node_bounds')
+        set_node_bounds = profile_kernel(set_node_bounds, 'set_node_bounds',
+                                         backend='opencl')
 
         pa_gpu = self.pa.gpu
         dtype = ctype_to_dtype(self.c_type)
@@ -441,7 +442,9 @@ class PointTree(Tree):
             output_expr="cnt[i] = count;"
         )
         find_neighbor_cid_counts = profile_kernel(
-            find_neighbor_cid_counts, 'find_neighbor_cid_count')
+            find_neighbor_cid_counts, 'find_neighbor_cid_count',
+            backend='opencl'
+        )
         find_neighbor_cid_counts(tree_src.pbounds.dev,
                                  neighbor_cid_count.dev)
 
@@ -463,7 +466,7 @@ class PointTree(Tree):
             output_expr=""
         )
         find_neighbor_cids = profile_kernel(
-            find_neighbor_cids, 'find_neighbor_cids')
+            find_neighbor_cids, 'find_neighbor_cids', backend='opencl')
         find_neighbor_cids(tree_src.pbounds.dev,
                            neighbor_cid_count.dev, neighbor_cids.dev)
         return neighbor_cid_count, neighbor_cids

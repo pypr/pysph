@@ -1,5 +1,6 @@
 # Standard imports.
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from argparse import ArgumentDefaultsHelpFormatter
+from compyle.utils import ArgumentParser
 import glob
 import inspect
 import json
@@ -431,13 +432,6 @@ class Application(object):
 
         # --openmp
         parser.add_argument(
-            "--openmp",
-            action="store_true",
-            dest="with_openmp",
-            default=None,
-            help="Use OpenMP to run the "
-            "simulation using multiple cores.")
-        parser.add_argument(
             "--no-openmp",
             action="store_false",
             dest="with_openmp",
@@ -479,22 +473,6 @@ class Application(object):
             default=False,
             help="Use local memory with OpenCL (Experimental)"
         )
-        # --profile
-        parser.add_argument(
-            "--profile",
-            action="store_true",
-            dest="profile",
-            default=False,
-            help="Enable profiling with OpenCL.")
-
-        # --use-double
-        parser.add_argument(
-            "--use-double",
-            action="store_true",
-            dest="use_double",
-            default=False,
-            help="Use double precision for OpenCL/CUDA code.")
-
         # --kernel
         all_kernels = list_all_kernels()
         parser.add_argument(
@@ -1586,9 +1564,6 @@ class Application(object):
         end_time = time.time()
         run_duration = end_time - start_time
         self._message("Run took: %.5f secs" % (run_duration))
-        if self.options.with_opencl and self.options.profile:
-            from compyle.opencl import print_profile
-            print_profile()
         self._write_info(
             self.info_filename, completed=True, cpu_time=run_duration)
 

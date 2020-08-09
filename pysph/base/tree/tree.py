@@ -176,7 +176,7 @@ def get_M_array_initialization(k):
 # The array of vectors M are just a math trick. M[j] gives a vector with j
 # zeros and k - j ones (With k = 4, M[1] = {0, 1, 1, 1}). Adding this up in
 # the prefix sum directly gives us the required result.
-@named_profile('particle_reordering')
+@named_profile('particle_reordering', backend='opencl')
 @memoize
 def _get_particle_kernel(ctx, k, args, index_code):
     return GenericScanKernel(
@@ -196,7 +196,7 @@ def _get_particle_kernel(ctx, k, args, index_code):
 # offset of first child in next layer + k * (number of non-leaf nodes before
 # given node).
 # If the node is a leaf, we set this value to be -1.
-@named_profile('set_offset')
+@named_profile('set_offset', backend='opencl')
 @memoize
 def _get_set_offset_kernel(ctx, k, leaf_size):
     return GenericScanKernel(
@@ -224,7 +224,7 @@ def _get_set_offset_kernel(ctx, k, leaf_size):
 #
 # Note that unique_cids also gives us the list of leaves / last layer nodes
 # which are not empty.
-@named_profile('unique_cids')
+@named_profile('unique_cids', backend='opencl')
 @memoize
 def _get_unique_cids_kernel(ctx):
     return GenericScanKernel(
@@ -245,7 +245,7 @@ def _get_unique_cids_kernel(ctx):
 
 # A lot of leaves are going to be empty. Not really sure if this guy is of
 # any use.
-@named_profile('leaves')
+@named_profile('leaves', backend='opencl')
 @memoize
 def _get_leaves_kernel(ctx, leaf_size):
     return GenericScanKernel(
@@ -265,7 +265,7 @@ def _get_leaves_kernel(ctx, leaf_size):
     )
 
 
-@named_profile("group_cids")
+@named_profile("group_cids", backend='opencl')
 @memoize
 def _get_cid_groups_kernel(ctx):
     return GenericScanKernel(

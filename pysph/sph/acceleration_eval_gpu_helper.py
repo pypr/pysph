@@ -170,11 +170,9 @@ def get_queue(backend):
 
 
 def profile_kernel(knl, backend):
-    if backend == 'cuda':
-        return knl
-    elif backend == 'opencl':
-        from compyle.opencl import profile_kernel
-        return profile_kernel(knl, knl.function_name)
+    if backend == 'cuda' or backend == 'opencl':
+        from compyle.profile import profile_kernel
+        return profile_kernel(knl, knl.function_name, backend=backend)
     else:
         raise RuntimeError('Unsupported GPU backend %s' % backend)
 
