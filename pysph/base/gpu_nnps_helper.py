@@ -13,7 +13,7 @@ def get_simple_kernel(kernel_name, args, src, wgs, preamble=""):
         kernel_name, preamble=preamble
     )
 
-    return profile_kernel(knl, kernel_name)
+    return profile_kernel(knl, kernel_name, backend='opencl')
 
 
 def get_elwise_kernel(kernel_name, args, src, preamble=""):
@@ -23,7 +23,7 @@ def get_elwise_kernel(kernel_name, args, src, preamble=""):
         ctx, args, src,
         kernel_name, preamble=preamble
     )
-    return profile_kernel(knl, kernel_name)
+    return profile_kernel(knl, kernel_name, backend='opencl')
 
 
 class GPUNNPSHelper(object):
