@@ -396,11 +396,11 @@ class DamBreak3DGeometry(object):
 
             pa.rho[:] = self.rho0
 
-        nf = fluid.num_real_particles
-        nb = boundary.num_real_particles
+        nf = fluid.get_number_of_particles()
+        nb = boundary.get_number_of_particles()
 
         if self.with_obstacle:
-            no = obstacle.num_real_particles
+            no = obstacle.get_number_of_particles()
             print(
                 "3D dam break with %d fluid, %d boundary, %d obstacle particles" %
                 (nf, nb, no))
