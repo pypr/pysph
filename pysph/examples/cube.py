@@ -80,6 +80,10 @@ class Cube(Application):
 
         print("Number of particles:", x.size)
         fluid.set_lb_props( list(fluid.properties.keys()) )
+
+        if fluid.gpu:
+            fluid.gpu.push()
+
         return [fluid]
 
 

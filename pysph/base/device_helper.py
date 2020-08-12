@@ -600,7 +600,7 @@ class DeviceHelper(object):
             prop_type = dtype_to_ctype(src_arr.dtype)
             prop_default = self._particle_array.default_values[prop_name]
             result_array.add_property(name=prop_name,
-                                      type=prop_type,
+                                      type='double' if prop_type == 'float' else prop_type,
                                       default=prop_default,
                                       stride=stride)
 
