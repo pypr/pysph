@@ -265,9 +265,9 @@ class WindTunnel(Application):
         self._set_wall_normal(wall)
 
         if self.io_method == 'hybrid':
-            fluid.uag[:] = 1.0
-            fluid.uta[:] = 1.0
-            outlet.uta[:] = 1.0
+            fluid.uag[:] = umax
+            fluid.uta[:] = umax
+            outlet.uta[:] = umax
 
         return particles
 

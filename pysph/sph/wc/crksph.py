@@ -972,7 +972,7 @@ class CRKSPHScheme(Scheme):
         from pysph.solver.solver import Solver
         self.solver = Solver(
             dim=self.dim, integrator=integrator, kernel=kernel,
-            output_at_times=[0, 0.2, 0.4, 0.8], **kw
+            **kw
         )
 
     def get_equations(self):
