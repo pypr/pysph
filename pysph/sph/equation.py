@@ -264,15 +264,47 @@ def precomputed_symbols():
         code="GRADIENT(XIJ, RIJ, HIJ, DWIJ)",
         DWIJ=[0.0, 0.0, 0.0]
     )
+    c.UDWIJ = BasicCodeBlock(
+        code=dedent(
+            """
+            UDWIJ[0] = DWIJ[0]
+            UDWIJ[1] = DWIJ[1]
+            UDWIJ[2] = DWIJ[2]
+            """
+        ),
+        UDWIJ=[0.0, 0.0, 0.0]
+    )
 
     c.DWI = BasicCodeBlock(
         code="GRADIENT(XIJ, RIJ, d_h[d_idx], DWI)",
         DWI=[0.0, 0.0, 0.0]
     )
 
+    c.UDWI = BasicCodeBlock(
+        code=dedent(
+            """
+            UDWI[0] = DWI[0]
+            UDWI[1] = DWI[1]
+            UDWI[2] = DWI[2]
+            """
+        ),
+        UDWI=[0.0, 0.0, 0.0]
+    )
+
     c.DWJ = BasicCodeBlock(
         code="GRADIENT(XIJ, RIJ, s_h[s_idx], DWJ)",
         DWJ=[0.0, 0.0, 0.0]
+    )
+
+    c.UDWJ = BasicCodeBlock(
+        code=dedent(
+            """
+            UDWJ[0] = DWJ[0]
+            UDWJ[1] = DWJ[1]
+            UDWJ[2] = DWJ[2]
+            """
+        ),
+        UDWJ=[0.0, 0.0, 0.0]
     )
 
     c.GHI = BasicCodeBlock(

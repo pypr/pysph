@@ -330,6 +330,9 @@ following:
  - ``N_NBRS``: an integer denoting the number of neighbors for the current
    destination particle with index, ``d_idx``.
 
+In case a kernel correction is used which modifies the ``DWIJ``. The
+uncorrected version can be called using ``UDWIJ``. Similarly for ``DWI`` and
+``DWJ``, we have ``UDWI`` and ``UDWJ`` for the uncorrected gradient.
 
 .. note::
 

@@ -442,7 +442,7 @@ class MomentumEquationPressureGradient(Equation):
 
     def loop(self, d_idx, s_idx, d_m, d_rho, s_rho,
              d_au, d_av, d_aw, d_p, d_pavg, s_p,
-             d_auhat, d_avhat, d_awhat, d_V, s_V, DWIJ):
+             d_auhat, d_avhat, d_awhat, d_V, s_V, DWIJ, UDWIJ):
 
         # averaged pressure Eq. (7)
         rhoi = d_rho[d_idx]
@@ -473,9 +473,9 @@ class MomentumEquationPressureGradient(Equation):
         # contribution due to the background pressure Eq. (13)
         tmp = -self.pb * mi1 * (Vi2 + Vj2)
 
-        d_auhat[d_idx] += tmp * DWIJ[0]
-        d_avhat[d_idx] += tmp * DWIJ[1]
-        d_awhat[d_idx] += tmp * DWIJ[2]
+        d_auhat[d_idx] += tmp * UDWIJ[0]
+        d_avhat[d_idx] += tmp * UDWIJ[1]
+        d_awhat[d_idx] += tmp * UDWIJ[2]
 
     def post_loop(self, d_idx, d_au, d_av, d_aw, t):
         # damped accelerations due to body or external force
