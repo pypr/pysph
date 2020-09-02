@@ -60,6 +60,7 @@ The framework and library
 
    design/overview.rst
    design/equations.rst
+   design/iom.rst
    starcluster/overview
    using_pysph.rst
    contribution/how_to_write_docs.rst
