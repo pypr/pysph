@@ -1,5 +1,7 @@
 from pysph.sph.wc.linalg import (
-    augmented_matrix, gj_solve, mat_mult, mat_vec_mult
+    augmented_matrix, gj_solve, mat_mult, mat_vec_mult, deteminant_2d,
+    deteminant_3d, deteminant_4d, replace_vector_in_matrix, linear_solver_2d,
+    linear_solver_3d, linear_solver_4d
 )
 import numpy as np
 import unittest
@@ -11,6 +13,28 @@ def gj_solve_helper(a, b, n):
     result = [0.0]*n
     is_singular = gj_solve(m, n, 1, result)
     return is_singular, result
+
+
+def deteminat_helper(A, dim):
+    det = 0.0
+    if dim == 2:
+        det = deteminant_2d(A)
+    elif dim == 3:
+        det = deteminant_3d(A)
+    elif dim == 4:
+        det = deteminant_4d(A)
+    return det
+
+
+def linear_solver_helper(A, b, dim):
+    result = [0.0]*dim
+    if dim == 2:
+        linear_solver_2d(A, b, result)
+    elif dim == 3:
+        linear_solver_3d(A, b, result)
+    elif dim == 4:
+        linear_solver_4d(A, b, result)
+    return result
 
 
 class TestLinalg(unittest.TestCase):
@@ -199,6 +223,67 @@ class TestLinalg(unittest.TestCase):
         #
         sing, result = gj_solve_helper(np.ravel(mat), b, n)
         self.assertAlmostEqual(sing, 1.0)
+
+    def test_determinant(self):
+        # Given
+        mat2 = [[1., 3.], [4., -1.]]
+        mat3 = [[1., 3., 6.], [4., -1., 4.], [3., 5., 2.]]
+        mat4 = [[1., 3., 6., 5.], [4., -1., 4., 1.], [3., 5., 2., 0.], [1., 8., 2., 7.]]
+        #
+        det2 = deteminat_helper(np.ravel(mat2), 2)
+        det3 = deteminat_helper(np.ravel(mat3), 3)
+        det4 = deteminat_helper(np.ravel(mat4), 4)
+        self.assertAlmostEqual(det2, np.linalg.det(mat2))
+        self.assertAlmostEqual(det3, np.linalg.det(mat3))
+        self.assertAlmostEqual(det4, np.linalg.det(mat4))
+
+    def test_vector_swaping_in_matrix(self):
+        # Given
+        mat4 = [[1., 3., 6., 5.], [4., -1., 4., 1.], [3., 5., 2., 0.], [1., 8., 2., 7.]]
+        b = [1., 4., 5., 7.]
+        # when
+        result = [0.0]*16
+        replace_vector_in_matrix(np.ravel(mat4), b, 2, 4, result)
+        #then
+        expect = [[1., 3., 1., 5.], [4., -1., 4., 1.], [3., 5., 5., 0.], [1., 8., 7., 7.]]
+        np.testing.assert_allclose(result, np.ravel(expect))
+
+    def test_vector_swaping_invalid_column_in_matrix(self):
+        # Given
+        mat4 = [[1., 3., 6., 5.], [4., -1., 4., 1.], [3., 5., 2., 0.], [1., 8., 2., 7.]]
+        b = [1., 4., 5., 7.]
+        # when
+        result = [0.0]*16
+        ret = replace_vector_in_matrix(np.ravel(mat4), b, 4, 4, result)
+        #the
+        self.assertAlmostEqual(ret, -1.0)
+
+    def test_2d_linear_solver(self):
+        mat = [[0.96, 4.6], [2.7, 4.3]]
+        b = [2.4, 3.6]
+        result = linear_solver_helper(np.ravel(mat), b, 2)
+        mat = np.array(mat)
+        new_b = np.dot(mat, np.transpose(np.array(result)))
+        new_b = np.ravel(np.array(new_b))
+        assert np.allclose(new_b, np.array(b))
+
+    def test_3d_linear_solver(self):
+        mat = [[0.96, 4.6, -3.7], [2.7, 4.3, -0.67], [0.9, 0., -5.]]
+        b = [2.4, 3.6, -5.8]
+        result = linear_solver_helper(np.ravel(mat), b, 3)
+        mat = np.array(mat)
+        new_b = np.dot(mat, np.transpose(np.array(result)))
+        new_b = np.ravel(np.array(new_b))
+        assert np.allclose(new_b, np.array(b))
+
+    def test_4d_linear_solver(self):
+        mat = [[0.96, 4.6, -3.7, 1.2], [2.7, 4.3, -0.67, 1.3], [0.9, 0., -5., 2.4], [1.4, 2.6, 3.1, 7.8]]
+        b = [2.4, 3.6, -5.8, 2.0]
+        result = linear_solver_helper(np.ravel(mat), b, 4)
+        mat = np.array(mat)
+        new_b = np.dot(mat, np.transpose(np.array(result)))
+        new_b = np.ravel(np.array(new_b))
+        assert np.allclose(new_b, np.array(b))
 
 
 if __name__ == '__main__':

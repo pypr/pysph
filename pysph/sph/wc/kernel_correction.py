@@ -17,7 +17,7 @@ References
 from math import sqrt
 from compyle.api import declare
 from pysph.sph.equation import Equation
-from pysph.sph.wc.density_correction import gj_solve
+from pysph.sph.wc.linalg import linear_solver_2d, linear_solver_3d, deteminant_2d, deteminant_3d, replace_vector_in_matrix
 
 
 class KernelCorrection(Equation):
@@ -88,7 +88,7 @@ class GradientCorrection(Equation):
     """
 
     def _get_helpers_(self):
-        return [gj_solve]
+        return [linear_solver_2d, linear_solver_3d, deteminant_2d, deteminant_3d, replace_vector_in_matrix]
 
     def __init__(self, dest, sources, dim=2, tol=0.1):
         self.dim = dim
@@ -96,21 +96,23 @@ class GradientCorrection(Equation):
         super(GradientCorrection, self).__init__(dest, sources)
 
     def loop(self, d_idx, d_m_mat, DWIJ, HIJ):
-        i, j, n, nt = declare('int', 4)
+        i, j, n = declare('int', 3)
         n = self.dim
-        nt = n + 1
         # Note that we allocate enough for a 3D case but may only use a
         # part of the matrix.
-        temp = declare('matrix(12)')
+        A = declare('matrix(9)')
         res = declare('matrix(3)')
+        b = declare('matrix(3)')
         eps = 1.0e-04 * HIJ
         for i in range(n):
             for j in range(n):
-                temp[nt * i + j] = d_m_mat[9 * d_idx + 3 * i + j]
-            # Augmented part of matrix
-            temp[nt*i + n] = DWIJ[i]
+                A[n * i + j] = d_m_mat[9 * d_idx + 3 * i + j]
+            b[i] = DWIJ[i]
 
-        gj_solve(temp, n, 1, res)
+        if n == 2:
+            linear_solver_2d(A, b, res)
+        elif n == 3:
+            linear_solver_3d(A, b, res)
 
         res_mag = 0.0
         dwij_mag = 0.0
@@ -222,7 +224,7 @@ class MixedGradientCorrection(Equation):
     """
 
     def _get_helpers_(self):
-        return [gj_solve]
+        return [linear_solver_2d, linear_solver_3d, deteminant_2d, deteminant_3d, replace_vector_in_matrix]
 
     def __init__(self, dest, sources, dim=2, tol=0.1):
         self.dim = dim
@@ -230,19 +232,23 @@ class MixedGradientCorrection(Equation):
         super(MixedGradientCorrection, self).__init__(dest, sources)
 
     def loop(self, d_idx, d_m_mat, d_dw_gamma, d_cwij, DWIJ, HIJ):
-        i, j, n, nt = declare('int', 4)
+        i, j, n = declare('int', 3)
         n = self.dim
-        nt = n + 1
-        temp = declare('matrix(12)')  # The augmented matrix
+        A = declare('matrix(9)')
         res = declare('matrix(3)')
+        b = declare('matrix(3)')
         dwij = declare('matrix(3)')
         eps = 1.0e-04 * HIJ
         for i in range(n):
             dwij[i] = (DWIJ[i] - d_dw_gamma[3*d_idx + i])/d_cwij[d_idx]
             for j in range(n):
-                temp[nt * i + j] = d_m_mat[9 * d_idx + 3 * i + j]
-            temp[nt*i + n] = dwij[i]
-        gj_solve(temp, n, 1, res)
+                A[n * i + j] = d_m_mat[9 * d_idx + 3 * i + j]
+            b[i] = dwij[i]
+
+        if n == 2:
+            linear_solver_2d(A, b, res)
+        elif n == 3:
+            linear_solver_3d(A, b, res)
 
         res_mag = 0.0
         dwij_mag = 0.0

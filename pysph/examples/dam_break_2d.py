@@ -248,6 +248,7 @@ class DamBreak2D(Application):
             boundary.add_property('cwij')
         if corr == 'mixed-corr' or corr == 'grad-corr':
             fluid.add_property('m_mat', stride=9)
+            fluid.add_property('dw_gamma', stride=3)
             boundary.add_property('m_mat', stride=9)
         elif corr == 'crksph':
             fluid.add_property('ai')
