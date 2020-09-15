@@ -17,7 +17,9 @@ References
 from math import sqrt
 from compyle.api import declare
 from pysph.sph.equation import Equation
-from pysph.sph.wc.linalg import linear_solver_2d, linear_solver_3d, deteminant_2d, deteminant_3d, replace_vector_in_matrix
+from pysph.sph.wc.linalg import (linear_solver_2d, linear_solver_3d,
+                                 determinant_2d, determinant_3d,
+                                 replace_vector_in_matrix)
 
 
 class KernelCorrection(Equation):
@@ -88,7 +90,10 @@ class GradientCorrection(Equation):
     """
 
     def _get_helpers_(self):
-        return [linear_solver_2d, linear_solver_3d, deteminant_2d, deteminant_3d, replace_vector_in_matrix]
+        return [
+            linear_solver_2d, linear_solver_3d, determinant_2d, determinant_3d,
+            replace_vector_in_matrix
+        ]
 
     def __init__(self, dest, sources, dim=2, tol=0.1):
         self.dim = dim
@@ -224,7 +229,10 @@ class MixedGradientCorrection(Equation):
     """
 
     def _get_helpers_(self):
-        return [linear_solver_2d, linear_solver_3d, deteminant_2d, deteminant_3d, replace_vector_in_matrix]
+        return [
+            linear_solver_2d, linear_solver_3d, determinant_2d, determinant_3d,
+            replace_vector_in_matrix
+        ]
 
     def __init__(self, dest, sources, dim=2, tol=0.1):
         self.dim = dim
