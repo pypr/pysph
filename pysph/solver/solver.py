@@ -24,7 +24,7 @@ class Solver(object):
                  n_damp=0, tf=1.0, dt=1e-3,
                  adaptive_timestep=False, cfl=0.3,
                  output_at_times=(),
-                 fixed_h=False, **kwargs):
+                 fixed_h=False, pfreq=100, **kwargs):
         """**Constructor**
 
         Any additional keyword args are used to set the values of any
@@ -111,7 +111,7 @@ class Solver(object):
         self.post_stage_callbacks = []
 
         # default output printing frequency
-        self.pfreq = 100
+        self.pfreq = pfreq
 
         # Compress generated files.
         self.compress_output = False
