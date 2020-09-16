@@ -10,7 +10,7 @@ J.C Crespo, Journal of Hydraulic Research, Vol 48, Extra Issue (2010), pp
 import os
 import numpy as np
 
-from pysph.base.kernels import WendlandQuintic, QuinticSpline
+from pysph.base.kernels import WendlandQuintic, QuinticSpline, CubicSpline
 from pysph.base.utils import get_particle_array
 from pysph.solver.application import Application
 from pysph.sph.scheme import WCSPHScheme, SchemeChooser, AdamiHuAdamsScheme
@@ -23,6 +23,8 @@ from pysph.sph.wc.kernel_correction import (GradientCorrectionPreStep,
 from pysph.sph.wc.crksph import CRKSPHPreStep, CRKSPH
 from pysph.sph.wc.gtvf import GTVFScheme
 from pysph.sph.isph.sisph import SISPHScheme
+from pysph.sph.graphics.pcisph import PCISPHScheme
+from pysph.sph.graphics.dfsph import DFSPHScheme
 from pysph.tools.geometry import get_2d_tank, get_2d_block
 
 
@@ -139,6 +141,23 @@ class DamBreak2D(Application):
             self.scheme.configure_solver(
                 dt=dt, tf=tf, adaptive_timestep=False, pfreq=10,
             )
+        elif self.options.scheme == 'pcisph':
+            dt = 0.125*self.h/vref
+            kernel = CubicSpline(dim=2)
+            print("PCISPH dt = %f" % dt)
+            kw.update(dict(kernel=kernel))
+            self.scheme.configure(h=self.h, dx=self.dx)
+            self.scheme.configure_solver(
+                dt=dt, tf=tf, adaptive_timestep=False, pfreq=10,
+            )
+        elif self.options.scheme == 'dfsph':
+            dt = 0.125*self.h/vref
+            kernel = CubicSpline(dim=2)
+            print("DFISPH dt = %f" % dt)
+            kw.update(dict(kernel=kernel))
+            self.scheme.configure_solver(
+                dt=dt, tf=tf, adaptive_timestep=False, pfreq=10,
+            )
 
         self.scheme.configure_solver(**kw)
 
@@ -169,13 +188,23 @@ class DamBreak2D(Application):
             c0=co, rho0=ro, alpha=0.05, gy=-g, pref=ro*co**2,
             internal_flow=False, hg_correction=True, gtvf=True, symmetric=True
         )
+        pcisph = PCISPHScheme(
+            ['fluid'], ['boundary'], dim=2, rho0=ro, nu=nu, gy=-g,
+            tolerance=0.1, max_iterations=100, h=None, dx=None,
+            alpha=0.01, c0=co
+        )
+        dfsph = DFSPHScheme(
+            ['fluid'], ['boundary'], dim=2, rho0=ro, nu=nu, gy=-g,
+            tolerance=0.1, max_iterations=100, alpha=0.01, c0=co
+        )
         s = SchemeChooser(default='wcsph', wcsph=wcsph, aha=aha, edac=edac,
-                          iisph=iisph, gtvf=gtvf, sisph=sisph)
+                          iisph=iisph, gtvf=gtvf, sisph=sisph,
+                          dfsph=dfsph, pcisph=pcisph)
         return s
 
     def create_equations(self):
         eqns = self.scheme.get_equations()
-        if self.options.scheme == 'iisph' or self.options.scheme == 'sisph':
+        if self.options.scheme in ['iisph', 'sisph', 'pcisph', 'dfsph']:
             return eqns
         if self.options.scheme == 'gtvf':
             return eqns
@@ -210,14 +239,17 @@ class DamBreak2D(Application):
         return eqns
 
     def create_particles(self):
-        if self.options.staggered_grid:
-            nboundary_layers = 2
-            nfluid_offset = 2
-            wall_hex_pack = True
+        if self.options.scheme in ['pcisph', 'dfsph']:
+            nboundary_layers = 1
         else:
-            nboundary_layers = 4
-            nfluid_offset = 1
-            wall_hex_pack = False
+            if self.options.staggered_grid:
+                nboundary_layers = 2
+                nfluid_offset = 2
+                wall_hex_pack = True
+            else:
+                nboundary_layers = 4
+                nfluid_offset = 1
+                wall_hex_pack = False
         xt, yt = get_2d_tank(dx=self.dx, length=container_width,
                              height=container_height, base_center=[2, 0],
                              num_layers=nboundary_layers)
@@ -236,6 +268,9 @@ class DamBreak2D(Application):
             # the default position tends to cause the particles to be pushed
             # away from the wall, so displacing it by a tiny amount helps.
             fluid.x += self.dx / 4
+        elif self.options.scheme in ['pcisph', 'dfsph']:
+            fluid.x += 2*self.dx
+            fluid.y += 2*self.dx
 
         self.kernel_corrections(fluid, boundary)
         return [fluid, boundary]
