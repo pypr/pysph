@@ -62,12 +62,20 @@ Mayavi Viewer
    :members:
    :undoc-members:
 
-STL Converter
+Mesh Converter
 -------------
 
-The following function can be used to convert an STL file to a set of grid
+The following functions can be used to convert an STL file to a set of surface
 points.
 
-.. autofunction:: pysph.tools.geometry_stl.get_stl_surface
+.. autofunction:: pysph.tools.gen_geom_surf.stl_surf
 
+.. autofunction:: pysph.tools.gen_geom_surf.stl_surf_uniform
+
+The following functions can be used to convert a mesh file supported by
+'meshio<https://github.com/nschloe/meshio>'_ to a set of surface points.
+
+.. autofunction:: pysph.tools.gen_geom_surf.surf_from_file
+
+.. autofunction:: pysph.tools.gen_geom_surf.surf_file_uniform
 

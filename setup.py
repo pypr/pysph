@@ -477,8 +477,8 @@ def get_basic_extensions():
 
         # STL tool
         Extension(
-            name="pysph.tools.geometry_stl",
-            sources=["pysph/tools/geometry_stl.pyx"],
+            name="pysph.tools.geom_surf_points",
+            sources=["pysph/tools/geom_surf_points.pyx"],
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args,
             language="c++",
@@ -641,7 +641,7 @@ def setup_package():
         'numpy', 'mako', 'cyarray', 'compyle', 'Cython>=0.20',
         'setuptools>=42.0.0', 'pytools', 'Beaker'
     ]
-    tests_require = ['pytest>=3.0', 'numpy-stl']
+    tests_require = ['pytest>=3.0', 'meshio']
     if sys.version_info[:2] == (2, 6):
         install_requires += [
             'ordereddict', 'importlib'
