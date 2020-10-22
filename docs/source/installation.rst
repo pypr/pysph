@@ -296,7 +296,7 @@ Now depending on your setup you can install the Python related dependencies.
 For example with conda_ you can do::
 
   $ conda install -c conda-forge cython mako matplotlib jupyter pyside pytest \
-                     mock numpy-stl pytools
+                     mock meshio pytools
 
   $ conda install -c conda-forge mpi4py
 
