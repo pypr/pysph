@@ -344,7 +344,7 @@ def get_surface_points_uniform(x, y, z, cells, normals, dx_sph=1,
     return xf, yf, zf
 
 
-def get_surface_points(x, y, z, cells, dx_triangle, radius_scale=1.0):
+def get_surface_points(x, y, z, cells, dx_triangle):
     """ Generates points to cover surface described by given set of connected points
     Parameters
     ----------
@@ -358,8 +358,6 @@ def get_surface_points(x, y, z, cells, dx_triangle, radius_scale=1.0):
         2d numpy array of triplets containing vertices of the triangles as indices
     dx_triangle : float
         Required spacing between generated particles
-    radius_scale : float, optional
-        Kernel radius scale
     Returns
     -------
     xf : ndarray
@@ -371,5 +369,5 @@ def get_surface_points(x, y, z, cells, dx_triangle, radius_scale=1.0):
     """
 
     xm, ym, zm = _get_surface_mesh(x, y, z, cells, dx_triangle, uniform = False)
-    xf, yf, zf = remove_repeated_points(xm, ym, zm, dx_triangle, radius_scale)
+    xf, yf, zf = remove_repeated_points(xm, ym, zm, dx_triangle)
     return xf, yf, zf

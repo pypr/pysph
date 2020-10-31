@@ -663,7 +663,7 @@ class FindRepeatedPoints(Equation):
                 d_min_idx[d_idx] = NBRS[i]
 
 
-def remove_repeated_points(x, y, z, dx_triangle, radius_scale):
+def remove_repeated_points(x, y, z, dx_triangle):
     EPS = np.finfo(float).eps
     pa_mesh = ParticleArray(name='mesh', x=x, y=y, z=z, h=EPS)
     pa_grid = ParticleArray(name='grid', x=x, y=y, z=z, h=EPS)
