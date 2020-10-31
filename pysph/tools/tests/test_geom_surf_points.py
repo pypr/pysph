@@ -130,7 +130,7 @@ class TestGeometry(unittest.TestCase):
     def test_get_surface_points(self):
         """Check if surface is generated correctly for unit cube"""
         h = 0.1
-        x, y, z = G.get_surface_points(x_cube, y_cube, z_cube, cells, h, 1)
+        x, y, z = G.get_surface_points(x_cube, y_cube, z_cube, cells, h)
         self._cube_assert(x, y, z, h)
 
     def test_get_surface_points_uniform(self):

@@ -52,132 +52,20 @@ class Mesh:
         return self.normals
 
 
-def stl_surf(file_name, dx, radius_scale=1.0):
+def gen_surf_points(file_name, dx):
     '''
-    Generates points with a spacing dx to descibe the input STL file
-    Parameters
-    ----------
-    file_name : string
-        STL file name
-    dx : float
-        Required spacing between generated particles
-    radius_scale : float, optional
-        Kernel radius scale
-    Returns
-    -------
-    xf, yf, zf : ndarray
-        1d numpy arrays with x, y, z coordinates of covered surface
-    '''
-    mesh = Mesh(file_name, 'stl')
-    cells = mesh.extract_connectivity_info()
-    x, y, z = mesh.extract_coordinates()
+    Generates points with a spacing dx to describe the surface of the
+    input mesh file.
 
-    xf, yf, zf = get_surface_points(x, y, z, cells, dx, radius_scale)
-    return xf, yf, zf
-
-
-def stl_surf_uniform(file_name, dx_sph, h_sph,
-                     radius_scale=1.0, dx_triangle=None):
-    '''
-    Generates points on a grid of spacing dx to descibe the input STL file
-    Parameters
-    ----------
-    file_name : string
-        STL file name
-    dx_sph : float
-        Grid spacing
-    h_sph : float
-        Smoothing length
-    radius_scale : float, optional
-        Kernel radius scale
-    dx_triangle : float, optional
-        By default, dx_triangle = 0.5 * dx_sph
-    Returns
-    -------
-    xf, yf, zf : ndarray
-        1d numpy arrays with x, y, z coordinates of covered surface grid
-    '''
-    mesh = Mesh(file_name, 'stl')
-    cells = mesh.extract_connectivity_info()
-    x, y, z = mesh.extract_coordinates()
-    normals = mesh.mesh.cell_data['facet_normals'][0]
-
-    xf, yf, zf = get_surface_points_uniform(x, y, z, cells, normals,
-                                            dx_sph, h_sph, radius_scale,
-                                            dx_triangle)
-    return xf, yf, zf
-
-
-def ply_surf(file_name, dx, radius_scale=1.0):
-    '''
-    Generates points with a spacing dx to descibe the input PLY file
-    Parameters
-    ----------
-    file_name : string
-        PLY file name
-    dx : float
-        Required spacing between generated particles
-    radius_scale : float, optional
-        Kernel radius scale
-    Returns
-    -------
-    xf, yf, zf : ndarray
-        1d numpy arrays with x, y, z coordinates of covered surface
-    '''
-    mesh = Mesh(file_name, 'ply')
-    cells = mesh.extract_connectivity_info()
-    x, y, z = mesh.extract_coordinates()
-
-    xf, yf, zf = get_surface_points(x, y, z, cells, dx, radius_scale)
-    return xf, yf, zf
-
-
-def ply_surf_uniform(file_name, dx_sph, h_sph,
-                     radius_scale=1.0, dx_triangle=None):
-    '''
-    Generates points on a grid of spacing dx to descibe the input PLY file
-    Parameters
-    ----------
-    file_name : string
-        PLY file name
-    dx_sph : float
-        Grid spacing
-    h_sph : float
-        Smoothing length
-    radius_scale : float, optional
-        Kernel radius scale
-    dx_triangle : float, optional
-        By default, dx_triangle = 0.5 * dx_sph
-    Returns
-    -------
-    xf, yf, zf : ndarray
-        1d numpy arrays with x, y, z coordinates of covered surface grid
-    '''
-    mesh = Mesh(file_name, 'ply')
-    cells = mesh.extract_connectivity_info()
-    x, y, z = mesh.extract_coordinates()
-    normals = mesh.compute_normals()
-
-    xf, yf, zf = get_surface_points_uniform(x, y, z, cells, normals,
-                                            dx_sph, h_sph, radius_scale,
-                                            dx_triangle)
-    return xf, yf, zf
-
-
-def surf_from_file(file_name, dx, radius_scale=1.0):
-    '''
-    Generates points with a spacing dx to descibe the input mesh file.
     Supported file formats: Refer to https://github.com/nschloe/meshio
 
     Only works with triangle meshes.
     Parameters
     ----------
     file_name : string
-        PLY file name
+        Mesh file name
     dx : float
         Required spacing between generated particles
-    radius_scale : float, optional
-        Kernel radius scale
     Returns
     -------
     xf, yf, zf : ndarray
@@ -187,12 +75,13 @@ def surf_from_file(file_name, dx, radius_scale=1.0):
     cells = mesh.extract_connectivity_info()
     x, y, z = mesh.extract_coordinates()
 
-    xf, yf, zf = get_surface_points(x, y, z, cells, dx, radius_scale)
+    xf, yf, zf = get_surface_points(x, y, z, cells, dx)
     return xf, yf, zf
 
 
-def surf_file_uniform(file_name, dx_sph, h_sph,
-                      radius_scale=1.0, dx_triangle=None):
+def gen_surf_points_uniform(file_name, dx_sph, h_sph,
+                            radius_scale=1.0, dx_triangle=None,
+                            file_format=None):
     '''
     Generates points on a grid of spacing dx to descibe the input mesh file
     Supported file formats: Refer to https://github.com/nschloe/meshio
@@ -210,6 +99,8 @@ def surf_file_uniform(file_name, dx_sph, h_sph,
         Kernel radius scale
     dx_triangle : float, optional
         By default, dx_triangle = 0.5 * dx_sph
+    file_format : str
+        Mesh file format
     Returns
     -------
     xf, yf, zf : ndarray
@@ -218,7 +109,11 @@ def surf_file_uniform(file_name, dx_sph, h_sph,
     mesh = Mesh(file_name)
     cells = mesh.extract_connectivity_info()
     x, y, z = mesh.extract_coordinates()
-    normals = mesh.compute_normals()
+
+    if file_format is 'stl':
+        normals = mesh.mesh.cell_data['facet_normals'][0]
+    else:
+        normals = mesh.compute_normals()
 
     xf, yf, zf = get_surface_points_uniform(x, y, z, cells, normals,
                                             dx_sph, h_sph, radius_scale,
