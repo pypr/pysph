@@ -1,4 +1,4 @@
-"""Rectangular dam break over a sloping dry bed. (39 min)
+"""Rectangular dam break over a sloping dry bed. (17 mins)
 
 A rectangular dam is placed on a sloping bed with bed slope = theta deg
 (measured in clockwise direction from horizontal). The dam is simulated by
@@ -142,81 +142,54 @@ class RectangularDamBreakSlopingBed(Application):
         equations = [
             Group(
                 equations=[
-                    InitialGuessDensity(dim=dim, dest='fluid',
-                                        sources=['fluid'])
-                    ]
-                ),
-            Group(
-                equations=[
+                    InitialGuessDensity(dim=dim, dest='fluid', sources=['fluid']),
                     UpdateSmoothingLength(dim=dim, dest='fluid')
-                    ], update_nnps=True
-                ),
+                ], update_nnps=True
+            ),
+
+            Group(
+                equations=[
+                    CorrectionFactorVariableSmoothingLength(dest='fluid', sources=['fluid']),
+                    SummationDensity(dest='fluid', sources=['fluid']),
+                    DensityResidual('fluid')
+                ]
+            ),
+
             Group(
                 equations=[
                     Group(
                         equations=[
-                            CorrectionFactorVariableSmoothingLength(
-                                dest='fluid', sources=['fluid']
-                                ),
-                            ]
-                        ),
-                    Group(
-                        equations=[
-                            SummationDensity(dest='fluid', sources=['fluid'])
-                            ]
-                        ),
-                    Group(
-                        equations=[
-                            DensityResidual('fluid'),
-                            DensityNewtonRaphsonIteration(dim=dim,
-                                                          dest='fluid')
-                            ]
-                        ),
-                    Group(
-                        equations=[
+                            DensityNewtonRaphsonIteration(dim=dim, dest='fluid'),
                             UpdateSmoothingLength(dim=dim, dest='fluid')
-                            ], update_nnps=True
-                        ),
+                        ], update_nnps=True
+                    ),
+
                     Group(
                         equations=[
-                            SummationDensity(dest='fluid', sources=['fluid'])
-                            ],
-                        ),
-                    Group(
-                        equations=[
+                            CorrectionFactorVariableSmoothingLength(dest='fluid', sources=['fluid']),
+                            SummationDensity(dest='fluid', sources=['fluid']),
                             DensityResidual(dest='fluid'),
                             CheckConvergence(dest='fluid')
-                            ],
-                    )], iterate=True, max_iterations=10
+                        ],
+                    )
+                ], iterate=True, max_iterations=10
             ),
+
             Group(
                 equations=[
-                    CorrectionFactorVariableSmoothingLength(
-                        dest='fluid', sources=['fluid'])
-                    ]
-                ),
-            Group(
-                equations=[
+                    CorrectionFactorVariableSmoothingLength(dest='fluid', sources=['fluid']),
                     SWEOS(dest='fluid')
-                    ]
-                ),
+                ]
+            ),
+
             Group(
                 equations=[
-                    FluidBottomElevation(dest='fluid', sources=['bed'])
-                    ]
-                ),
-            Group(
-                equations=[
-                    FluidBottomGradient(dest='fluid', sources=['bed'])
-                    ]
-                ),
-            Group(
-                equations=[
-                    ParticleAcceleration(dim=dim, dest='fluid',
-                                         sources=['fluid'], u_only=True),
-                    ],
-                ),
-            ]
+                    FluidBottomElevation(dest='fluid', sources=['bed']),
+                    FluidBottomGradient(dest='fluid', sources=['bed']),
+                    ParticleAcceleration(dim=dim, dest='fluid', sources=['fluid'], u_only=True)
+                ]
+            )
+        ]
         return equations
 
     def post_process(self, info_fname):
@@ -318,26 +291,13 @@ def compute_initial_props(particles):
     one_time_equations = [
         Group(
             equations=[
-                FluidBottomElevation(dest='fluid', sources=['bed'])
-                ]
-            ),
-        Group(
-            equations=[
-                BedGradient(dest='bed', sources=['bed'])
-                ]
-            ),
-        Group(
-            equations=[
-                CorrectionFactorVariableSmoothingLength(
-                    dest='fluid', sources=['fluid'])
-                ]
-            ),
-        Group(
-            equations=[
+                FluidBottomElevation(dest='fluid', sources=['bed']),
+                BedGradient(dest='bed', sources=['bed']),
+                CorrectionFactorVariableSmoothingLength(dest='fluid', sources=['fluid']),
                 SWEOS(dest='fluid')
-                ],
-            )
-        ]
+            ]
+        ),
+    ]
     kernel = CubicSpline(dim=2)
     sph_eval = SPHEvaluator(particles, one_time_equations, dim=2,
                             kernel=kernel)
