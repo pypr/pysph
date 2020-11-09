@@ -121,14 +121,16 @@ class CylindricalDamBreak(Application):
         equations = [
             Group(
                 equations=[
-                    InitialGuessDensity(dim=dim, dest='fluid', sources=['fluid']),
+                    InitialGuessDensity(dim=dim, dest='fluid', 
+                                        sources=['fluid']),
                     UpdateSmoothingLength(dim=dim, dest='fluid')
                 ], update_nnps=True
             ),
 
             Group(
                 equations=[
-                    CorrectionFactorVariableSmoothingLength(dest='fluid', sources=['fluid']),
+                    CorrectionFactorVariableSmoothingLength(
+                        dest='fluid', sources=['fluid']),
                     SummationDensity(dest='fluid', sources=['fluid']),
                     DensityResidual('fluid')
                 ]
@@ -138,14 +140,16 @@ class CylindricalDamBreak(Application):
                 equations=[
                     Group(
                         equations=[
-                            DensityNewtonRaphsonIteration(dim=dim, dest='fluid'),
+                            DensityNewtonRaphsonIteration(dim=dim, 
+                                                          dest='fluid'),
                             UpdateSmoothingLength(dim=dim, dest='fluid')
                         ], update_nnps=True
                     ),
 
                     Group(
                         equations=[
-                            CorrectionFactorVariableSmoothingLength(dest='fluid', sources=['fluid']),
+                            CorrectionFactorVariableSmoothingLength(
+                                dest='fluid', sources=['fluid']),
                             SummationDensity(dest='fluid', sources=['fluid']),
                             DensityResidual(dest='fluid'),
                             CheckConvergence(dest='fluid')
@@ -156,14 +160,16 @@ class CylindricalDamBreak(Application):
 
             Group(
                 equations=[
-                    CorrectionFactorVariableSmoothingLength(dest='fluid', sources=['fluid']),
+                    CorrectionFactorVariableSmoothingLength(
+                        dest='fluid', sources=['fluid']),
                     SWEOS(dest='fluid')
                 ]
             ),
 
             Group(
                 equations=[
-                    ParticleAcceleration(dim=dim, dest='fluid', sources=['fluid'])
+                    ParticleAcceleration(dim=dim, dest='fluid',
+                                         sources=['fluid'])
                 ]
             ),
         ]
@@ -252,7 +258,8 @@ def compute_initial_props(particles):
     one_time_equations = [
         Group(
             equations=[
-                CorrectionFactorVariableSmoothingLength(dest='fluid', sources=['fluid']),
+                CorrectionFactorVariableSmoothingLength(dest='fluid',
+                                                        sources=['fluid']),
                 SWEOS(dest='fluid')
             ]
         )
