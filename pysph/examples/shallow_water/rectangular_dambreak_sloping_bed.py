@@ -142,14 +142,16 @@ class RectangularDamBreakSlopingBed(Application):
         equations = [
             Group(
                 equations=[
-                    InitialGuessDensity(dim=dim, dest='fluid', sources=['fluid']),
+                    InitialGuessDensity(dim=dim, dest='fluid', 
+                                        sources=['fluid']),
                     UpdateSmoothingLength(dim=dim, dest='fluid')
                 ], update_nnps=True
             ),
 
             Group(
                 equations=[
-                    CorrectionFactorVariableSmoothingLength(dest='fluid', sources=['fluid']),
+                    CorrectionFactorVariableSmoothingLength(dest='fluid', 
+                                                            sources=['fluid']),
                     SummationDensity(dest='fluid', sources=['fluid']),
                     DensityResidual('fluid')
                 ]
@@ -159,14 +161,16 @@ class RectangularDamBreakSlopingBed(Application):
                 equations=[
                     Group(
                         equations=[
-                            DensityNewtonRaphsonIteration(dim=dim, dest='fluid'),
+                            DensityNewtonRaphsonIteration(dim=dim, 
+                                                          dest='fluid'),
                             UpdateSmoothingLength(dim=dim, dest='fluid')
                         ], update_nnps=True
                     ),
 
                     Group(
                         equations=[
-                            CorrectionFactorVariableSmoothingLength(dest='fluid', sources=['fluid']),
+                            CorrectionFactorVariableSmoothingLength(
+                              dest='fluid', sources=['fluid']),
                             SummationDensity(dest='fluid', sources=['fluid']),
                             DensityResidual(dest='fluid'),
                             CheckConvergence(dest='fluid')
@@ -177,7 +181,8 @@ class RectangularDamBreakSlopingBed(Application):
 
             Group(
                 equations=[
-                    CorrectionFactorVariableSmoothingLength(dest='fluid', sources=['fluid']),
+                    CorrectionFactorVariableSmoothingLength(dest='fluid',
+                                                            sources=['fluid']),
                     SWEOS(dest='fluid')
                 ]
             ),
@@ -186,7 +191,8 @@ class RectangularDamBreakSlopingBed(Application):
                 equations=[
                     FluidBottomElevation(dest='fluid', sources=['bed']),
                     FluidBottomGradient(dest='fluid', sources=['bed']),
-                    ParticleAcceleration(dim=dim, dest='fluid', sources=['fluid'], u_only=True)
+                    ParticleAcceleration(dim=dim, dest='fluid', 
+                                         sources=['fluid'], u_only=True)
                 ]
             )
         ]
@@ -293,7 +299,8 @@ def compute_initial_props(particles):
             equations=[
                 FluidBottomElevation(dest='fluid', sources=['bed']),
                 BedGradient(dest='bed', sources=['bed']),
-                CorrectionFactorVariableSmoothingLength(dest='fluid', sources=['fluid']),
+                CorrectionFactorVariableSmoothingLength(dest='fluid',
+                                                        sources=['fluid']),
                 SWEOS(dest='fluid')
             ]
         ),
