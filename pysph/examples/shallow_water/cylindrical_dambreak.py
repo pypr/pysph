@@ -1,4 +1,4 @@
-"""Cylindrical dam break over a dry bed. (3 min)
+"""Cylindrical dam break over a dry bed. (1.5 mins)
 
 The case is described in "A corrected smooth particle hydrodynamics formulation
 of the shallow-water equations", Miguel Rodriguez-Paz and Javier Bonet,
@@ -121,72 +121,52 @@ class CylindricalDamBreak(Application):
         equations = [
             Group(
                 equations=[
-                    InitialGuessDensity(dim=dim, dest='fluid',
-                                        sources=['fluid'])
-                    ]
-                ),
-            Group(
-                equations=[
+                    InitialGuessDensity(dim=dim, dest='fluid', sources=['fluid']),
                     UpdateSmoothingLength(dim=dim, dest='fluid')
-                    ], update_nnps=True
-                ),
+                ], update_nnps=True
+            ),
+
+            Group(
+                equations=[
+                    CorrectionFactorVariableSmoothingLength(dest='fluid', sources=['fluid']),
+                    SummationDensity(dest='fluid', sources=['fluid']),
+                    DensityResidual('fluid')
+                ]
+            ),
+
             Group(
                 equations=[
                     Group(
                         equations=[
-                            CorrectionFactorVariableSmoothingLength(
-                                dest='fluid', sources=['fluid']
-                                ),
-                            ]
-                        ),
-                    Group(
-                        equations=[
-                            SummationDensity(dest='fluid', sources=['fluid']),
-                            ]
-                        ),
-                    Group(
-                        equations=[
-                            DensityResidual('fluid'),
-                            DensityNewtonRaphsonIteration(dim=dim,
-                                                          dest='fluid')
-                            ]
-                        ),
-                    Group(
-                        equations=[
+                            DensityNewtonRaphsonIteration(dim=dim, dest='fluid'),
                             UpdateSmoothingLength(dim=dim, dest='fluid')
-                            ], update_nnps=True
-                        ),
+                        ], update_nnps=True
+                    ),
+
                     Group(
                         equations=[
-                            SummationDensity(dest='fluid', sources=['fluid'])
-                            ],
-                        ),
-                    Group(
-                        equations=[
+                            CorrectionFactorVariableSmoothingLength(dest='fluid', sources=['fluid']),
+                            SummationDensity(dest='fluid', sources=['fluid']),
                             DensityResidual(dest='fluid'),
                             CheckConvergence(dest='fluid')
-                            ],
-                    )], iterate=True, max_iterations=10
+                        ],
+                    )
+                ], iterate=True, max_iterations=10
             ),
+
             Group(
                 equations=[
-                    CorrectionFactorVariableSmoothingLength(
-                        dest='fluid', sources=['fluid']
-                        ),
-                    ]
-                ),
+                    CorrectionFactorVariableSmoothingLength(dest='fluid', sources=['fluid']),
+                    SWEOS(dest='fluid')
+                ]
+            ),
+
             Group(
                 equations=[
-                    SWEOS(dest='fluid'),
-                    ]
-                ),
-            Group(
-                equations=[
-                    ParticleAcceleration(dim=dim, dest='fluid',
-                                         sources=['fluid']),
-                    ],
-                ),
-            ]
+                    ParticleAcceleration(dim=dim, dest='fluid', sources=['fluid'])
+                ]
+            ),
+        ]
         return equations
 
     def post_process(self, info_fname):
@@ -272,15 +252,10 @@ def compute_initial_props(particles):
     one_time_equations = [
         Group(
             equations=[
-                CorrectionFactorVariableSmoothingLength(dest='fluid',
-                                                        sources=['fluid'])
-                ]
-            ),
-        Group(
-            equations=[
+                CorrectionFactorVariableSmoothingLength(dest='fluid', sources=['fluid']),
                 SWEOS(dest='fluid')
-                ],
-            )
+            ]
+        )
     ]
     kernel = CubicSpline(dim=2)
     sph_eval = SPHEvaluator(particles, one_time_equations, dim=2,
