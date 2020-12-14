@@ -52,6 +52,12 @@ class Integrator(object):
         args = ', '.join(['%s=%s' % (k, s[k]) for k in s])
         return '%s(%s)' % (name, args)
 
+    def _my_max(self, x):
+        if len(x) > 0:
+            return np.max(x)
+        else:
+            return -1.0
+
     def _get_dt_adapt_factors(self):
         a_eval = self.acceleration_evals[0]
         factors = [-1.0, -1.0, -1.0]
@@ -62,7 +68,7 @@ class Integrator(object):
                     if pa.gpu:
                         prop_names.append(name)
                     else:
-                        max_val = np.max(pa.get(name))
+                        max_val = self._my_max(pa.get(name))
                         factors[i] = max(factors[i], max_val)
             if pa.gpu:
                 pa.gpu.update_minmax_cl(prop_names, only_max=True)
