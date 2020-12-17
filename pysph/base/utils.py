@@ -490,7 +490,8 @@ def get_particles_info(particles):
             const_info[c_name] = value.get_npy_array()
         info[parray.name] = dict(
             properties=prop_info, constants=const_info,
-            output_property_arrays=parray.output_property_arrays
+            output_property_arrays=parray.output_property_arrays,
+            lb_props=parray.get_lb_props()
         )
 
     return info
@@ -502,8 +503,10 @@ def create_dummy_particles(info):
     for name, pa_data in info.items():
         prop_dict = pa_data['properties']
         constants = pa_data['constants']
+        lb_props = pa_data['lb_props']
         pa = ParticleArray(name=name, constants=constants, **prop_dict)
         pa.set_output_arrays(pa_data['output_property_arrays'])
+        pa.set_lb_props(lb_props)
         particles.append(pa)
 
     return particles

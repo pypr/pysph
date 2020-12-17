@@ -1001,6 +1001,7 @@ class ParticleArrayUtils(unittest.TestCase):
         p.add_property('A', data=numpy.arange(6), stride=2)
         c = [1.0, 2.0]
         p.add_constant('c', c)
+        p.set_lb_props(['x'])
 
         # When.
         info = utils.get_particles_info([p])
@@ -1014,6 +1015,7 @@ class ParticleArrayUtils(unittest.TestCase):
         self.assertTrue('A' in dummy.properties)
         self.assertTrue('A' in dummy.stride)
         self.assertEqual(dummy.stride['A'], 2)
+        self.assertEqual(dummy.get_lb_props(), p.get_lb_props())
 
     def test_get_particle_array_takes_scalars(self):
         # Given/when
