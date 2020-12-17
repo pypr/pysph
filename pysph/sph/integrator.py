@@ -9,6 +9,7 @@ from the `sph_eval` module.
 from numpy import sqrt
 import numpy as np
 
+from compyle.profile import profile_ctx, profile
 # Local imports.
 from .integrator_step import IntegratorStep
 
@@ -274,14 +275,18 @@ class Integrator(object):
         if update_nnps:
             # update NNPS since particles have moved
             if self.parallel_manager:
-                self.parallel_manager.update()
-            self.nnps.update()
+                with profile_ctx('parallel_manager.update'):
+                    self.parallel_manager.update()
+            with profile_ctx('nnps.update'):
+                self.nnps.update()
 
         # Evaluate
         c_integrator = self.c_integrator
         a_eval = self.acceleration_evals[index]
-        a_eval.compute(c_integrator.t, c_integrator.dt)
+        with profile_ctx('acceleration_eval_%d' % index):
+            a_eval.compute(c_integrator.t, c_integrator.dt)
 
+    @profile
     def initial_acceleration(self, t, dt):
         """Compute the initial accelerations if needed before the iterations start.
 
@@ -292,6 +297,7 @@ class Integrator(object):
         """
         self.acceleration_evals[0].compute(t, dt)
 
+    @profile
     def update_domain(self):
         """Update the domain of the simulation.
 
