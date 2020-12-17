@@ -4,6 +4,7 @@ from __future__ import print_function
 import os
 import numpy
 
+from compyle.profile import profile, profile_ctx
 # PySPH imports
 from pysph.base.kernels import CubicSpline
 from pysph.sph.acceleration_eval import make_acceleration_evals
@@ -291,6 +292,7 @@ class Solver(object):
 
         self.setup(self.particles)
 
+    @profile
     def reorder_particles(self):
         """Re-order particles so as to coalesce memory access.
         """
@@ -459,8 +461,10 @@ class Solver(object):
               (self.count < self.max_steps):
 
             # perform any pre step functions
-            for callback in self.pre_step_callbacks:
-                callback(self)
+            if self.pre_step_callbacks:
+                with profile_ctx('Solver.pre_step_callback'):
+                    for callback in self.pre_step_callbacks:
+                        callback(self)
 
             if self.rank == 0:
                 logger.debug(
@@ -472,8 +476,10 @@ class Solver(object):
             self.integrator.step(self.t, self.dt)
 
             # perform any post step functions
-            for callback in self.post_step_callbacks:
-                callback(self)
+            if self.post_step_callbacks:
+                with profile_ctx('Solver.post_step_callback'):
+                    for callback in self.post_step_callbacks:
+                        callback(self)
 
             # update time and iteration counters if successfully
             # integrated
@@ -510,6 +516,7 @@ class Solver(object):
         for array in self.particles:
             array.set_time(self.t)
 
+    @profile
     def dump_output(self):
         """Dump the simulation results to file
 
@@ -745,6 +752,7 @@ class Solver(object):
 
         return {'dt': dt, 't': self.t, 'count': self.count}
 
+    @profile
     def _get_timestep(self):
         if abs(self.tf - self.t) < self._epsilon:
             # We have reached the end, so no need to adjust the timestep
@@ -771,8 +779,10 @@ class Solver(object):
         return self.dt/self._damping_factor
 
     def _post_stage_callback(self, time, dt, stage):
-        for callback in self.post_stage_callbacks:
-            callback(time, dt, stage)
+        if self.post_stage_callbacks:
+            with profile_ctx('Solver.post_stage_callback'):
+                for callback in self.post_stage_callbacks:
+                    callback(time, dt, stage)
 
 
 ############################################################################
