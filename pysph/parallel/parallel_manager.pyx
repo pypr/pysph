@@ -79,7 +79,7 @@ cdef class ParticleArrayExchange:
         self.numParticleImport = 0
 
         # load balancing props are taken from the particle array
-        lb_props = pa.get_lb_props()
+        lb_props = list(pa.get_lb_props())
         lb_props.sort()
 
         self.lb_props = lb_props
@@ -124,16 +124,17 @@ cdef class ParticleArrayExchange:
         cdef dict sendbufs = self.get_sendbufs( exportLocalids )
 
         # remove particles to be exported
-        pa.remove_particles(exportLocalids)
-        pa.align_particles()
+        pa.remove_particles(exportLocalids, align=True)
 
         # old and new sizes
         cdef int current_size = self.num_local
         cdef int count = current_size - numExport
         cdef int newsize = count + numImport
 
-        # resize the particle array to accomodate the receive
-        pa.resize( newsize )
+        # resize the particle array to accomodate the receive.
+        # remove_particles updates the size, so count is the
+        # current size of the array.
+        self.extend(count, newsize)
 
         # exchange data
         self.exchange_data(zcomm, sendbufs, count)
@@ -186,7 +187,7 @@ cdef class ParticleArrayExchange:
         cdef dict sendbufs = self.get_sendbufs( exportLocalids )
 
         # update the size of the array
-        pa.resize( newsize )
+        self.extend(current_size, newsize)
         self.exchange_data(zcomm, sendbufs, count)
 
         # set tags for all received particles as Remote
@@ -231,7 +232,7 @@ cdef class ParticleArrayExchange:
         cdef int num_local = self.num_local
 
         # resize the particle array
-        self.pa.resize( num_local )
+        self.pa.resize(num_local)
         self.pa.align_particles()
 
         # reset the number of remote particles
@@ -295,7 +296,12 @@ cdef class ParticleArrayExchange:
         self.importParticleProcs.reset()
 
     def extend(self, int currentsize, int newsize):
-        self.pa.resize( newsize )
+        if newsize <= currentsize:
+            self.pa.resize(newsize)
+        else:
+            # We use extend so any non lb_prop props are reset.
+            # resize does not set the values to any defaults.
+            self.pa.extend(newsize - currentsize)
 
     def get_sendbufs(self, UIntArray exportIndices):
         cdef ParticleArray pa = self.pa
@@ -311,7 +317,7 @@ cdef class ParticleArrayExchange:
             if stride > 1:
                 s_indices[stride] = get_strided_indices(indices, stride)
 
-        for prop in pa.properties:
+        for prop in self.lb_props:
             prop_arr = pa.properties[prop].get_npy_array()
             stride = pa.stride.get(prop, 1)
             sendbufs[prop] = prop_arr[s_indices[stride]]

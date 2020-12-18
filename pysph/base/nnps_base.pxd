@@ -143,8 +143,8 @@ cdef class NNPSParticleArrayWrapper:
     cdef public IntArray tag
     cdef public ParticleArray pa
 
-    cdef str name
-    cdef int np
+    cdef public str name
+    cdef public int np
 
     # get the number of particles
     cdef int get_number_of_particles(self)
