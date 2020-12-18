@@ -1322,10 +1322,11 @@ class GSPHScheme(Scheme):
             )
         equations.append(Group(equations=group, update_nnps=True))
 
-        group = []
-        for solid in self.solids:
-            group.append(WallBoundary(solid, sources=self.fluids))
-        equations.append(Group(equations=group))
+        if self.solids:
+            group = []
+            for solid in self.solids:
+                group.append(WallBoundary(solid, sources=self.fluids))
+            equations.append(Group(equations=group))
 
         all_pa = self.fluids + self.solids
         group = []
@@ -1337,10 +1338,11 @@ class GSPHScheme(Scheme):
             )
         equations.append(Group(equations=group, update_nnps=False))
 
-        group = []
-        for solid in self.solids:
-            group.append(WallBoundary(solid, sources=self.fluids))
-        equations.append(Group(equations=group))
+        if self.solids:
+            group = []
+            for solid in self.solids:
+                group.append(WallBoundary(solid, sources=self.fluids))
+            equations.append(Group(equations=group))
 
         group = []
         for fluid in self.fluids:
@@ -1368,10 +1370,11 @@ class GSPHScheme(Scheme):
                                      gamma=self.gamma))
         equations.append(Group(equations=group))
 
-        group = []
-        for solid in self.solids:
-            group.append(WallBoundary(solid, sources=self.fluids))
-        equations.append(Group(equations=group))
+        if self.solids:
+            group = []
+            for solid in self.solids:
+                group.append(WallBoundary(solid, sources=self.fluids))
+            equations.append(Group(equations=group))
 
         g2 = []
         for fluid in self.fluids:
@@ -1477,10 +1480,11 @@ class ADKEScheme(Scheme):
         from pysph.sph.gas_dynamics.boundary_equations import WallBoundary
 
         equations = []
-        g1 = []
-        for solid in self.solids:
-            g1.append(WallBoundary(solid, sources=self.fluids))
-        equations.append(Group(equations=g1))
+        if self.solids:
+            g1 = []
+            for solid in self.solids:
+                g1.append(WallBoundary(solid, sources=self.fluids))
+            equations.append(Group(equations=g1))
 
         g2 = []
         for fluid in self.fluids:
@@ -1490,22 +1494,24 @@ class ADKEScheme(Scheme):
                     eps=self.eps
                 )
             )
-        equations.append(Group(g2, update_nnps=True, iterate=False))
+        equations.append(Group(g2, update_nnps=False, iterate=False))
 
-        g3 = []
-        for solid in self.solids:
-            g3.append(WallBoundary(solid, sources=self.fluids))
-        equations.append(Group(equations=g3))
+        if self.solids:
+            g3 = []
+            for solid in self.solids:
+                g3.append(WallBoundary(solid, sources=self.fluids))
+            equations.append(Group(equations=g3))
 
         g4 = []
         for fluid in self.fluids:
             g4.append(SummationDensity(fluid, self.fluids+self.solids))
-        equations.append(Group(g4))
+        equations.append(Group(g4,  update_nnps=True))
 
-        g5 = []
-        for solid in self.solids:
-            g5.append(WallBoundary(solid, sources=self.fluids))
-        equations.append(Group(equations=g5))
+        if self.solids:
+            g5 = []
+            for solid in self.solids:
+                g5.append(WallBoundary(solid, sources=self.fluids))
+            equations.append(Group(equations=g5))
 
         g6 = []
         for elem in self.fluids+self.solids:
