@@ -130,7 +130,7 @@ def _star_pu(rho_l, u_l, p_l, c_l, rho_r, u_r, p_r, c_r, p_guess):
     fr = _flux_fsolve(p_guess, rho_r, c_r, p_r)
     f = lambda p: fl(p) + fr(p) + u_r - u_l
     from scipy.optimize import fsolve
-    p_star = fsolve(f, 0.0)
+    p_star = fsolve(f, 0.0)[0]
     u_star = (
         0.5 * (u_l + u_r + _flux_fsolve(p_star, rho_r, c_r, p_r)(p_star) -
                _flux_fsolve(p_star, rho_l, c_l, p_l)(p_star))
