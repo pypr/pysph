@@ -10,7 +10,9 @@ def get_directory(file):
 
 
 def kill_process(process):
+    print('*'*70)
     print('KILLING PROCESS ON TIMEOUT')
+    print('*'*70)
     process.kill()
 
 

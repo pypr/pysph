@@ -84,7 +84,14 @@ class DamBreak3D(Application):
         ''')
 
     def post_process(self, info_fname):
-        self.read_info(info_fname)
+        if self.rank > 0:
+            return
+        import os
+        if os.path.exists(info_fname):
+            self.read_info(info_fname)
+        else:
+            return
+
         if len(self.output_files) == 0:
             return
 
@@ -92,7 +99,6 @@ class DamBreak3D(Application):
         import matplotlib.pyplot as plt
         from pysph.examples import db_exp_data as dbd
         from pysph.tools.interpolator import Interpolator
-        import os
         H = self.geom.fluid_column_height
         factor_y = 1/(ro*9.81*H)
         factor_x = np.sqrt(9.81/H)
@@ -108,7 +114,9 @@ class DamBreak3D(Application):
         p_y = np.repeat(0, 2)
         p_z = np.array([0.021, 0.101])
 
-        for sd, arrays1, arrays2, arrays3 in iter_output(files, "fluid", "obstacle", "boundary"):
+        for sd, arrays1, arrays2, arrays3 in iter_output(
+                files, "fluid", "obstacle", "boundary"
+        ):
             t.append(sd["t"]*factor_x)
             interp = Interpolator([arrays1, arrays2, arrays3],
                                   x=p_x, y=p_y, z=p_z, method="shepard")
