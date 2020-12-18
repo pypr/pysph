@@ -89,6 +89,7 @@ from pysph.sph.acceleration_nnps_helper import generate_body, \
 
 from compyle.ext_module import get_platform_dir
 from compyle.config import get_config
+from compyle.profile import profile_ctx
 from compyle.translator import (CStructHelper, CUDAConverter, OpenCLConverter,
                                 ocl_detect_type, ocl_detect_pointer_base_type)
 
@@ -311,8 +312,10 @@ class GPUAccelerationEval(object):
         raise NotImplementedError('GPU backend is incomplete')
 
     def update_nnps(self):
-        self.nnps.update_domain()
-        self.nnps.update()
+        with profile_ctx('Integrator.update_domain'):
+            self.nnps.update_domain()
+        with profile_ctx('nnps.update'):
+            self.nnps.update()
 
     def do_reduce(self, eqs, dest, t, dt):
         for eq in eqs:
