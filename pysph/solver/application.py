@@ -1,5 +1,6 @@
 # Standard imports.
 from argparse import ArgumentDefaultsHelpFormatter
+import atexit
 from compyle.utils import ArgumentParser
 import glob
 import inspect
@@ -25,6 +26,7 @@ from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
 
 from pysph.base import kernels
 from compyle.config import get_config
+from compyle.profile import print_profile, get_profile_info
 from pysph.solver.controller import CommandManager
 from pysph.solver.utils import mkdir, load, get_files, get_free_port
 
@@ -772,6 +774,10 @@ class Application(object):
         else:
             options = self.arg_parse.parse_args(self.args)
 
+        if options.profile:
+            # Remove the default callback from compyle.
+            atexit.unregister(print_profile)
+
         self.options = options
 
     def _process_command_line(self):
@@ -1393,11 +1399,22 @@ class Application(object):
         """Write the information dictionary to given filename. Any extra
         keyword arguments are written to the file.
         """
-        info = dict(
-            fname=self.fname, output_dir=self.output_dir, args=self.args)
-        info.update(kw)
-        with open(filename, 'w') as f:
+        if self.rank == 0:
+            info = dict(
+                fname=self.fname, output_dir=self.output_dir, args=self.args)
+            info.update(kw)
+            with open(filename, 'w') as f:
+                json.dump(info, f)
+
+    def _write_profile_info(self):
+        # Note that this is called when the run method ends and NOT
+        # at exit, so any post-processing will be after this is dumped.
+        fname = join(self.output_dir, 'profile_info_%d.json' % self.rank)
+        with open(fname, 'w') as f:
+            info = get_profile_info()
             json.dump(info, f)
+        if self.options.profile and self.rank == 0:
+            print_profile()
 
     def _log_solver_info(self, solver):
         sep = '-'*70
@@ -1565,9 +1582,11 @@ class Application(object):
         run_duration = end_time - start_time
         self._message("Run took: %.5f secs" % (run_duration))
         self._write_info(
-            self.info_filename, completed=True, cpu_time=run_duration)
+            self.info_filename, completed=True, cpu_time=run_duration
+        )
 
         self._stop_interfaces()
+        self._write_profile_info()
 
     def set_args(self, args):
         self.args = args
