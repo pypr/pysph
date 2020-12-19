@@ -275,8 +275,7 @@ class Integrator(object):
         if update_nnps:
             # update NNPS since particles have moved
             if self.parallel_manager:
-                with profile_ctx('ParallelManager.update'):
-                    self.parallel_manager.update()
+                self.parallel_manager.update()
             with profile_ctx('nnps.update'):
                 self.nnps.update()
 

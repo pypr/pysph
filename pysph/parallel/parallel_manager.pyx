@@ -9,6 +9,8 @@ import mpi4py.MPI as mpi
 
 from cpython.list cimport PyList_Append, PyList_GET_SIZE
 
+from compyle.profile import profile_ctx, ProfileContext
+
 # PyZoltan
 from pyzoltan.czoltan cimport czoltan
 from pyzoltan.czoltan.czoltan cimport Zoltan_Struct
@@ -101,6 +103,7 @@ cdef class ParticleArrayExchange:
         arrays re-sized. MPI is then used to send and receive the data
 
         """
+        _p = ProfileContext('PAExchange.lb_exchange_data')
         # data array
         cdef ParticleArray pa = self.pa
 
@@ -145,6 +148,7 @@ cdef class ParticleArrayExchange:
 
         # update the number of particles
         self.num_local = newsize
+        _p.stop()
 
     def remote_exchange_data(self):
         """Share particle info after computing remote particles.
@@ -158,6 +162,7 @@ cdef class ParticleArrayExchange:
         to reflect the new particles that come in as remote particles.
 
         """
+        _p = ProfileContext('PAExchange.remote_exchange_data')
         # data arrays
         cdef ParticleArray pa = self.pa
 
@@ -196,6 +201,7 @@ cdef class ParticleArrayExchange:
 
         # store the number of remote particles
         self.num_remote = newsize - current_size
+        _p.stop()
 
     cdef exchange_data(self, ZComm zcomm, dict sendbufs, int count):
         cdef ParticleArray pa = self.pa
@@ -206,26 +212,27 @@ cdef class ParticleArrayExchange:
 
         cdef list props = self.lb_props
 
-        for i in range(nprops):
-            prop = props[i]
+        with profile_ctx('PAExchange.exchange_data'):
+            for i in range(nprops):
+                prop = props[i]
 
-            prop_arr = pa.properties[prop].get_npy_array()
-            nbytes = prop_arr.dtype.itemsize
-            stride = pa.stride.get(prop, 1)
+                prop_arr = pa.properties[prop].get_npy_array()
+                nbytes = prop_arr.dtype.itemsize
+                stride = pa.stride.get(prop, 1)
 
-            # the send and receive buffers
-            sendbuf = sendbufs[prop]
-            recvbuf = prop_arr[count*stride:]
+                # the send and receive buffers
+                sendbuf = sendbufs[prop]
+                recvbuf = prop_arr[count*stride:]
 
-            # tag for this property
-            prop_tag = i
+                # tag for this property
+                prop_tag = i
 
-            # set the nbytes and tag for the zoltan communicator
-            zcomm.set_nbytes( nbytes*stride )
-            zcomm.set_tag( prop_tag )
+                # set the nbytes and tag for the zoltan communicator
+                zcomm.set_nbytes( nbytes*stride )
+                zcomm.set_tag( prop_tag )
 
-            # exchange the data
-            zcomm.Comm_Do( sendbuf, recvbuf )
+                # exchange the data
+                zcomm.Comm_Do( sendbuf, recvbuf )
 
     def remove_remote_particles(self):
         self.num_local = self.pa.get_number_of_particles(real=True)
@@ -497,6 +504,7 @@ cdef class ParallelManager:
             self.num_global[i] = pa_exchange.num_global
 
     def update(self):
+        _p = ProfileContext("ParallelManager.update")
         cdef int lb_freq = self.lb_freq
         cdef int lb_count = self.lb_count
 
@@ -506,11 +514,14 @@ cdef class ParallelManager:
         self.remove_remote_particles()
 
         if ( lb_count == lb_freq ):
-            self.update_partition()
+            with profile_ctx('ParallelManager.update_partition'):
+                self.update_partition()
             self.lb_count = 0
         else:
-            self.migrate_partition()
+            with profile_ctx('ParallelManager.migrate_partition'):
+                self.migrate_partition()
             self.lb_count = lb_count
+        _p.stop()
 
     def update_partition(self):
         """Update the partition.
@@ -567,7 +578,8 @@ cdef class ParallelManager:
 
         if self.in_parallel:
             # use Zoltan to get the cell import/export lists
-            self.load_balance()
+            with profile_ctx('ParallelManager.load_balance'):
+                self.load_balance()
 
             # move the data to the new partitions
             if self.changes == 1:
@@ -618,12 +630,13 @@ cdef class ParallelManager:
         cdef int narrays = self.narrays
         cdef ParticleArrayExchange pa_exchange
 
-        for i in range(narrays):
-            pa_exchange = self.pa_exchanges[i]
-            pa_exchange.remove_remote_particles()
+        with profile_ctx('ParallelManager.remove_remote_particles'):
+            for i in range(narrays):
+                pa_exchange = self.pa_exchanges[i]
+                pa_exchange.remove_remote_particles()
 
-            self.num_local[i] = pa_exchange.num_local
-            self.num_remote[i] = pa_exchange.num_remote
+                self.num_local[i] = pa_exchange.num_local
+                self.num_remote[i] = pa_exchange.num_remote
 
     def local_bin(self):
         """Create the local cell map.
