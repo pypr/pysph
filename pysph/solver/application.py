@@ -1409,10 +1409,16 @@ class Application(object):
     def _write_profile_info(self):
         # Note that this is called when the run method ends and NOT
         # at exit, so any post-processing will be after this is dumped.
-        fname = join(self.output_dir, 'profile_info_%d.json' % self.rank)
+        fname = join(self.output_dir, 'profile_info_%d.csv' % self.rank)
+        info = get_profile_info()
+        profile_data = sorted(info.items(), key=lambda x: x[1]['time'],
+                              reverse=True)
         with open(fname, 'w') as f:
-            info = get_profile_info()
-            json.dump(info, f)
+            f.write("{0},{1},{2}\n".format('function', 'calls', 'time'))
+            for name, data in profile_data:
+                f.write("{0},{1},{2}\n".format(
+                    name, data['calls'], data['time']
+                ))
         if self.options.profile and self.rank == 0:
             print_profile()
 
