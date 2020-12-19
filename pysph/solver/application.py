@@ -26,7 +26,7 @@ from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
 
 from pysph.base import kernels
 from compyle.config import get_config
-from compyle.profile import print_profile, get_profile_info
+from compyle.profile import print_profile, profile2csv
 from pysph.solver.controller import CommandManager
 from pysph.solver.utils import mkdir, load, get_files, get_free_port
 
@@ -1410,15 +1410,7 @@ class Application(object):
         # Note that this is called when the run method ends and NOT
         # at exit, so any post-processing will be after this is dumped.
         fname = join(self.output_dir, 'profile_info_%d.csv' % self.rank)
-        info = get_profile_info()
-        profile_data = sorted(info.items(), key=lambda x: x[1]['time'],
-                              reverse=True)
-        with open(fname, 'w') as f:
-            f.write("{0},{1},{2}\n".format('function', 'calls', 'time'))
-            for name, data in profile_data:
-                f.write("{0},{1},{2}\n".format(
-                    name, data['calls'], data['time']
-                ))
+        profile2csv(fname)
         if self.options.profile and self.rank == 0:
             print_profile()
 
