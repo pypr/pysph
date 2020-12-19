@@ -95,8 +95,10 @@ class DamBreak3D(Application):
         if len(self.output_files) == 0:
             return
 
-        from pysph.solver.utils import iter_output
+        import matplotlib
+        matplotlib.use('Agg')
         import matplotlib.pyplot as plt
+        from pysph.solver.utils import iter_output
         from pysph.examples import db_exp_data as dbd
         from pysph.tools.interpolator import Interpolator
         H = self.geom.fluid_column_height
