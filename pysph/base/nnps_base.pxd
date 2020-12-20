@@ -236,7 +236,7 @@ cdef class Cell:
     cdef cPoint boxmax                  # Bounding box max for the cell
     cdef int layers                     # Layers to compute bounding box
     cdef IntArray nbrprocs              # List of neighboring processors
-    cdef public int size                # total number of particles in this cell
+    cdef public double size             # total number of particles in this cell
 
     ############################################################################
     # Member functions
