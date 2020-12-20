@@ -520,6 +520,11 @@ class WCSPHScheme(Scheme):
         for pa in particles:
             self._ensure_properties(pa, props, clean)
             pa.set_output_arrays(output_props)
+            if pa.name in self.solids:
+                # This is the load balancing weight for the solid particles.
+                # They do less work so we reduce the weight.
+                if 'lb_weight' not in pa.constants:
+                    pa.add_constant('lb_weight', 0.1)
 
 
 class TVFScheme(Scheme):

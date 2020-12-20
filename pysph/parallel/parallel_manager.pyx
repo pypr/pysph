@@ -86,6 +86,12 @@ cdef class ParticleArrayExchange:
 
         self.lb_props = lb_props
         self.nprops = len( lb_props )
+        # If an lb_weight  constant is present in the array, this
+        # is the weight to use for the load balancing for those particles.
+        if 'lb_weight' in pa.constants:
+            self.lb_weight = pa.constants.get('lb_weight')[0]
+        else:
+            self.lb_weight = 1.0
 
         # exchange flags
         self.lb_exchange = True
@@ -717,6 +723,7 @@ cdef class ParallelManager:
         cdef int ncells_total = 0
         cdef int narrays = self.narrays
         cdef int layers = self.ghost_layers
+        cdef double lb_weight = self.pa_exchanges[pa_index].lb_weight
 
         # now bin the particles
         num_particles = indices.length
@@ -749,7 +756,7 @@ cdef class ParallelManager:
 
             # increment the size of the cells to reflect the added
             # particle. The size will be used to set the weights.
-            cell.size += 1
+            cell.size += lb_weight
 
         # update the total number of cells
         self.ncells_total = self.ncells_total + ncells_total
