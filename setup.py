@@ -477,8 +477,8 @@ def get_basic_extensions():
 
         # STL tool
         Extension(
-            name="pysph.tools.geom_surf_points",
-            sources=["pysph/tools/geom_surf_points.pyx"],
+            name="pysph.tools.mesh_tools",
+            sources=["pysph/tools/mesh_tools.pyx"],
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args,
             language="c++",
