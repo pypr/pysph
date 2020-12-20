@@ -276,9 +276,10 @@ cdef double dot(double[:] normal, double[:] point, double[:] face_centre):
            normal[1]*(point[1]-face_centre[1]) + \
            normal[2]*(point[2]-face_centre[2])
 
-def get_surface_points_uniform(x, y, z, cells, normals, dx_sph=1,
-                               h_sph=1, radius_scale=1.0,
-                               dx_triangle=None):
+
+def surf_points_uniform(x, y, z, cells, normals, dx_sph=1,
+                        h_sph=1, radius_scale=1.0,
+                        dx_triangle=None):
     """Generates points to cover surface described by a set of points
     The function generates a grid with a spacing of dx_sph and keeps points
     on the grid which lie within the object.
@@ -344,7 +345,7 @@ def get_surface_points_uniform(x, y, z, cells, normals, dx_sph=1,
     return xf, yf, zf
 
 
-def get_surface_points(x, y, z, cells, dx_triangle):
+def surface_points(x, y, z, cells, dx_triangle):
     """ Generates points to cover surface described by given set of connected points
     Parameters
     ----------

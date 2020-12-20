@@ -2,55 +2,59 @@ import numpy as np
 import unittest
 import pytest
 from pysph.base.particle_array import ParticleArray
-import pysph.tools.geom_surf_points as G
+import pysph.tools.mesh_tools as G
 from pysph.base.utils import get_particle_array
 
+
 # Data of a unit length cube
-points = np.array([[0., 0., 0.],
-                   [0., 1., 0.],
-                   [1., 1., 0.],
-                   [1., 0., 0.],
-                   [0., 0., 1.],
-                   [0., 1., 1.],
-                   [1., 0., 1.],
-                   [1., 1., 1.]])
+def cube_data():
+    points = np.array([[0., 0., 0.],
+                       [0., 1., 0.],
+                       [1., 1., 0.],
+                       [1., 0., 0.],
+                       [0., 0., 1.],
+                       [0., 1., 1.],
+                       [1., 0., 1.],
+                       [1., 1., 1.]])
 
-x_cube, y_cube, z_cube = points.T
+    x_cube, y_cube, z_cube = points.T
 
-cells = np.array([[0, 1, 2],
-                  [0, 2, 3],
-                  [0, 4, 5],
-                  [0, 5, 1],
-                  [0, 3, 6],
-                  [0, 6, 4],
-                  [4, 6, 7],
-                  [4, 7, 5],
-                  [3, 2, 7],
-                  [3, 7, 6],
-                  [1, 5, 7],
-                  [1, 7, 2]])
+    cells = np.array([[0, 1, 2],
+                      [0, 2, 3],
+                      [0, 4, 5],
+                      [0, 5, 1],
+                      [0, 3, 6],
+                      [0, 6, 4],
+                      [4, 6, 7],
+                      [4, 7, 5],
+                      [3, 2, 7],
+                      [3, 7, 6],
+                      [1, 5, 7],
+                      [1, 7, 2]])
 
-normals = np.array([[0.,  0., -1.],
-                    [0.,  0., -1.],
-                    [-1.,  0.,  0.],
-                    [-1.,  0.,  0.],
-                    [0., -1.,  0.],
-                    [0., -1.,  0.],
-                    [0.,  0.,  1.],
-                    [0.,  0.,  1.],
-                    [1.,  0.,  0.],
-                    [1.,  0.,  0.],
-                    [0.,  1.,  0.],
-                    [0.,  1.,  0.]])
+    normals = np.array([[0.,  0., -1.],
+                        [0.,  0., -1.],
+                        [-1.,  0.,  0.],
+                        [-1.,  0.,  0.],
+                        [0., -1.,  0.],
+                        [0., -1.,  0.],
+                        [0.,  0.,  1.],
+                        [0.,  0.,  1.],
+                        [1.,  0.,  0.],
+                        [1.,  0.,  0.],
+                        [0.,  1.,  0.],
+                        [0.,  1.,  0.]])
 
-vectors = np.zeros((len(cells), 3, 3))
-for i, cell in enumerate(cells):
-    idx1, idx2, idx3 = cell
+    vectors = np.zeros((len(cells), 3, 3))
+    for i, cell in enumerate(cells):
+        idx1, idx2, idx3 = cell
 
-    vector = np.array([[x_cube[idx1], y_cube[idx1], z_cube[idx1]],
-                       [x_cube[idx2], y_cube[idx2], z_cube[idx2]],
-                       [x_cube[idx3], y_cube[idx3], z_cube[idx3]]])
-    vectors[i] = vector
+        vector = np.array([[x_cube[idx1], y_cube[idx1], z_cube[idx1]],
+                           [x_cube[idx2], y_cube[idx2], z_cube[idx2]],
+                           [x_cube[idx3], y_cube[idx3], z_cube[idx3]]])
+        vectors[i] = vector
+
+    return x_cube, y_cube, z_cube, cells, normals, vectors
 
 
 class TestGeometry(unittest.TestCase):
@@ -92,6 +96,7 @@ class TestGeometry(unittest.TestCase):
     def test_get_points_from_mgrid(self):
         """Find neighbouring particles around a unit cube"""
         h = 0.1
+        x_cube, y_cube, z_cube, cells, normals, vectors = cube_data()
 
         x, y, z, x_list, y_list, z_list, vectors = \
         G._get_surface_mesh(x_cube, y_cube, z_cube, cells, h, uniform=True)
@@ -123,6 +128,7 @@ class TestGeometry(unittest.TestCase):
     def test_get_surface_mesh(self):
         """Check if mesh is generated correctly for unit cube"""
 
+        x_cube, y_cube, z_cube, cells, normals, vectors = cube_data()
         x, y, z = G._get_surface_mesh(x_cube, y_cube, z_cube, cells, 0.1)
         h = np.finfo(float).eps
         self._cube_assert(x, y, z, h)
@@ -130,14 +136,16 @@ class TestGeometry(unittest.TestCase):
     def test_get_surface_points(self):
         """Check if surface is generated correctly for unit cube"""
         h = 0.1
-        x, y, z = G.get_surface_points(x_cube, y_cube, z_cube, cells, h)
+        x_cube, y_cube, z_cube, cells, normals, vectors = cube_data()
+        x, y, z = G.surface_points(x_cube, y_cube, z_cube, cells, h)
         self._cube_assert(x, y, z, h)
 
     def test_get_surface_points_uniform(self):
         """Check if uniform surface is generated correctly for unit cube"""
         h = 0.1
-        x, y, z = G.get_surface_points_uniform(x_cube, y_cube, z_cube,
-                                               cells, normals, 1.0, 1.0)
+        x_cube, y_cube, z_cube, cells, normals, vectors = cube_data()
+        x, y, z = G.surf_points_uniform(x_cube, y_cube, z_cube,
+                                        cells, normals, 1.0, 1.0)
         self._cube_assert(x, y, z, h)
 
     def test_prism(self):
@@ -145,7 +153,7 @@ class TestGeometry(unittest.TestCase):
         tri_points = np.array([[0, 0, 0], [1, 0, 0], [0, 0, 1]])
         h = 1/1.5
         prism_normals, prism_points, prism_face_centres = \
-          G.prism(tri_normal, tri_points, h)
+            G.prism(tri_normal, tri_points, h)
         assert np.array([-1, 0, 0]) in prism_normals
         assert np.array([0, 1, 0]) in prism_points
         assert np.array([0.5, 0.5, 0]) in prism_face_centres

@@ -68,7 +68,4 @@ Mesh Converter
 The following functions can be used to convert a mesh file supported by
 'meshio<https://github.com/nschloe/meshio>'_ to a set of surface points.
 
-.. autofunction:: pysph.tools.gen_geom_surf.gen_surf_points
-
-.. autofunction:: pysph.tools.gen_geom_surf.gen_surf_points_uniform
-
+.. autofunction:: pysph.tools.read_mesh.mesh2points
