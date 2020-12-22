@@ -28,7 +28,7 @@ class VTKOutput(Output):
 
         vectors:
             Vectors to dump
-            Example V=['u', 'v', 'z']
+            Example velocity=['u', 'v', 'z']
         """
 
         self.vectors = {}
@@ -136,7 +136,7 @@ def dump_vtk(filename, particles, scalars=None, **vectors):
 
     vectors:
         Vectors to dump
-        Example V=['u', 'v', 'z']
+        Example velocity=['u', 'v', 'z']
     """
 
     if has_pyvisfile():

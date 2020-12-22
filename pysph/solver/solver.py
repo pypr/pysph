@@ -25,7 +25,8 @@ class Solver(object):
                  n_damp=0, tf=1.0, dt=1e-3,
                  adaptive_timestep=False, cfl=0.3,
                  output_at_times=(),
-                 fixed_h=False, **kwargs):
+                 fixed_h=False,
+                 **kwargs):
         """**Constructor**
 
         Any additional keyword args are used to set the values of any
@@ -113,6 +114,9 @@ class Solver(object):
 
         # default output printing frequency
         self.pfreq = 100
+
+        # default value for total number of dumps --> overrides pfreq
+        self.N = 0
 
         # Compress generated files.
         self.compress_output = False
@@ -703,6 +707,8 @@ class Solver(object):
 
         # dump output if the iteration number is a multiple of the printing
         # frequency.
+        if self.N > 0:
+            self.pfreq = int(self.tf/(self.N*self.dt))
         dump = self.count % self.pfreq == 0
 
         # Consider the other cases if user has requested output at a specified

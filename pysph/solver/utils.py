@@ -1,6 +1,7 @@
 """
 Module contains some common functions.
 """
+from __future__ import unicode_literals
 
 # standard imports
 import errno
@@ -130,7 +131,7 @@ class ProgressBar(object):
     def _fmt_bar(self, percent, width):
         chars = ASCII_FMT if self.ascii else UTF_FMT
         nsyms = len(chars) - 1
-        tens, ones = divmod(int(percent/100 * width * nsyms), nsyms)
+        tens, ones = divmod(int(percent/100.0 * width * nsyms), nsyms)
         end = chars[ones] if ones > 0 else ''
         return (chars[-1]*tens + end).ljust(width)
 

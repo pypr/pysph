@@ -6,8 +6,8 @@ These classes are used to generate the code for the actual integrators
 from the `sph_eval` module.
 """
 
-from numpy import sqrt
 import numpy as np
+from numpy import sqrt
 
 from compyle.profile import profile_ctx, profile
 # Local imports.

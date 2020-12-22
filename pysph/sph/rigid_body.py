@@ -303,9 +303,9 @@ class ViscosityRigidBody(Equation):
         d_au[d_idx] += ax
         d_av[d_idx] += ay
         d_aw[d_idx] += az
-        s_fx[s_idx] += -d_m[d_idx]*ax
-        s_fy[s_idx] += -d_m[d_idx]*ay
-        s_fz[s_idx] += -d_m[d_idx]*az
+        s_fx[s_idx] -= d_m[d_idx]*ax
+        s_fy[s_idx] -= d_m[d_idx]*ay
+        s_fz[s_idx] -= d_m[d_idx]*az
 
 
 class PressureRigidBody(Equation):
@@ -330,9 +330,9 @@ class PressureRigidBody(Equation):
         d_au[d_idx] += ax
         d_av[d_idx] += ay
         d_aw[d_idx] += az
-        s_fx[s_idx] += -d_m[d_idx]*ax
-        s_fy[s_idx] += -d_m[d_idx]*ay
-        s_fz[s_idx] += -d_m[d_idx]*az
+        s_fx[s_idx] -= d_m[d_idx]*ax
+        s_fy[s_idx] -= d_m[d_idx]*ay
+        s_fz[s_idx] -= d_m[d_idx]*az
 
 
 class AkinciRigidFluidCoupling(Equation):

@@ -15,7 +15,7 @@ References
 """
 
 from pysph.sph.equation import Equation
-from math import sin, pi
+from math import pi, sin
 
 # constants
 M_PI = pi
@@ -636,6 +636,54 @@ class SolidWallNoSlipBC(Equation):
         d_au[d_idx] += tmp * (d_u[d_idx] - s_ug[s_idx])
         d_av[d_idx] += tmp * (d_v[d_idx] - s_vg[s_idx])
         d_aw[d_idx] += tmp * (d_w[d_idx] - s_wg[s_idx])
+
+
+class FiberViscousTraction(Equation):
+    r"""**Fiber boundary condition**
+    """
+
+    def __init__(self, dest, sources, nu):
+        r"""
+        Parameters
+        ----------
+        nu : float
+            kinematic viscosity
+        """
+
+        self.nu = nu
+        super(FiberViscousTraction, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_au, d_av, d_aw):
+        d_au[d_idx] = 0.0
+        d_av[d_idx] = 0.0
+        d_aw[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, d_m, s_m, d_rho, s_rho, d_V, s_V,
+             s_u, s_v, s_w,
+             d_au, d_av, d_aw,
+             d_ug, d_vg, d_wg,
+             DWIJ, R2IJ, EPS, XIJ):
+
+        # averaged shear viscosity Eq. (6).
+        etai = self.nu * d_rho[d_idx]
+        etaj = self.nu * s_rho[s_idx]
+
+        etaij = 2 * (etai * etaj)/(etai + etaj)
+
+        # particle volumes; d_V is inverse volume
+        Vi = 1./d_V[d_idx]
+        Vj = 1./s_V[s_idx]
+        Vi2 = Vi * Vi
+        Vj2 = Vj * Vj
+
+        # scalar part of the kernel gradient
+        Fij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
+
+        tmp = 1./d_m[d_idx] * (Vi2 + Vj2) * (etaij * Fij/(R2IJ + EPS))
+
+        d_au[d_idx] += tmp * (d_ug[d_idx]-s_u[s_idx])
+        d_av[d_idx] += tmp * (d_vg[d_idx]-s_v[s_idx])
+        d_aw[d_idx] += tmp * (d_wg[d_idx]-s_w[s_idx])
 
 
 class SolidWallPressureBC(Equation):
