@@ -26,7 +26,7 @@ from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
 
 from pysph.base import kernels
 from compyle.config import get_config
-from compyle.profile import print_profile, profile2csv
+from compyle.profile import print_profile, profile2csv, get_profile_info
 from pysph.solver.controller import CommandManager
 from pysph.solver.utils import mkdir, load, get_files, get_free_port
 
@@ -609,8 +609,9 @@ class Application(object):
             "--zoltan-lb-method",
             action="store",
             dest="zoltan_lb_method",
-            default="RCB",
-            help="Choose the Zoltan load balancnig method")
+            default='HSFC',
+            choices=['RCB', 'RIB', 'HSFC'],
+            help="Choose the Zoltan load balancing method")
 
         zoltan.add_argument(
             "--rcb-lock",
@@ -638,8 +639,10 @@ class Application(object):
             action='store',
             dest="zoltan_rcb_set_direction",
             default=0,
+            choices=[0, 1, 2, 3, 4, 5, 6],
             type=int,
-            help="Set the order of the RCB cuts")
+            help="Set the order of the RCB cuts (0: no order, 1:'xyz', "
+                 "2:'xzy', 3:'yzx', 4:'yxz', 5:'zxy', 6:'zyx')")
 
         zoltan.add_argument(
             "--zoltan-weights",
@@ -653,7 +656,7 @@ class Application(object):
             "--ghost-layers",
             action='store',
             dest='ghost_layers',
-            default=3.0,
+            default=1.0,
             type=float,
             help=('Number of ghost cells to share for remote neighbors'))
 
@@ -1409,8 +1412,13 @@ class Application(object):
     def _write_profile_info(self):
         # Note that this is called when the run method ends and NOT
         # at exit, so any post-processing will be after this is dumped.
-        fname = join(self.output_dir, 'profile_info_%d.csv' % self.rank)
-        profile2csv(fname)
+        fname = join(self.output_dir, 'profile_info.csv')
+        data = None
+        if self.num_procs > 1:
+            data = dict(get_profile_info())
+            data = self.comm.gather(data, root=0)
+        if self.rank == 0:
+            profile2csv(fname, info=data)
         if self.options.profile and self.rank == 0:
             print_profile()
 
