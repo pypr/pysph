@@ -2302,6 +2302,7 @@ class Viewer3D(Viewer):
         # being displayed.
 
         self.plot = p3.figure(width=800)
+        self.plot.animation_exponent = 0.0
         temp_data = self.get_frame(0)['arrays']
         for array_name in self._widgets.particles.keys():
             pa_widgets = self._widgets.particles[array_name]
