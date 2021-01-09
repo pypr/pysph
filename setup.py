@@ -1,27 +1,65 @@
+'''Setup script for PySPH.
+
+You can use some environment variables to control the build. Setting CC/CXX
+will let you choose a custom compiler (these can also be set in the config file
+discussed below). You can also export ZOLTAN or ZOLTAN_INCLUDE/ZOLTAN_LIBRARY.
+
+These are more configuration file options that trump everything. The file is in
+~/.compyle/config.py.  The options are:
+
+OMP_CFLAGS = ['-fopenmp']
+OMP_LINK = ['-fopenmp']
+
+# MPI options: handy on clusters like a Cray.
+MPI_CFLAGS = ['...']  # must be a list.
+MPI_LINK = ['...']
+
+# Zoltan options
+USE_TRILINOS = 1  # When set to anything, use "-ltrilinos_zoltan".
+ZOLTAN = '/path/to_zoltan'  # looks inside this for $ZOLTAN/include/, lib/
+
+# Not needed if using ZOLTAN
+ZOLTAN_INCLUDE = 'path/include'  # path to zoltan.h
+ZOLTAN_LIBRARY = 'path/lib'  # path to libzoltan.a
+
+'''
+
 import os
-from os import path
-try:
-    from subprocess import check_output
-except ImportError:
-    # check_output does not exist in Python-2.6
-    from subprocess import Popen, PIPE, CalledProcessError
-
-    def check_output(*popenargs, **kwargs):
-        if 'stdout' in kwargs:
-            raise ValueError(
-                'stdout argument not allowed, it will be overridden.'
-            )
-        process = Popen(stdout=PIPE, *popenargs, **kwargs)
-        output, unused_err = process.communicate()
-        retcode = process.poll()
-        if retcode:
-            cmd = kwargs.get("args")
-            if cmd is None:
-                cmd = popenargs[0]
-            raise CalledProcessError(retcode, cmd, output=output)
-        return output
-
+from subprocess import check_output
 import sys
+
+
+# This is taken from compyle.ext_module.
+def get_config_file_opts():
+    '''A global configuration file is used to configure build options
+    for compyle and other packages.  This is located in:
+
+    ~/.compyle/config.py
+
+    The file can contain arbitrary Python that is exec'd. The variables defined
+    here specify the compile and link args. For example, one may set:
+
+    OMP_CFLAGS = ['-fopenmp']
+    OMP_LINK = ['-fopenmp']
+
+    Will use these instead of the defaults that are automatically determined.
+    These must be lists.
+
+    '''
+    fname = os.path.expanduser(os.path.join('~', '.compyle', 'config.py'))
+    opts = {}
+    if os.path.exists(fname):
+        print('Reading configuration options from %s.' % fname)
+        with open(fname) as fp:
+            exec(compile(fp.read(), fname, 'exec'), opts)
+        opts.pop('__builtins__', None)
+    return opts
+
+
+# NOTE: the configuration options in the file trump everything else!
+# These are options from the .compyle/config.py
+CONFIG_OPTS = get_config_file_opts()
+
 
 if len(os.environ.get('COVERAGE', '')) > 0:
     MACROS = [("CYTHON_TRACE", "1"), ("CYTHON_TRACE_NOGIL", "1")]
@@ -71,7 +109,7 @@ def get_deps(*args):
     for basename in args:
         for ext in ('.pyx', '.pxd'):
             f = basename + ext
-            if path.exists(f):
+            if os.path.exists(f):
                 result.append(f)
     return result
 
@@ -82,6 +120,9 @@ def _get_openmp_flags():
     This returns two lists, [extra_compile_args], [extra_link_args]
     """
     # Copied from compyle.ext_module
+    if 'OMP_CFLAGS' in CONFIG_OPTS or 'OMP_LINK' in CONFIG_OPTS:
+        return CONFIG_OPTS['OMP_CFLAGS'], CONFIG_OPTS['OMP_LINK']
+
     if sys.platform == 'win32':
         return ['/openmp'], []
     elif sys.platform == 'darwin':
@@ -98,12 +139,6 @@ def get_openmp_flags():
     """Returns any OpenMP related flags if OpenMP is avaiable on the system.
     """
     omp_compile_flags, omp_link_flags = _get_openmp_flags()
-
-    env_var = os.environ.get('USE_OPENMP', '')
-    if env_var.lower() in ("0", 'false', 'n'):
-        print("-" * 70)
-        print("OpenMP disabled by environment variable (USE_OPENMP).")
-        return [], [], False
 
     from textwrap import dedent
     try:
@@ -124,7 +159,7 @@ def get_openmp_flags():
             openmp.omp_get_num_threads()
     """)
     tmp_dir = tempfile.mkdtemp()
-    fname = path.join(tmp_dir, 'check_omp.pyx')
+    fname = os.path.join(tmp_dir, 'check_omp.pyx')
     with open(fname, 'w') as fp:
         fp.write(test_code)
     extension = Extension(
@@ -160,13 +195,16 @@ def get_openmp_flags():
 
 def get_zoltan_directory(varname):
     global USE_ZOLTAN
+    if varname in CONFIG_OPTS:
+        return os.path.expanduser(CONFIG_OPTS[varname])
+
     d = os.environ.get(varname, '')
     if len(d) == 0:
         USE_ZOLTAN = False
         return ''
     else:
         USE_ZOLTAN = True
-    if not path.exists(d):
+    if not os.path.exists(d):
         print("*" * 80)
         print("%s incorrectly set to %s, not using ZOLTAN!" % (varname, d))
         print("*" * 80)
@@ -184,33 +222,42 @@ def get_mpi_flags():
     mpi_link_args = []
     if not HAVE_MPI:
         return mpi_inc_dirs, mpi_compile_args, mpi_link_args
-    try:
-        mpic = 'mpic++'
-        if compiler == 'intel':
-            link_args = check_output(
-                [mpic, '-cc=icc', '-link_info'], universal_newlines=True
-            ).strip()
-            link_args = link_args[3:]
-            compile_args = check_output(
-                [mpic, '-cc=icc', '-compile_info'], universal_newlines=True
-            ).strip()
-            compile_args = compile_args[3:]
-        else:
-            link_args = check_output(
-                [mpic, '--showme:link'], universal_newlines=True
-            ).strip()
-            compile_args = check_output(
-                [mpic, '--showme:compile'], universal_newlines=True
-            ).strip()
-    except:  # noqa: E722
-        print('-' * 80)
-        print("Unable to run mpic++ correctly, skipping parallel build")
-        print('-' * 80)
-        HAVE_MPI = False
-    else:
-        mpi_link_args.extend(link_args.split())
-        mpi_compile_args.extend(compile_args.split())
+    elif 'MPI_CFLAGS' in CONFIG_OPTS:
+        mpi_compile_args = CONFIG_OPTS['MPI_CFLAGS']
+        mpi_link_args = CONFIG_OPTS['MPI_LINK']
         mpi_inc_dirs.append(mpi4py.get_include())
+    else:
+        try:
+            mpic = 'mpic++'
+            if compiler == 'intel':
+                link_args = check_output(
+                    [mpic, '-cc=icc', '-link_info'],
+                    universal_newlines=True
+                ).strip()
+                link_args = link_args[3:]
+                compile_args = check_output(
+                    [mpic, '-cc=icc', '-compile_info'],
+                    universal_newlines=True
+                ).strip()
+                compile_args = compile_args[3:]
+            else:
+                link_args = check_output(
+                    [mpic, '--showme:link'],
+                    universal_newlines=True
+                ).strip()
+                compile_args = check_output(
+                    [mpic, '--showme:compile'],
+                    universal_newlines=True
+                ).strip()
+        except:  # noqa: E722
+            print('-' * 80)
+            print("Unable to run mpic++ correctly, skipping parallel build")
+            print('-' * 80)
+            HAVE_MPI = False
+        else:
+            mpi_link_args.extend(link_args.split())
+            mpi_compile_args.extend(compile_args.split())
+            mpi_inc_dirs.append(mpi4py.get_include())
 
     return mpi_inc_dirs, mpi_compile_args, mpi_link_args
 
@@ -226,9 +273,9 @@ def get_zoltan_args():
     zoltan_base = get_zoltan_directory('ZOLTAN')
     inc = lib = ''
     if len(zoltan_base) > 0:
-        inc = path.join(zoltan_base, 'include')
-        lib = path.join(zoltan_base, 'lib')
-        if not path.exists(inc) or not path.exists(lib):
+        inc = os.path.join(zoltan_base, 'include')
+        lib = os.path.join(zoltan_base, 'lib')
+        if not os.path.exists(inc) or not os.path.exists(lib):
             inc = lib = ''
 
     # try with the older ZOLTAN include directories
@@ -258,8 +305,8 @@ def get_zoltan_args():
 
         # PyZoltan includes
         zoltan_cython_include = [
-            path.abspath(
-                path.join(path.dirname(pyzoltan.__file__), 'czoltan')
+            os.path.abspath(
+                os.path.join(os.path.dirname(pyzoltan.__file__), 'czoltan')
             )
         ]
         zoltan_include_dirs += zoltan_cython_include
@@ -569,7 +616,9 @@ def get_parallel_extensions():
     cython_compile_time_env = {'MPI4PY_V2': MPI4PY_V2}
 
     zoltan_lib = 'zoltan'
-    if os.environ.get('USE_TRILINOS', None) is not None:
+    if 'USE_TRILINOS' in CONFIG_OPTS:
+        zoltan_lib = 'trilinos_zoltan'
+    elif os.environ.get('USE_TRILINOS', None) is not None:
         zoltan_lib = 'trilinos_zoltan'
 
     parallel_modules = [
@@ -596,8 +645,8 @@ def get_parallel_extensions():
 def create_sources():
     argv = sys.argv
     if 'build_ext' in argv or 'develop' in sys.argv or 'install' in argv:
-        pth = path.join('pysph', 'base')
-        cmd = [sys.executable, '-m', 'cyarray.generator', path.abspath(pth)]
+        pth = os.path.join('pysph', 'base')
+        cmd = [sys.executable, '-m', 'cyarray.generator', os.path.abspath(pth)]
         print(check_output(cmd).decode())
 
 
@@ -627,7 +676,7 @@ def setup_package():
 
     # Extract the version information from pysph/__init__.py
     info = {}
-    module = path.join('pysph', '__init__.py')
+    module = os.path.join('pysph', '__init__.py')
     exec(compile(open(module).read(), module, 'exec'), info)
 
     # The requirements.
@@ -710,7 +759,7 @@ def setup_package():
               """,
           platforms=['Linux', 'Mac OS-X', 'Unix', 'Windows'],
           classifiers=[c.strip() for c in """\
-            Development Status :: 3 - Alpha
+            Development Status :: 4 - Beta
             Environment :: Console
             Intended Audience :: Developers
             Intended Audience :: Science/Research
