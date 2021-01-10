@@ -114,13 +114,16 @@ class ClearyArtificialViscosity(Equation):
 
 
 class LaminarViscosityDeltaSPH(Equation):
-    r"""
-    See section 2 of the below reference
+    r"""See section 2 of the below reference [Sun2017]
 
-    - P. Sun, A. Colagrossi, S. Marrone, A. Zhang
-    "The plus-SPH model: simple procedures for a further improvement of the SPH
-    scheme", Computer Methods in Applied Mechanics and Engineering 315 (2017),
-    pp. 25-49.
+    References
+    ----------
+
+    .. [Sun2017] P. Sun, A. Colagrossi, S. Marrone, A. Zhang "The $\delta$
+       plus-SPH model: simple procedures for a further improvement of the SPH
+       scheme", Computer Methods in Applied Mechanics and Engineering 315
+       (2017), pp. 25-49.
+
     """
     def __init__(self, dest, sources, dim, rho0, nu):
         self.dim = dim

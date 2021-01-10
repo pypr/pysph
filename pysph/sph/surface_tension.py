@@ -1,19 +1,21 @@
-"""
-Implementation of the equations used for surface tension modelling,
-for example in KHI simulations. The references are as under:
+"""Implementation of the equations used for surface tension modelling, for
+example in KHI simulations. The references are [SY11], [JM00], [A10], [XA06].
 
- - M. Shadloo, M. Yildiz, "Numerical modelling of Kelvin-Helmholtz
-   isntability using smoothed particle hydrodynamics", IJNME, 2011,
-   87, pp 988--1006 [SY11]
 
- - Joseph P. Morris "Simulating surface tension with smoothed particle
-   hydrodynamics", JCP, 2000, 33, pp 333--353 [JM00]
+References
+----------
 
- - Adami et al. "A new surface-tension formulation for multi-phase SPH
-   using a reproducing divergence approximation", JCP 2010, 229, pp
-   5011--5021 [A10]
+.. [SY11] M. Shadloo, M. Yildiz, "Numerical modelling of Kelvin-Helmholtz
+   instability using smoothed particle hydrodynamics", IJNME, 2011, 87, pp
+   988--1006
 
- - X.Y.Hu, N.A. Adams. "A multi-phase SPH method for macroscopic and
+.. [JM00] Joseph P. Morris "Simulating surface tension with smoothed particle
+   hydrodynamics", JCP, 2000, 33, pp 333--353
+
+.. [A10] Adami et al. "A new surface-tension formulation for multi-phase SPH
+   using a reproducing divergence approximation", JCP 2010, 229, pp 5011--5021
+
+.. [XA06] X.Y.Hu, N.A. Adams. "A multi-phase SPH method for macroscopic and
    mesoscopic flows", JCP 2006, 213, pp 844-861 [XA06]
 
 """
@@ -848,12 +850,12 @@ class AdamiColorGradient(Equation):
 def get_surface_tension_equations(fluids, solids, scheme, rho0, p0, c0, b,
                                   factor1, factor2, nu, sigma, d, epsilon,
                                   gamma, real=False):
-    """
-    This function returns the required equations for the multiphase
-    formulation taking inputs of the fluid particles array, solid particles
-    array, the scheme to be used and other physical parameters
+    """This function returns the required equations for the multiphase formulation
+    taking inputs of the fluid particles array, solid particles array, the
+    scheme to be used and other physical parameters
+
     Parameters
-    ------------------
+    -----------
 
     fluids: list
         List of names of fluid particle arrays
@@ -862,17 +864,19 @@ def get_surface_tension_equations(fluids, solids, scheme, rho0, p0, c0, b,
     scheme: string
         The scheme with which the equations are to be setup.
         Supported Schemes:
-            1. TVF scheme with Morris' surface tension.
-            String to be used: "tvf"
-            2. Adami's surface tension implementation which doesn't involve
-            calculation of curvature. String to be used: "adami_stress"
-            3. Adami's surface tension implementation which involves
-            calculation of curvature. String to be used: "adami"
-            4. Shadloo Yildiz surface tension formulation.
-            String to be used: "shadloo"
-            5. Morris' surface tension formulation. This is the default scheme
-            which will be used if none of the above strings are input as
-            scheme.
+
+        1. TVF scheme with Morris' surface tension.
+           String to be used: "tvf"
+        2. Adami's surface tension implementation which doesn't involve
+           calculation of curvature. String to be used: "adami_stress"
+        3. Adami's surface tension implementation which involves
+           calculation of curvature. String to be used: "adami"
+        4. Shadloo Yildiz surface tension formulation.
+           String to be used: "shadloo"
+        5. Morris' surface tension formulation. This is the default scheme
+           which will be used if none of the above strings are input as
+           scheme.
+
     rho0 : float
         The reference density of the medium (Currently multiple reference
         densities for different particles is not supported)
@@ -901,6 +905,7 @@ def get_surface_tension_equations(fluids, solids, scheme, rho0, p0, c0, b,
     epsilon: float
         Put this option false if the equations are supposed to be evaluated
         for the ghost particles, else keep it True
+
     """
     if scheme == 'tvf':
         result = []

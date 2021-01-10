@@ -394,6 +394,7 @@ class DeviatoricStressRate(Equation):
             - \frac{1}{3} \text{Tr}(\boldsymbol{\epsilon})\textbf{I}) +
             \boldsymbol{\sigma}' \cdot \boldsymbol{\Omega}^{T} +
             \boldsymbol{\Omega} \cdot \boldsymbol{\sigma}'
+
     where,
 
     .. math::

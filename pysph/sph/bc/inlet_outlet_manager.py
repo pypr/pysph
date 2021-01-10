@@ -14,9 +14,9 @@ class InletInfo(object):
     def __init__(self, pa_name, normal, refpoint, has_ghost=True,
                  update_cls=None, equations=None, umax=1.0,
                  props_to_copy=None):
-        """Create object with information of inlets, all the others parameters
-           which are not passed here get evaluated by `InletOutletManager`once
-           the inlet is created.
+        """Create object with information of inlets, all the others parameters which
+           are not passed here get evaluated by `InletOutletManager` once the
+           inlet is created.
 
         Parameters
         ----------
@@ -35,6 +35,7 @@ class InletInfo(object):
             List of equations (optional)
         props_to_copy : array
             properties to copy
+
         """
 
         self.pa_name = pa_name
@@ -353,8 +354,8 @@ class IOEvaluate(Equation):
            1 : particle is inside the inlet/outlet
            2 : particle is out of inlet/outlet
 
-        parameters:
-        ----------
+        Parameters
+        -----------
 
         dest : str
             destination particle array name
@@ -410,7 +411,7 @@ class UpdateNormalsAndDisplacements(Equation):
         """Update normal and perpendicular distance from the interface
         for the inlet/outlet particles
 
-        parameters:
+        Parameters
         ----------
 
         dest : str

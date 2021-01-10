@@ -59,8 +59,10 @@ def mesh2points(file_name, dx, file_format=None, uniform=False):
     Supported file formats: Refer to https://github.com/nschloe/meshio
 
     Only works with triangle meshes.
+
     Parameters
     ----------
+
     file_name : string
         Mesh file name
     dx : float
@@ -69,6 +71,7 @@ def mesh2points(file_name, dx, file_format=None, uniform=False):
         Mesh file format
     uniform : bool
         If True generates points on a grid of spacing dx
+
     Returns
     -------
     xf, yf, zf : ndarray

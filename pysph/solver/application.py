@@ -164,7 +164,7 @@ class Application(object):
       :py:class:`pysph.parallel.parallel_manager.ParallelManager`.
 
     - ``particles``: list of
-      :py:class:`pysph.base.particle_array.ParticleArray`s.
+      :py:class:`pysph.base.particle_array.ParticleArray`.
 
     - ``rank``: Rank of this process.
 
@@ -172,7 +172,7 @@ class Application(object):
 
     - ``solver``: the solver instance, :py:class:`pysph.solver.solver.Solver`.
 
-    - ``tools``: a list of possible :py:class:`pysph.solver.tools.Tool`s.
+    - ``tools``: a list of possible :py:class:`pysph.solver.tools.Tool`.
 
     """
 
