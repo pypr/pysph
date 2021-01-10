@@ -388,7 +388,7 @@ class MomentumEquationWithStress(Equation):
 
 
 class HookesDeviatoricStressRate(Equation):
-    r""" **Rate of change of stress **
+    r""" Rate of change of stress
 
     .. math::
         \frac{dS^{ij}}{dt} = 2\mu\left(\epsilon^{ij} - \frac{1}{3}\delta^{ij}

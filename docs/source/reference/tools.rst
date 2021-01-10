@@ -63,9 +63,9 @@ Mayavi Viewer
    :undoc-members:
 
 Mesh Converter
--------------
+--------------
 
 The following functions can be used to convert a mesh file supported by
-'meshio<https://github.com/nschloe/meshio>'_ to a set of surface points.
+`meshio <https://github.com/nschloe/meshio>`_ to a set of surface points.
 
 .. autofunction:: pysph.tools.read_mesh.mesh2points

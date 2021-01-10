@@ -390,8 +390,10 @@ class EPECIntegrator(Integrator):
 
     In the EPEC mode, the final corrector can be modified to:
 
-    :math:`y^{n+1} = y^n + \frac{\Delta t}{2}\left( F(y^n) +
-                                F(y^{n+\frac{1}{2}}) \right)`
+    .. math::
+
+        y^{n+1} = y^n + \frac{\Delta t}{2}\left( F(y^n) +
+                                F(y^{n+\frac{1}{2}}) \right)
 
     This would require additional storage for the accelerations.
 

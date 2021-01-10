@@ -81,21 +81,21 @@ class SPHFirstOrderApproximationPreStep(Equation):
 
 
 class SPHFirstOrderApproximation(Equation):
-    """ First order SPH approximation
-        -------------
-        The method used to solve the linear system in this function is not same
-        as in the reference. In the function `Ax=b` is solved where `A :=
-        moment` (Moment matrix) and `b := p_sph` (Property calculated using
-        basic SPH).
-        The calculation need the `moment` to be evaluated before this step
-        which is done in `SPHFirstOrderApproximationPreStep`
+    """First order SPH approximation.
 
-        References
-        ----------
+    The method used to solve the linear system in this function is not same as
+    in the reference. In the function :math:`Ax=b` is solved where :math:`A :=
+    moment` (Moment matrix) and :math:`b := p_sph` (Property calculated using
+    basic SPH). The calculation need the "moment" to be evaluated before this
+    step which is done in `SPHFirstOrderApproximationPreStep`
 
-        .. [Liu2006] M.B. Liu, G.R. Liu, "Restoring particle consistency in
-           smoothed particle hydrodynamics", Applied Numerical Mathematics
-           Volume 56, Issue 1 2006, Pages 19-36, ISSN 0168-9274
+    References
+    -----------
+
+    .. [Liu2006] M.B. Liu, G.R. Liu, "Restoring particle consistency in
+       smoothed particle hydrodynamics", Applied Numerical Mathematics
+       Volume 56, Issue 1 2006, Pages 19-36, ISSN 0168-9274
+
     """
     def _get_helpers_(self):
         return [gj_solve, augmented_matrix]
