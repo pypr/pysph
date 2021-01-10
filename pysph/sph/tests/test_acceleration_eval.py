@@ -665,6 +665,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         return GPUNNPS
 
     def _make_accel_eval(self, equations, cache_nnps=True):
+        pytest.importorskip('pyopencl')
         pytest.importorskip('pysph.base.gpu_nnps')
         GPUNNPS = self._get_nnps_cls()
         arrays = [self.pa]
@@ -946,6 +947,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         self.assertEqual(eq.called_with, (1.0, 0.1))
 
     def test_get_equations_with_converged(self):
+        pytest.importorskip('pyopencl')
         pytest.importorskip('pysph.base.gpu_nnps')
         from pysph.sph.acceleration_eval_gpu_helper import \
             get_equations_with_converged

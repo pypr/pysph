@@ -482,6 +482,7 @@ class TestPEFRLIntegrator(TestIntegratorBase):
 
 class TestLeapFrogIntegratorGPU(TestIntegratorBase):
     def _setup_integrator(self, equations, integrator):
+        pytest.importorskip('pyopencl')
         pytest.importorskip('pysph.base.gpu_nnps')
         kernel = CubicSpline(dim=1)
         arrays = [self.pa]
