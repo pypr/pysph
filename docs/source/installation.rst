@@ -6,14 +6,17 @@ Installation and getting started
 
 To install PySPH, you need a working Python environment with the required
 dependencies installed. You may use any of the available Python distributions.
-PySPH is currently tested with Python-2.7.x and 3.x. If you are new to Python
-we recommend `Enthought Canopy`_ or EDM_. PySPH will work fine with
-Miniconda_, Anaconda_ or other environments like WinPython_. The following
-instructions should help you get started.
+PySPH is currently tested with Python 3.x. If you are new to Python we
+recommend EDM_ or Anaconda_. PySPH will work fine with miniconda_, Anaconda_
+or other environments like WinPython_. The following instructions should help
+you get started.
 
 Since there is a lot of information here, we suggest that you skim the section
-on :ref:`dependencies` and then directly jump to one of the "Installing the
-dependencies on xxx" sections below depending on your operating system.
+on :ref:`quick-install`, :ref:`dependencies` and then directly jump to one of
+the "Installing the dependencies on xxx" sections below depending on your
+operating system. If you need to use MPI please do go through
+:ref:`install-with-mpi` first though.
+
 Depending on your chosen Python distribution, simply follow the instructions
 and links referred therein.
 
@@ -22,10 +25,9 @@ and links referred therein.
     :depth: 1
 
 
-.. _Enthought Canopy: https://www.enthought.com/products/canopy/
 .. _EDM: https://www.enthought.com/products/edm/
 .. _Anaconda: http://continuum.io/downloads
-.. _Miniconda: https://conda.io/miniconda.html
+.. _miniconda: https://conda.io/miniconda.html
 
 
 .. _quick-install:
@@ -41,11 +43,12 @@ Simply running pip_ like so::
 
     $ pip install PySPH
 
-should do the trick.  You may do this in a virtualenv_ if you chose to.  The
+should do the trick. You may do this in a virtualenv_ if you chose to. The
 important examples are packaged with the sources, you should be able to run
 those immediately. If you wish to download the sources and explore them, you
 can download the sources either using the tarball/ZIP or from git, see
-:ref:`downloading-pysph`.
+:ref:`downloading-pysph`. If you need MPI support you should first read
+:ref:`install-with-mpi`.
 
 The above will install the latest released version of PySPH, you can install
 the development version using::
@@ -64,6 +67,98 @@ is also available below.
 
 If you are running into strange issues when you are setting up an installation
 with ZOLTAN, see here, :ref:`pip-cache-issues`.
+
+.. _install-with-mpi:
+
+----------------------
+Installation with MPI
+----------------------
+
+These are the big picture instructions for installation with MPI. This can be
+tricky since MPI is often very tuned to the specific hardware you are using.
+For example on large HPC clusters, different flavors of highly optimized MPI
+libraries are made available. These require different compilation and link
+flags and often different compilers are available as well.
+
+In addition to this, the Python package installer pip_ tries to build wheels
+in an isolated environment by default. This is a problem when installing
+packages which use libraries like MPI. Our recommendations and notes here are
+so you understand what is going on.
+
+The first thing you will need to do is install mpi4py_ and test that it works
+well. Read the documentation so your mpi4py is suitably configured for your
+hardware and works correctly. You will then need to install PyZoltan_ which
+requires that the Zoltan library be installed. The installation instructions
+are available in the `PyZoltan documentation
+<https://pyzoltan.readthedocs.io>`_ but you must ensure that you either
+install it from source using ``python setup.py install`` or ``python setup.py
+develop`` or if you install it with pip_ you can do this::
+
+   pip install pyzoltan --no-build-isolation
+
+This shuts of pip's default build isolation so it picks up your installed
+version of mpi4py_. Once this is installed you can install pysph using::
+
+  pip install pysph --no-build-isolation
+
+Basically, if you use pip with MPI support you will need to turn off its
+default build isolation. OTOH, you do not need to do anything special if you
+install using ``python setup.py install``.
+
+Finally, given that custom MPI environments require custom compile/link flags
+you may find it worthwhile using a configuration file to set these up for both
+PyZoltan_ and PySPH as discussed in :ref:`config-file`.
+
+
+.. _config-file:
+
+-----------------------------
+Using the configuration file
+-----------------------------
+
+Instead of setting environment variables and build options on the shell you
+can have them setup using a simple configuration file. This is the same as
+that described in the PyZoltan_ documentation and is entirely optional but if
+you are customizing your builds for MPI, this may be very useful.
+
+The file is located in ``~/.compyle/config.py`` (we use the same file for
+compyle_ and PyZoltan_). Here ``~`` is your home directory which on Linux is
+``/home/username``, on MacOS ``/Users/username`` and on Windows the location
+is likely ``\Users\username``. This file is executed and certain options may
+be set there.
+
+For example if you wish to set the appropriate C and C++ compiler (icc, Cray,
+or PGI), you may set the ``CC`` and ``CXX`` environment variables. You could
+do this in the ``~/.compyle/config.py``::
+
+  import os
+
+  os.environ['CC'] = 'cc'
+  os.environ['CXX'] = 'CC'
+
+The above are for a Cray system.  You may also setup custom OpenMP related flags. For
+example, on a Cray system you may do the following::
+
+  OMP_CFLAGS = ['-homp']
+  OMP_LINK = ['-homp']
+
+The ``OMP_CFLAGS`` and ``OMP_LINK`` parameters should be lists.
+
+The MPI and ZOLTAN specific options are::
+
+  MPI_CFLAGS = ['...']  # must be a list.
+  MPI_LINK = ['...']
+
+  # Zoltan options
+  USE_TRILINOS = 1  # When set to anything, use "-ltrilinos_zoltan".
+  ZOLTAN = '/path/to_zoltan'  # looks inside this for $ZOLTAN/include/, lib/
+
+  # Not needed if using ZOLTAN
+  ZOLTAN_INCLUDE = 'path/include'  # path to zoltan.h
+  ZOLTAN_LIBRARY = 'path/lib'  # path to libzoltan.a
+
+Note that the above just lists all the different options. You do not need to
+set them all, only use those that you need, if the defaults work for you.
 
 
 .. _dependencies:
@@ -112,9 +207,9 @@ or an equivalent compiler. More details are available below.
 .. _Cython: http://www.cython.org
 .. _pytest: https://www.pytest.org
 .. _Mako: https://pypi.python.org/pypi/Mako
-.. _pip: http://www.pip-installer.org
+.. _pip: https://pip.pypa.io/
 .. _cyarray: https://pypi.python.org/pypi/cyarray
-.. _compyle: https://pypi.python.org/pypi/compyle
+.. _compyle: https://compyle.readthedocs.io
 
 
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -129,6 +224,9 @@ The optional dependencies are:
  - PyOpenCL_: PySPH can use OpenCL if it is available. This requires
    installing PyOpenCL_.
 
+ - PyCUDA_: PySPH can use CUDA if it is available. This requires installing
+   PyCUDA_.
+
  - Mayavi_: PySPH provides a convenient viewer to visualize the output
    of simulations. This viewer can be launched using the command
    ``pysph view`` and requires Mayavi_ to be installed.  Since this is
@@ -139,7 +237,8 @@ The optional dependencies are:
  - mpi4py_ and Zoltan_: If you want to use PySPH in parallel, you will need
    mpi4py_ and the Zoltan_ data management library along with the PyZoltan_
    package. PySPH will work in serial without mpi4py_ or Zoltan_. Simple build
-   instructions for Zoltan are included below.
+   instructions for Zoltan are included below but please do go through the
+   :ref:`install-with-mpi` section to get an overview.
 
 Mayavi_ is packaged with all the major distributions and is easy to install.
 Zoltan_ is very unlikely to be already packaged and will need to be compiled.
@@ -149,6 +248,7 @@ Zoltan_ is very unlikely to be already packaged and will need to be compiled.
 .. _Zoltan: http://www.cs.sandia.gov/zoltan/
 .. _OpenMP: http://openmp.org/
 .. _PyOpenCL: https://documen.tician.de/pyopencl/
+.. _PyCUDA: https://documen.tician.de/pycuda/
 .. _OpenCL: https://www.khronos.org/opencl/
 .. _PyZoltan: https://github.com/pypr/pyzoltan
 
@@ -199,14 +299,17 @@ ZOLTAN, see here, :ref:`pip-cache-issues`.
         $ export ZOLTAN_INCLUDE=$INSTALL_PREFIX/include
         $ export ZOLTAN_LIBRARY=$INSTALL_PREFIX/lib
 
+    You may also set these in the configuration file described in
+    :ref:`config-file`.
+
 
 -----------------------------------------
 Installing the dependencies on GNU/Linux
 -----------------------------------------
 
-If you are using `Enthought Canopy`_ EDM_ or Anaconda_ the instructions in the
-section :ref:`installing-deps-osx` will be useful as the instructions are the
-same. The following are for the case where you wish to use the native Python
+If you are using EDM_ or Anaconda_ the instructions in the section
+:ref:`installing-deps-osx` will be useful as the instructions are the same.
+The following are for the case where you wish to use the native Python
 packages distributed with the Linux distribution you are using.
 
 If you are running into trouble, note that it is very easy to install using
@@ -256,6 +359,9 @@ icc run the following commands `before` building PySPH::
     installation, you can try running ``export
     LD_LIBRARY_PATH=/path/to/icc/lib``.
 
+Note that you may also set the configuration options in the configuration file
+described in :ref:`config-file`.
+
 You should be set now and should skip to :ref:`downloading-pysph` and
 :ref:`building-pysph`.
 
@@ -292,6 +398,9 @@ follows::
   $ export ZOLTAN_LIBRARY=/usr/lib/x86_64-linux-gnu
   $ export USE_TRILINOS=1
 
+You may also set these options in the configuration file described in
+:ref:`config-file`.
+
 Now depending on your setup you can install the Python related dependencies.
 For example with conda_ you can do::
 
@@ -302,20 +411,31 @@ For example with conda_ you can do::
 
 Then you should be able to install pyzoltan and its dependency cyarray using::
 
-  $ pip install pyzoltan
+  $ pip install pyzoltan --no-build-isolation
 
 Finally, install PySPH with ::
 
-  $ pip install pysph
+  $ pip install pysph --no-build-isolation
 
 Or with::
 
-  $ pip install --no-cache-dir pysph
+  $ pip install --no-cache-dir --no-build-isolation pysph
 
 If you are having trouble due to pip's cache as discussed in
 :ref:`pip-cache-issues`.
 
 You should be all set now and should next consider :ref:`running-the-tests`.
+
+.. _conda: https://docs.conda.io/
+
+.. note::
+
+   The ``--no-build-isolation`` argument to pip is **necessary** for without
+   it, pip will attempt to create an isolated environment and build a pyzoltan
+   wheel inside that isolated environment. This will mean that it will not see
+   mpi4py that you have built and installed. This could end up causing all
+   sorts of problems especially if you have a custom MPI library.
+
 
 .. _installing-deps-osx:
 
@@ -323,9 +443,9 @@ You should be all set now and should next consider :ref:`running-the-tests`.
 Installing the dependencies on Mac OS X
 ------------------------------------------
 
-On OS X, your best bet is to install `Enthought Canopy`_, EDM_, or Anaconda_
-or some other Python distribution. Ensure that you have gcc or clang installed
-by installing XCode. See `this
+On OS X, your best bet is to install EDM_, or Anaconda_ or some other Python
+distribution. Ensure that you have gcc or clang installed by installing XCode.
+See `this
 <http://stackoverflow.com/questions/12228382/after-install-xcode-where-is-clang>`_
 if you installed XCode but can't find clang or gcc.
 
@@ -411,32 +531,6 @@ Manager (EDM_).
   :ref:`building-pysph`.
 
 
-^^^^^^^^^^^^^
-Using Canopy
-^^^^^^^^^^^^^
-
-Download the Canopy express installer for your platform (the full installer is
-also fine).  Launch Canopy after you install it so it initializes your user
-environment.  If you have made Canopy your default Python, all should be well,
-otherwise launch the Canopy terminal from the Tools menu of the Canopy editor
-before typing your commands below.
-
-NumPy_ ships by default but Cython_ does not. Mako_ and Cython can be installed
-with ``pip`` easily (``pip`` will be available in your Canopy environment)::
-
-    $ pip install cython mako
-
-Mayavi_ is best installed with the Canopy package manager::
-
-    $ enpkg mayavi
-
-.. note:: If you are a subscriber you can also ``enpkg cython`` to install
-   Enthought's build.
-
-If you need parallel support, please see :ref:`installing-mpi-osx`, otherwise,
-skip to :ref:`downloading-pysph` and :ref:`building-pysph`.
-
-
 .. _using_conda_osx:
 
 ^^^^^^^^^^^^^^^
@@ -459,7 +553,6 @@ If you need parallel support, please see :ref:`installing-mpi-osx`, otherwise,
 skip to :ref:`downloading-pysph` and :ref:`building-pysph`.
 
 
-.. _miniconda: http://conda.pydata.org/miniconda.html
 
 .. _installing-mpi-osx:
 
@@ -526,42 +619,13 @@ Once you are done with this, please skip ahead to
 :ref:`installing-visual-c++`.
 
 
-^^^^^^^^^^^^^^
-Using Canopy
-^^^^^^^^^^^^^^
-
-Download and install Canopy Express for you Windows machine (32 or 64 bit).
-Launch the Canopy editor at least once so it sets up your user environment.
-Make the Canopy Python the default Python when it prompts you.  If you have
-already skipped that option, you may enable it in the ``Edit->Preferences``
-menu.  With that done you may install the required dependencies.  You can
-either use the Canopy package manager or use the command line.  We will use
-the command line for the rest of the instructions.  To start a command line,
-click on "Start" and navigate to the ``All Programs/Enthought Canopy`` menu.
-Select the "Canopy command prompt", if you made Canopy your default Python,
-just starting a command prompt (via ``cmd.exe``) will also work.
-
-On the command prompt,  Mako_ and Cython can be installed with ``pip`` easily
-(``pip`` should be available in your Canopy environment)::
-
-    > pip install cython mako
-
-Mayavi_ is best installed with the Canopy package manager::
-
-    > enpkg mayavi
-
-Once you are done with this, please skip ahead to
-:ref:`installing-visual-c++`.
-
-.. note:: If you are a subscriber you can also ``enpkg cython`` to install
-   Enthought's build.
 
 ^^^^^^^^^^^^^^^^^
 Using WinPython
 ^^^^^^^^^^^^^^^^^
 
-Instead of Canopy or Anaconda you could try WinPython_ 2.7.x.x. To obtain the
-core dependencies, download the corresponding binaries from Christoph Gohlke's
+Instead of Anaconda you could try WinPython_ 2.7.x.x. To obtain the core
+dependencies, download the corresponding binaries from Christoph Gohlke's
 `Unofficial Windows Binaries for Python Extension Packages
 <http://www.lfd.uci.edu/~gohlke/pythonlibs/>`_. Mayavi is available through
 the binary ETS.
@@ -726,19 +790,6 @@ directory::
     to be absolutely sure.
 
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Using Virtualenv on Canopy
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-If you are using `Enthought Canopy`_, it already bundles virtualenv for you but
-you should use the ``venv`` script.  For example::
-
-    $ venv --help
-    $ venv --system-site-packages myenv
-    $ source myenv/bin/activate
-
-The rest of the steps are the same as above.
-
 
 .. _downloading-pysph:
 
@@ -791,6 +842,10 @@ Once you have the dependencies installed you can install PySPH with::
 
     $ pip install PySPH
 
+If you are going to be using PySPH with MPI support you will likely need to do::
+
+  $ pip install PySPH --no-build-isolation
+
 You can install the development version using::
 
     $ pip install https://github.com/pypr/pysph/zipball/master
@@ -814,6 +869,7 @@ You should be all set now and should next consider :ref:`running-the-tests`.
 
 .. _pip-cache-issues:
 
+--------------------------
 Issues with the pip cache
 --------------------------
 
@@ -829,7 +885,7 @@ and want it to re-build PySPH to use ZOLTAN say, then you can do the
 following::
 
 
-  $ pip install --no-cache-dir pysph
+  $ pip install --no-cache-dir --no-build-isolation pysph
 
 In this case, pip_ will disregard its default cache and freshly download and
 build PySPH. This is often handy.
