@@ -27,8 +27,8 @@ from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
 from pysph.base import kernels
 from compyle.config import get_config
 from compyle.profile import print_profile, profile2csv, get_profile_info
-from pysph.solver.controller import CommandManager
-from pysph.solver.utils import mkdir, load, get_files, get_free_port
+from .controller import CommandManager
+from .utils import mkdir, load, get_files, get_free_port, is_using_ipython
 
 # conditional parallel imports
 from pysph import has_mpi, has_zoltan, in_parallel
@@ -38,20 +38,6 @@ if in_parallel():
     import mpi4py.MPI as mpi
 
 logger = logging.getLogger(__name__)
-
-
-def is_using_ipython():
-    """Return True if the code is being run from an IPython session or
-    notebook.
-    """
-    try:
-        # If this is being run inside an IPython console or notebook
-        # then this is defined.
-        __IPYTHON__
-    except NameError:
-        return False
-    else:
-        return True
 
 
 def list_all_kernels():
