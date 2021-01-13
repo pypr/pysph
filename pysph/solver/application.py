@@ -1155,7 +1155,7 @@ class Application(object):
         solver.set_disable_output(options.disable_output)
 
         if options.reorder_freq is None:
-            if options.with_opencl:
+            if options.with_opencl or options.with_cuda:
                 solver.set_reorder_freq(50)
         else:
             solver.set_reorder_freq(options.reorder_freq)
