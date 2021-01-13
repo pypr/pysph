@@ -1524,6 +1524,38 @@ class Application(object):
 
     def run(self, argv=None):
         """Run the application.
+
+        This basically calls ``setup()`` and then ``solve()``.
+
+        Parameters
+        ----------
+
+        argv: list
+            Optional command line arguments.  Handy when running
+            interactively.
+        """
+        self.setup(argv)
+        self.solve()
+
+    def set_args(self, args):
+        self.args = args
+
+    def setup(self, argv=None):
+        """Setup the application.
+
+        This may be used to setup the various pieces of infrastructure to run
+        an SPH simulation, for example, this will parse the command line
+        arguments passed, setup the scheme, solver, equations etc. It will not
+        call the solver's solve method though. This can be useful if you wish
+        to manually run the solver.
+
+        Parameters
+        ----------
+
+        argv: list
+            Optional command line arguments.  Handy when running
+            interactively.
+
         """
         if argv is not None:
             self.set_args(argv)
@@ -1568,6 +1600,13 @@ class Application(object):
 
         self.customize_output()
 
+    def solve(self):
+        """This runs the solver.
+
+        Note that this method expects that ``setup`` has already been called.
+
+        Don't use this method unless you really know what you are doing.
+        """
         start_time = time.time()
         self.solver.solve(not self.options.quiet)
         end_time = time.time()
@@ -1579,82 +1618,6 @@ class Application(object):
 
         self._stop_interfaces()
         self._write_profile_info()
-
-    def set_args(self, args):
-        self.args = args
-
-    def setup(self, solver, equations, nnps=None, inlet_outlet_factory=None,
-              particle_factory=None, *args, **kwargs):
-        """Setup the application's solver.
-
-        This will parse the command line arguments (if this is not called from
-        within an IPython notebook or shell) and then using those parameters
-        and any additional parameters and call the solver's setup method.
-
-        Parameters
-        ----------
-        solver: pysph.solver.solver.Solver
-            The solver instance.
-
-        equations: list
-            A list of Groups/Equations.
-
-        nnps: pysph.base.nnps_base.NNPS
-            Optional NNPS instance. If None is given a default NNPS is created.
-
-        inlet_outlet_factory: callable or None
-            The `inlet_outlet_factory` is passed a dictionary of the particle
-            arrays.  The factory should return a list of inlets and outlets.
-
-        particle_factory : callable or None
-            If supplied, particles will be created for the solver using the
-            particle arrays returned by the callable. Else particles for the
-            solver need to be set before calling this method
-
-        args:
-            extra positional arguments passed on to the `particle_factory`.
-
-        kwargs:
-            extra keyword arguments passed to the `particle_factory`.
-
-
-        Examples
-        --------
-
-        >>> def create_particles():
-        ...    ...
-        ...
-        >>> solver = Solver(...)
-        >>> equations = [...]
-        >>> app = Application()
-        >>> app.setup(solver=solver, equations=equations,
-        ...           particle_factory=create_particles)
-        >>> app.run()
-        """
-        start_time = time.time()
-        self.solver = solver
-        self.equations = equations
-        solver.get_options(self.arg_parse)
-        self._parse_command_line()
-        self._process_command_line()
-        self._setup_logging()
-        self._configure_global_config()
-
-        # Create particles either from scratch or restart
-        self._create_particles(particle_factory, *args, **kwargs)
-
-        # This must be done before the initial load balancing
-        # as the inlets will create new particles.
-        self._create_inlet_outlet(inlet_outlet_factory)
-        if nnps is not None:
-            self.nnps = nnps
-
-        self._configure_solver()
-
-        end_time = time.time()
-        setup_duration = end_time - start_time
-        self._message("Setup took: %.5f secs" % (setup_duration))
-        self._write_info(self.info_filename, completed=False, cpu_time=0)
 
     ######################################################################
     # User methods that could be overloaded.
