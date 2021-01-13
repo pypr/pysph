@@ -44,13 +44,13 @@ NNPS_TEMPLATE = r"""
     int _offset_lim = _neighbor_cid_offset[_idx + 1];
     uint2 _pbound_here2;
 
-    local ${data_t} _xs[${wgs}];
-    local ${data_t} _ys[${wgs}];
-    local ${data_t} _zs[${wgs}];
-    local ${data_t} _hs[${wgs}];
+    LOCAL_MEM ${data_t} _xs[${wgs}];
+    LOCAL_MEM ${data_t} _ys[${wgs}];
+    LOCAL_MEM ${data_t} _zs[${wgs}];
+    LOCAL_MEM ${data_t} _hs[${wgs}];
 
     % for var, type in zip(vars, types):
-    local ${type} ${var}[${wgs}];
+    LOCAL_MEM ${type} ${var}[${wgs}];
     % endfor
 
     char _nbrs[${wgs}];
@@ -84,7 +84,7 @@ NNPS_TEMPLATE = r"""
                 ${var}[lid] = ${var}_global[_pid_src];
                 % endfor
             }
-            barrier(CLK_LOCAL_MEM_FENCE);
+            local_barrier();
 
             // Everything this point forward is done independently
             // by each thread.
@@ -110,7 +110,7 @@ NNPS_TEMPLATE = r"""
                     _j++;
                 }
             }
-            barrier(CLK_LOCAL_MEM_FENCE);
+            local_barrier();
             _pbound_here2.s0 += ${wgs};
         }
 

@@ -270,7 +270,7 @@ class IntegratorGPUHelper(IntegratorCythonHelper):
         s, d = get_array_names(args)
 
         all_args = self.acceleration_eval_helper._get_typed_args(
-            list(d) + ['t', 'dt']
+            sorted(d) + ['t', 'dt']
         )
         all_args.append('unsigned int NP_MAX')
 
@@ -290,7 +290,7 @@ class IntegratorGPUHelper(IntegratorCythonHelper):
 
         body = '\n'.join(' '*4 + x for x in code)
 
-        self.data[method][dest] = (kernel, list(d))
+        self.data[method][dest] = (kernel, sorted(d))
 
         sig = get_kernel_definition(kernel, all_args)
         return (
