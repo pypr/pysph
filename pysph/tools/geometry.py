@@ -778,3 +778,69 @@ def show_3d(points, **kw):
     from mayavi import mlab
     mlab.points3d(points[0], points[1], points[2], **kw)
     mlab.axes(xlabel='X', ylabel='Y', zlabel='Z')
+
+
+def get_packed_particles(folder,
+                         dx,
+                         x=None,
+                         y=None,
+                         z=None,
+                         L=None,
+                         B=None,
+                         H=None,
+                         dim=None,
+                         xn=None,
+                         yn=None,
+                         zn=None,
+                         pb=None,
+                         nu=None,
+                         k=None,
+                         scale=1.0,
+                         shift=False,
+                         filename=None,
+                         dfreq=-1,
+                         invert_normal=False,
+                         hardpoints=None,
+                         use_prediction=False,
+                         filter_layers=False,
+                         reduce_dfreq=False,
+                         tol=1e-2):
+
+    import os
+    parent = os.path.dirname(folder)
+    basename = os.path.basename(folder)
+    preprocess_folder = os.path.join(parent, 'packing_%.4f'%dx)
+
+    res_folder = os.path.join(parent, 'preprocess')
+    os.makedirs(res_folder, exist_ok=True)
+
+    res_file = os.path.join(parent, 'preprocess', basename + '_%.4f.npz'%dx)
+
+    def readdata(resfile):
+        data = np.load(resfile)
+        xs = data['xs']
+        ys = data['ys']
+        zs = data['zs']
+        xf = data['xf']
+        yf = data['yf']
+        zf = data['zf']
+        return xs, yz, zs, xf, yf, zf
+
+    if os.path.exists(res_file):
+        return readdata(res_file)
+    else:
+        from pysph.tools.packer import Packer
+        app = Packer(
+            None, preprocess_folder, None, dx, res_file, dim=dim, 
+            x=x, y=y, z=z, filename=filename, hardpoints=hardpoints, 
+            use_prediction=use_prediction, filter_layers=filter_layers,
+            reduce_dfreq=reduce_dfreq, tol=tol, scale=scale, shift=shift, 
+            invert_normal=invert_normal, pb=pb, nu=nu, k=k, dfreq=dfreq
+        )
+        app.run()
+        app.post_process(app.info_filename)
+        return readdata(res_file)
+
+
+
+
