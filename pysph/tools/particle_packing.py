@@ -12,7 +12,7 @@ from compyle.api import declare
 import numpy
 
 
-def get_bounding_box(x, y, z=[0]):
+def get_bounding_box(x, y, z=[0], L=None, B=None, H=0.0):
     """Returns the bounding box required by the packing method
     """
     xmax = max(x)
@@ -22,9 +22,14 @@ def get_bounding_box(x, y, z=[0]):
     zmax = max(z)
     zmin = min(z)
 
-    lenx = xmax - xmin
-    leny = ymax - ymin
-    lenz = zmax - zmin
+    if L == None:
+        lenx = xmax - xmin
+        leny = ymax - ymin
+        lenz = zmax - zmin
+    else:
+        lenx = L
+        leny = B
+        lenz = H
 
     b0x = xmin - 0.5 * lenx
     b1x = xmax + 0.5 * lenx
@@ -199,6 +204,137 @@ def repair_boundary(x, y, hard):
         y[id3] = y[id] + 0.8 * dy
         y[id2] = y[id] + 0.5 * dy
         y[id1] = y[id] + fac * dy
+
+
+def create_frozen_container_outer(dx, hdx, rho, bound,
+                            l=3, dim=2,
+                            name='frozen'):
+    """function to create frozen particle lattice of given
+    size and spacing
+
+    Parameters
+    ----------
+
+    dx: required resolution 
+    hdx: h/dx ratio
+    rho: density of the particles
+    L: length of the domain
+    B: Breadth of the domain
+    l: number of layers
+    H: height of the domain
+    dim: dimension of the problem
+    name: name of the particle array
+
+    Returns
+    -------
+
+    frozen: pysph.base.utils.ParticleArray class instance
+    """
+    import numpy as np
+    h = hdx * dx
+    m = rho * dx**dim
+    nl = l * dx
+    b = bound
+
+    if dim == 2:
+        x0, y0 = np.mgrid[b[0] + dx:b[1]:2 * dx, b[2]:b[3] + dx / 2:dx]
+        x1, y1 = np.mgrid[b[0]:b[1] + dx:2 * dx, b[2] + dx / 2:b[3]:dx]
+        x0, y0 = [t.ravel() for t in (x0, y0)]
+        x1, y1 = [t.ravel() for t in (x1, y1)]
+        x = np.concatenate((x0, x1))
+        y = np.concatenate((y0, y1))
+        z = np.zeros_like(x)
+    elif dim == 3:
+        x0, y0, z0 = np.mgrid[b[0] + dx:b[1]:2 * dx, b[2]:b[3] + dx / 2:dx,
+                              b[4]:b[5] + dx / 2:dx]
+        x1, y1, z1 = np.mgrid[b[0]:b[1] + dx:2 * dx, b[2] + dx / 2:b[3]:dx,
+                              b[4] + dx / 2:b[5]:dx]
+        x0, y0, z0 = [t.ravel() for t in (x0, y0, z0)]
+        x1, y1, z1 = [t.ravel() for t in (x1, y1, z1)]
+        x = np.concatenate((x0, x1))
+        y = np.concatenate((y0, y1))
+        z = np.concatenate((z0, z1))
+
+    inner = get_particle_array(x=x, y=y, z=z, m=m, rho=rho, h=h, name=name)
+
+    if dim == 2:
+        x0, y0 = np.mgrid[b[0] - 2 * nl + dx / 2:b[1] + 2 * nl:dx,
+                          b[2] - 2 * nl + dx / 2:b[3] + 2 * nl:dx]
+        x, y = [t.ravel() for t in (x0, y0)]
+        z = np.zeros_like(x)
+        cond = ~((x - (b[0] - nl) > 1e-14) & (x - (b[1] + nl) < 1e-14) &
+                 (y - (b[2] - nl) > 1e-14) & (y - (b[3] + nl) < 1e-14))
+
+    elif dim == 3:
+        x0, y0, z0 = np.mgrid[b[0] - 2 * nl + dx / 2:b[1] + 2 * nl:dx,
+                              b[2] - 2 * nl + dx / 2:b[3] + 2 * nl:dx,
+                              b[4] - 2 * nl + dx / 2:b[5] + 2 * nl:dx]
+        x, y, z = [t.ravel() for t in (x0, y0, z0)]
+        cond = ~((x - (b[0] - nl) > 1e-14) & (x - (b[1] + nl) < 1e-14) &
+                 (y - (b[2] - nl) > 1e-14) & (y - (b[3] + nl) < 1e-14) &
+                 (z - (b[4] - nl) > 1e-14) & (z - (b[5] + nl) < 1e-14))
+
+    frozen = get_particle_array(
+        x=x[cond], y=y[cond], z=z[cond], m=m, rho=rho, h=h, name=name)
+    inner.extract_particles(np.ones_like(inner.x), frozen)
+    return frozen
+
+
+def create_free_particles_outer(dx, hdx, rho, bound, l=3, dim=2, name='free'):
+    """function to create free particle lattice of given size and spacing
+
+    Parameters
+    ----------
+
+    dx: required resolution 
+    hdx: h/dx ratio
+    rho: density of the particles
+    L: length of the domain
+    B: Breadth of the domain
+    H: height of the domain
+    dim: dimension of the problem
+    name: name of the particle array
+
+    Returns
+    -------
+
+    free: pysph.base.utils.ParticleArray class instance
+    """
+    import numpy as np
+    h = hdx * dx
+    m = rho * dx**dim
+    nl = l * dx
+    b = bound
+    if dim == 2:
+        x0, y0 = np.mgrid[b[0] - nl + dx:b[1] + nl:2 * dx,
+                          b[2] - nl + dx / 2:b[3] + nl:dx]
+        x1, y1 = np.mgrid[b[0] - nl:b[1] + nl:2 * dx, b[2] - nl:b[3] + nl:dx]
+        x0, y0 = [t.ravel() for t in (x0, y0)]
+        x1, y1 = [t.ravel() for t in (x1, y1)]
+        x = np.concatenate((x0, x1))
+        y = np.concatenate((y0, y1))
+        z = np.zeros_like(x)
+        cond = ~((x - b[0] > 1e-14) & (x - b[1] < 1e-14) & (y - b[2] > 1e-14) &
+                 (y - b[3] < 1e-14))
+
+    elif dim == 3:
+        x0, y0, z0 = np.mgrid[b[0] - nl + dx:b[1] + nl:2 * dx,
+                              b[2] - nl + dx / 2:b[3] + nl:dx,
+                              b[4] - nl + dx / 2:b[5] + nl:dx]
+        x1, y1, z1 = np.mgrid[b[0] - nl:b[1] + nl:2 * dx,
+                              b[3] - nl:b[4] + nl:dx, b[5] - nl:b[6] + nl:dx]
+        x0, y0, z0 = [t.ravel() for t in (x0, y0, z0)]
+        x1, y1, z1 = [t.ravel() for t in (x1, y1, z1)]
+        x = np.concatenate((x0, x1))
+        y = np.concatenate((y0, y1))
+        z = np.concatenate((z0, z1))
+        cond = ~((x - b[0] > 1e-14) & (x - b[1] < 1e-14) & (y - b[2] > 1e-14) &
+                 (y - b[3] < 1e-14) & (z - b[4] > 1e-14) & (z - b[5] < 1e-14))
+
+    free = get_particle_array(
+        x=x[cond], y=y[cond], z=z[cond], m=m,
+        rho=rho, h=h, name=name)
+    return free
 
 
 def create_frozen_container(dx, hdx, rho, bound,
@@ -389,7 +525,7 @@ def create_surface_from_stl(
     return solid_nodes
 
 
-def create_surface_from_file(filename, points, dx, hdx, rho, 
+def create_surface_from_file(filename, points, dx, hdx, rho,
 isclosed, shift=True, invert=False, name='solid_nodes', hard={}):
     """function to create solid nodes particle from a x,y data file
 
@@ -866,7 +1002,7 @@ class ParticlePacking(Scheme):
         methods runs post every iteration 
     """
     def __init__(self, fluids, solids, frozen, dim, hdx=1.2,
-                 dx=0.1, nu=None, pb=None, k=None, dfreq=-1, 
+                 dx=0.1, nu=None, pb=None, k=None, dfreq=-1,
                  hardpoints=None, use_prediction=None,
                  filter_layers=None, reduce_dfreq=None, tol=None):
         """Parameters
@@ -1020,13 +1156,21 @@ class ParticlePacking(Scheme):
         if self.tol is None:
             self.tol = 1e-2
 
-    def create_frozen_container(self, bound, l=5, name='frozen'):
-        return create_frozen_container(
-            self.dx, self.hdx, 1.0, bound, l=l, dim=self.dim, name=name)
+    def create_frozen_container(self, bound, l=5, name='frozen', outer=False):
+        if outer:
+            return create_frozen_container_outer(
+                self.dx, self.hdx, 1.0, bound, l=l, dim=self.dim, name=name)
+        else:
+            return create_frozen_container(
+                self.dx, self.hdx, 1.0, bound, l=l, dim=self.dim, name=name)
 
-    def create_free_particles(self, bound, name='free'):
-        return create_free_particles(
-            self.dx, self.hdx, 1.0, bound, dim=self.dim, name=name)
+    def create_free_particles(self, bound, name='free', outer=False):
+        if outer:
+            return create_free_particles_outer(
+                self.dx, self.hdx, 1.0, bound, dim=self.dim, name=name)
+        else:
+            return create_free_particles(
+                self.dx, self.hdx, 1.0, bound, dim=self.dim, name=name)
 
     def create_boundary_node(self, filename, points=None, scale=1.0, shift=True, invert=False,
                              name='solid_nodes', isclosed=True):
@@ -1065,7 +1209,7 @@ class ParticlePacking(Scheme):
         from pysph.solver.solver import Solver
         self.solver = Solver(
             dim=self.dim, integrator=integrator, kernel=kernel,
-            n_damp=10, adaptive_timestep=True, pfreq=3000, tf=30, **kw)
+            n_damp=10, adaptive_timestep=True, pfreq=3000, tf=200, max_steps=40000, **kw)
 
     def get_equations(self):
 
@@ -1085,7 +1229,8 @@ class ParticlePacking(Scheme):
                 g1.append(
                     FindNearestNodeToHardPoint(dest=self.solids[name],
                                                sources=self.fluids))
-        equations.append(Group(equations=g1, real=False))
+        if len(self.solids.keys()) > 0:
+            equations.append(Group(equations=g1, real=False))
 
         g2 = []
         for name in self.solids:
@@ -1093,10 +1238,11 @@ class ParticlePacking(Scheme):
                 ProjectionToSurfaceBoundary(dest=name,
                                             sources=[self.solids[name]]))
         for name in self.fluids:
-            g2.append(
-                ProjectionToSurfaceBoundary(dest=name,
-                                            sources=list(
-                                                self.solids.values())))
+            if len(self.solids.keys()) > 0:
+                g2.append(
+                    ProjectionToSurfaceBoundary(dest=name,
+                                                sources=list(
+                                                    self.solids.values())))
         for name in self.solids:
             g2.append(
                 FindBoundaryNodeDirection(dest=name,
@@ -1203,12 +1349,37 @@ class ParticlePacking(Scheme):
     def post_process(self, free, solid, solid_nodes, frozen, dx, filename):
         import numpy as np
         free_n = free.name
+
+        if solid == None:
+            import os
+            xs, ys, zs, xf, yf, zf = None, None, None, None, None, None
+            if os.path.exists(filename):
+                data = np.load(filename)
+                xs = data['xs']
+                ys = data['ys']
+                zs = data['zs']
+                xf = data['xf']
+                yf = data['yf']
+                zf = data['zf']
+                np.concatenate((xf, free.x))
+                np.concatenate((yf, free.y))
+                np.concatenate((zf, free.z))
+            else:
+                xf = free.x
+                yf = free.y
+                zf = free.z
+                xs = []
+                ys = []
+                zs = []
+            return np.savez(filename, xs=xs, ys=ys, zs=zs,
+                     xf=xf, yf=yf, zf=zf)
+
         solid_nodes_n = solid_nodes.name
         frozen_n = frozen.name
 
-        xb, yb, zb, vb, rb = None, None, None, None, None
-        xi, yi, zi, vi, ri = None, None, None, None, None
-        xf, yf, zf, vf, rf = None, None, None, None, None
+        xb, yb, zb = None, None, None
+        xi, yi, zi = None, None, None
+        xf, yf, zf = None, None, None
 
         from pysph.tools.sph_evaluator import SPHEvaluator
         from pysph.sph.equation import Group
@@ -1244,14 +1415,10 @@ class ParticlePacking(Scheme):
         xi = free.x[external]
         yi = free.y[external]
         zi = free.z[external]
-        vi = free.V[external]
-        ri = free.rho[external]
 
         xf = free.x[internal]
         yf = free.y[internal]
         zf = free.z[internal]
-        vf = free.V[internal]
-        rf = free.rho[internal]
 
         isinterior = frozen.interior
         filter = frozen.filter
@@ -1260,36 +1427,25 @@ class ParticlePacking(Scheme):
         f_xi = frozen.x[external]
         f_yi = frozen.y[external]
         f_zi = frozen.z[external]
-        f_vi = frozen.V[external]
-        f_ri = frozen.rho[external]
 
         f_xf = frozen.x[internal]
         f_yf = frozen.y[internal]
         f_zf = frozen.z[internal]
-        f_vf = frozen.V[internal]
-        f_rf = frozen.rho[internal]
 
         xb = solid.x
         yb = solid.y
         zb = solid.z
-        vb = solid.V
-        rb = solid.rho
 
         xfluid = np.concatenate((xi, f_xi))
         yfluid = np.concatenate((yi, f_yi))
         zfluid = np.concatenate((zi, f_zi))
-        vfluid = np.concatenate((vi, f_vi))
-        rfluid = np.concatenate((ri, f_ri))
 
         xsolid = np.concatenate((xf, xb, f_xf))
         ysolid = np.concatenate((yf, yb, f_yf))
         zsolid = np.concatenate((zf, zb, f_zf))
-        vsolid = np.concatenate((vf, vb, f_vf))
-        rsolid = np.concatenate((rf, rb, f_rf))
 
         np.savez(filename, xs=xsolid, ys=ysolid, zs=zsolid,
-                 vs=vsolid, rs=rsolid, xf=xfluid, yf=yfluid,
-                 zf=zfluid, vf=vfluid, rf=rfluid)
+                 xf=xfluid, yf=yfluid, zf=zfluid)
 
     def setup_hardpoints(self, pa_solid_nodes, pa_fluid, pa_solid):
         if self.solver.t < 1e-14:
@@ -1472,3 +1628,6 @@ class ParticlePacking(Scheme):
 
                 if (self.do_check):
                     self._check(particles, pa_fluid)
+
+            if len(self.solids.keys()) == 0:
+                self._check(particles, pa_fluid)

@@ -804,12 +804,14 @@ def get_packed_particles(folder,
                          use_prediction=False,
                          filter_layers=False,
                          reduce_dfreq=False,
+                         no_solid=False,
                          tol=1e-2):
 
     import os
     parent = os.path.dirname(folder)
     basename = os.path.basename(folder)
     preprocess_folder = os.path.join(parent, 'packing_%.4f'%dx)
+    layer_folder = os.path.join(parent, 'layer_%.4f'%dx)
 
     res_folder = os.path.join(parent, 'preprocess')
     os.makedirs(res_folder, exist_ok=True)
@@ -824,21 +826,32 @@ def get_packed_particles(folder,
         xf = data['xf']
         yf = data['yf']
         zf = data['zf']
-        return xs, yz, zs, xf, yf, zf
+        return xs, ys, zs, xf, yf, zf
 
     if os.path.exists(res_file):
         return readdata(res_file)
     else:
-        from pysph.tools.packer import Packer
-        app = Packer(
+        from pysph.tools.packer import Packer, HexaToRectLayer
+        packer = Packer(
             None, preprocess_folder, None, dx, res_file, dim=dim, 
-            x=x, y=y, z=z, filename=filename, hardpoints=hardpoints, 
+            x=x, y=y, z=z, L=L, B=B, H=H, filename=filename, hardpoints=hardpoints, 
             use_prediction=use_prediction, filter_layers=filter_layers,
             reduce_dfreq=reduce_dfreq, tol=tol, scale=scale, shift=shift, 
-            invert_normal=invert_normal, pb=pb, nu=nu, k=k, dfreq=dfreq
+            invert_normal=invert_normal, pb=pb, nu=nu, k=k, dfreq=dfreq, no_solid=no_solid
         )
-        app.run()
-        app.post_process(app.info_filename)
+        packer.run()
+        packer.post_process(packer.info_filename)
+
+        if not no_solid:
+            hextorect = HexaToRectLayer(
+                None, layer_folder, None, dx, res_file, dim=dim, 
+                x=x, y=y, z=z, L=L, B=B, H=H, filename=filename, hardpoints=hardpoints, 
+                use_prediction=use_prediction, filter_layers=filter_layers,
+                reduce_dfreq=reduce_dfreq, tol=tol, scale=scale, shift=shift, 
+                invert_normal=invert_normal, pb=pb, nu=nu, k=k, dfreq=dfreq, no_solid=True
+            )
+            hextorect.run()
+            hextorect.post_process(hextorect.info_filename)
         return readdata(res_file)
 
 

@@ -31,11 +31,11 @@ class FPCWithPackedCylinder(WindTunnel):
 
         points = None
         if USE_COORDS:
-            coords = get_packed_particles(
+            points = get_packed_particles(
                 folder, dx, x=np.array(xc), y=np.array(yc))
         else:
-            coords = get_packed_particles(folder, dx, filename=cyl_file)
-        print(coords)
+            points = get_packed_particles(folder, dx, filename=cyl_file)
+        print(points)
 
 
 if __name__ == '__main__':
