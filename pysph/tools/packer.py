@@ -17,17 +17,21 @@ from pysph.tools.particle_packing import (
 
 class Packer(Application):
     def __init__(self, fname, output_dir, domain, dx, out,
-                 dim=None, x=None, y=None, z=None, filename=None,
+                 dim=None, x=None, y=None, z=None, L=None, B=None,
+                 H=None, filename=None,
                  hardpoints=None, use_prediction=False,
                  filter_layers=False, reduce_dfreq=False,
                  tol=1e-2, scale=1.0, shift=False,
                  invert_normal=False, pb=None, nu=None,
-                 k=None, dfreq=-1):
+                 k=None, dfreq=-1, no_solid=False):
         self.hdx = 1.2
         self.dx = dx
         self.x = x
         self.y = y
         self.z = z
+        self.L = L
+        self.B = B
+        self.H = H
         self.filename = filename
         self.dfreq = dfreq
         self.hardpoints = {} if hardpoints is None else hardpoints
@@ -43,6 +47,7 @@ class Packer(Application):
         self.nu = nu
         self.k = k
         self.out = out
+        self.no_solid = no_solid
 
         self.bound = self._get_bound()
 
@@ -88,28 +93,36 @@ class Packer(Application):
             self.dim = 2
             self.z = np.zeros_like(self.x)
 
-        return get_bounding_box(self.x, self.y, self.z)
+        return get_bounding_box(self.x, self.y, self.z, self.L, self.B, self.H)
 
     def create_particles(self):
         s = self.scheme
 
         bound = self.bound
         free = s.create_free_particles(bound, name='free')
-        nodes = None
-        if self.filename is None:
-            nodes = s.create_boundary_node(
-                self.filename, [self.x, self.y], scale=self.scale,
-                shift=self.shift, invert=self.invert_normal,
-                name='nodes')
-        else:
-            nodes = s.create_boundary_node(
-                self.filename, scale=self.scale, shift=self.shift,
-                invert=self.invert_normal, name='nodes')
-
-        boundary = get_particle_array(name='boundary')
         frozen = s.create_frozen_container(bound, name='frozen')
+        particles = [free, frozen]
+        if (self.filename is None) and (self.x is None):
+            np.random.seed(10)
+            x = free.x
+            free.x += (np.random.random(x) - 0.5) * self.dx
+            free.y += (np.random.random(x) - 0.5) * self.dx
+            if self.dim == 3:
+                free.z += (np.random.random(x) - 0.5) * self.dx
+        else:
+            nodes = None
+            if self.filename is None:
+                nodes = s.create_boundary_node(
+                    self.filename, [self.x, self.y], scale=self.scale,
+                    shift=self.shift, invert=self.invert_normal,
+                    name='nodes')
+            else:
+                nodes = s.create_boundary_node(
+                    self.filename, scale=self.scale, shift=self.shift,
+                    invert=self.invert_normal, name='nodes')
 
-        particles = [free, boundary, frozen, nodes]
+            boundary = get_particle_array(name='boundary')
+            particles.extend([boundary, nodes])
 
         s.setup_properties(particles)
         for pa in particles:
@@ -118,11 +131,21 @@ class Packer(Application):
 
     def create_scheme(self):
         hardpoints = self.hardpoints
-        s = ParticlePacking(
-            fluids=['free'], solids={'boundary':'nodes'},
-            frozen=['frozen'], dim=self.dim,
-            use_prediction=self.use_prediction, filter_layers=self.filter_layers, reduce_dfreq=self.reduce_dfreq,
-            hdx=self.hdx, dx=self.dx, hardpoints=hardpoints, nu=self.nu, pb=self.pb, k=self.k, tol=self.tol, dfreq=self.dfreq)
+        if self.no_solid:
+            s = ParticlePacking(
+                fluids=['free'], solids={}, frozen=['frozen'],
+                dim=self.dim, hdx=self.hdx, dx=self.dx, nu=self.nu, 
+                pb=self.pb, k=self.k, tol=self.tol)
+        else:
+            s = ParticlePacking(
+                fluids=['free'], solids={'boundary': 'nodes'}, 
+                frozen=['frozen'], dim=self.dim, 
+                use_prediction=self.use_prediction, 
+                filter_layers=self.filter_layers, 
+                reduce_dfreq=self.reduce_dfreq, 
+                hdx=self.hdx, dx=self.dx, hardpoints=hardpoints, 
+                nu=self.nu, pb=self.pb, k=self.k, tol=self.tol, 
+                dfreq=self.dfreq)
 
         s.configure_solver(dt = 1e-5)
         return s
@@ -136,12 +159,29 @@ class Packer(Application):
         self.read_info(info_fname)
         if len(self.output_files) == 0:
             return
-        res = os.path.join(self.output_dir, 'results.npz')
+        res = self.out 
         filename = self.output_files[-1]
         data = load(filename)
         free = data['arrays']['free']
-        solid = data['arrays']['boundary']
-        solid_nodes = data['arrays']['nodes']
         frozen = data['arrays']['frozen']
+        solid = None
+        solid_nodes = None
+        if len(data['arrays']) > 2:
+            solid = data['arrays']['boundary']
+            solid_nodes = data['arrays']['nodes']
         self.scheme.post_process(
             free, solid, solid_nodes, frozen, self.dx, res)
+
+
+class HexaToRectLayer(Packer):
+    def create_particles(self):
+        s = self.scheme
+
+        bound = self.bound
+        free = s.create_free_particles(bound, name='free')
+        frozen = s.create_frozen_container(bound, name='frozen')
+        particles = [free, frozen]
+        s.setup_properties(particles)
+        for pa in particles:
+            pa.dt_adapt[:] = 1e20
+        return particles
