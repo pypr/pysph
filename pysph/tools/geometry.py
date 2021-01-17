@@ -780,7 +780,8 @@ def show_3d(points, **kw):
     mlab.axes(xlabel='X', ylabel='Y', zlabel='Z')
 
 
-def get_packed_particles(folder,
+def get_packed_particles(add_opt_func,
+                         folder,
                          dx,
                          x=None,
                          y=None,
@@ -833,7 +834,7 @@ def get_packed_particles(folder,
     else:
         from pysph.tools.packer import Packer, HexaToRectLayer
         packer = Packer(
-            None, preprocess_folder, None, dx, res_file, dim=dim, 
+            None, preprocess_folder, None, add_opt_func, dx, res_file, dim=dim, 
             x=x, y=y, z=z, L=L, B=B, H=H, filename=filename, hardpoints=hardpoints, 
             use_prediction=use_prediction, filter_layers=filter_layers,
             reduce_dfreq=reduce_dfreq, tol=tol, scale=scale, shift=shift, 
@@ -844,7 +845,7 @@ def get_packed_particles(folder,
 
         if not no_solid:
             hextorect = HexaToRectLayer(
-                None, layer_folder, None, dx, res_file, dim=dim, 
+                None, layer_folder, None, add_opt_func, dx, res_file, dim=dim, 
                 x=x, y=y, z=z, L=L, B=B, H=H, filename=filename, hardpoints=hardpoints, 
                 use_prediction=use_prediction, filter_layers=filter_layers,
                 reduce_dfreq=reduce_dfreq, tol=tol, scale=scale, shift=shift, 

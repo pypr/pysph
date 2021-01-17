@@ -16,7 +16,7 @@ from pysph.tools.particle_packing import (
 
 
 class Packer(Application):
-    def __init__(self, fname, output_dir, domain, dx, out,
+    def __init__(self, fname, output_dir, domain, add_opt_func, dx, out,
                  dim=None, x=None, y=None, z=None, L=None, B=None,
                  H=None, filename=None,
                  hardpoints=None, use_prediction=False,
@@ -48,10 +48,14 @@ class Packer(Application):
         self.k = k
         self.out = out
         self.no_solid = no_solid
+        self.add_opt_func = add_opt_func
 
         self.bound = self._get_bound()
 
         super(Packer, self).__init__(fname, output_dir, domain)
+
+    def add_user_options(self, group):
+        self.add_opt_func(group) 
 
     def _get_bound(self):
         import sys
