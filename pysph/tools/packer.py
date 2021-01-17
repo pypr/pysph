@@ -93,7 +93,7 @@ class Packer(Application):
             self.dim = 2
             self.z = np.zeros_like(self.x)
 
-        return get_bounding_box(self.x, self.y, self.z, self.L, self.B, self.H)
+        return get_bounding_box(self.dx, self.x, self.y, self.z, self.L, self.B, self.H)
 
     def create_particles(self):
         s = self.scheme
@@ -178,8 +178,8 @@ class HexaToRectLayer(Packer):
         s = self.scheme
 
         bound = self.bound
-        free = s.create_free_particles(bound, name='free')
-        frozen = s.create_frozen_container(bound, name='frozen')
+        free = s.create_free_particles(bound, name='free', outer=True)
+        frozen = s.create_frozen_container(bound, name='frozen', outer=True)
         particles = [free, frozen]
         s.setup_properties(particles)
         for pa in particles:
