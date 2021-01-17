@@ -12,7 +12,7 @@ from compyle.api import declare
 import numpy
 
 
-def get_bounding_box(x, y, z=[0], L=None, B=None, H=0.0):
+def get_bounding_box(dx, x, y, z=[0], L=None, B=None, H=0.0):
     """Returns the bounding box required by the packing method
     """
     xmax = max(x)
@@ -23,9 +23,9 @@ def get_bounding_box(x, y, z=[0], L=None, B=None, H=0.0):
     zmin = min(z)
 
     if L == None:
-        lenx = xmax - xmin
-        leny = ymax - ymin
-        lenz = zmax - zmin
+        lenx = dx * int((xmax - xmin)/dx)
+        leny = dx * int((ymax - ymin)/dx)
+        lenz = dx * int((zmax - zmin)/dx)
     else:
         lenx = L
         leny = B
@@ -207,7 +207,7 @@ def repair_boundary(x, y, hard):
 
 
 def create_frozen_container_outer(dx, hdx, rho, bound,
-                            l=3, dim=2,
+                            l=8, dim=2,
                             name='frozen'):
     """function to create frozen particle lattice of given
     size and spacing
@@ -231,24 +231,29 @@ def create_frozen_container_outer(dx, hdx, rho, bound,
     frozen: pysph.base.utils.ParticleArray class instance
     """
     import numpy as np
+    eps = dx/10
     h = hdx * dx
     m = rho * dx**dim
     nl = l * dx
     b = bound
 
     if dim == 2:
-        x0, y0 = np.mgrid[b[0] + dx:b[1]:2 * dx, b[2]:b[3] + dx / 2:dx]
-        x1, y1 = np.mgrid[b[0]:b[1] + dx:2 * dx, b[2] + dx / 2:b[3]:dx]
+        x0, y0 = np.mgrid[b[0] + dx:b[1] - eps:2 * dx,
+                          b[2]:b[3] + dx / 2 - eps:dx]
+        x1, y1 = np.mgrid[b[0]:b[1] + dx - eps:2 * dx,
+                          b[2] + dx / 2:b[3] - eps:dx]
         x0, y0 = [t.ravel() for t in (x0, y0)]
         x1, y1 = [t.ravel() for t in (x1, y1)]
         x = np.concatenate((x0, x1))
         y = np.concatenate((y0, y1))
         z = np.zeros_like(x)
     elif dim == 3:
-        x0, y0, z0 = np.mgrid[b[0] + dx:b[1]:2 * dx, b[2]:b[3] + dx / 2:dx,
-                              b[4]:b[5] + dx / 2:dx]
-        x1, y1, z1 = np.mgrid[b[0]:b[1] + dx:2 * dx, b[2] + dx / 2:b[3]:dx,
-                              b[4] + dx / 2:b[5]:dx]
+        x0, y0, z0 = np.mgrid[b[0] + dx:b[1] - eps:2 * dx,
+                              b[2]:b[3] - eps + dx / 2:dx,
+                              b[4]:b[5] - eps + dx / 2:dx]
+        x1, y1, z1 = np.mgrid[b[0]:b[1] - eps + dx:2 * dx,
+                              b[2] + dx / 2:b[3] - eps:dx,
+                              b[4] + dx / 2:b[5] - eps:dx]
         x0, y0, z0 = [t.ravel() for t in (x0, y0, z0)]
         x1, y1, z1 = [t.ravel() for t in (x1, y1, z1)]
         x = np.concatenate((x0, x1))
@@ -258,29 +263,37 @@ def create_frozen_container_outer(dx, hdx, rho, bound,
     inner = get_particle_array(x=x, y=y, z=z, m=m, rho=rho, h=h, name=name)
 
     if dim == 2:
-        x0, y0 = np.mgrid[b[0] - 2 * nl + dx / 2:b[1] + 2 * nl:dx,
-                          b[2] - 2 * nl + dx / 2:b[3] + 2 * nl:dx]
+        x0, y0 = np.mgrid[b[0] - 2 * nl:b[1] - eps + 2 * nl:dx,
+                          b[2] - 2 * nl + dx / 2:b[3] - eps + 2 * nl:dx]
+        print(x[0])
         x, y = [t.ravel() for t in (x0, y0)]
         z = np.zeros_like(x)
-        cond = ~((x - (b[0] - nl) > 1e-14) & (x - (b[1] + nl) < 1e-14) &
-                 (y - (b[2] - nl) > 1e-14) & (y - (b[3] + nl) < 1e-14))
+        cond = ~((x - (b[0] - eps - nl) > 1e-14) &
+                 (x - (b[1] - eps + nl) < 1e-14) &
+                 (y - (b[2] - eps - nl) > 1e-14) &
+                 (y - (b[3] - eps + nl) < 1e-14))
 
     elif dim == 3:
-        x0, y0, z0 = np.mgrid[b[0] - 2 * nl + dx / 2:b[1] + 2 * nl:dx,
-                              b[2] - 2 * nl + dx / 2:b[3] + 2 * nl:dx,
-                              b[4] - 2 * nl + dx / 2:b[5] + 2 * nl:dx]
+        x0, y0, z0 = np.mgrid[b[0] - 2 * nl:b[1] - eps + 2 * nl:dx,
+                              b[2] - 2 * nl + dx / 2:b[3] - eps + 2 * nl:dx,
+                              b[4] - 2 * nl + dx / 2:b[5] - eps + 2 * nl:dx]
         x, y, z = [t.ravel() for t in (x0, y0, z0)]
-        cond = ~((x - (b[0] - nl) > 1e-14) & (x - (b[1] + nl) < 1e-14) &
-                 (y - (b[2] - nl) > 1e-14) & (y - (b[3] + nl) < 1e-14) &
-                 (z - (b[4] - nl) > 1e-14) & (z - (b[5] + nl) < 1e-14))
+        cond = ~((x - (b[0] - eps - nl) > 1e-14) &
+                 (x - (b[1] + eps + nl) < 1e-14) &
+                 (y - (b[2] - eps - nl) > 1e-14) &
+                 (y - (b[3] + eps + nl) < 1e-14) &
+                 (z - (b[4] - eps - nl) > 1e-14) & 
+                 (z - (b[5] + eps + nl) < 1e-14))
 
     frozen = get_particle_array(
         x=x[cond], y=y[cond], z=z[cond], m=m, rho=rho, h=h, name=name)
-    inner.extract_particles(np.ones_like(inner.x), frozen)
+    ids = np.where(inner.h > -1)[0]
+    print(ids)
+    inner.extract_particles(ids, frozen)
     return frozen
 
 
-def create_free_particles_outer(dx, hdx, rho, bound, l=3, dim=2, name='free'):
+def create_free_particles_outer(dx, hdx, rho, bound, l=8, dim=2, name='free'):
     """function to create free particle lattice of given size and spacing
 
     Parameters
@@ -301,35 +314,40 @@ def create_free_particles_outer(dx, hdx, rho, bound, l=3, dim=2, name='free'):
     free: pysph.base.utils.ParticleArray class instance
     """
     import numpy as np
+    eps = dx/10
     h = hdx * dx
     m = rho * dx**dim
     nl = l * dx
     b = bound
     if dim == 2:
-        x0, y0 = np.mgrid[b[0] - nl + dx:b[1] + nl:2 * dx,
-                          b[2] - nl + dx / 2:b[3] + nl:dx]
-        x1, y1 = np.mgrid[b[0] - nl:b[1] + nl:2 * dx, b[2] - nl:b[3] + nl:dx]
+        x0, y0 = np.mgrid[b[0] - nl + dx:b[1] - eps + nl:2 * dx,
+                          b[2] - nl + dx / 2:b[3] - eps + nl:dx]
+        x1, y1 = np.mgrid[b[0] - nl:b[1] - eps + nl:2 * dx,
+                          b[2] - nl:b[3] - eps + nl:dx]
         x0, y0 = [t.ravel() for t in (x0, y0)]
         x1, y1 = [t.ravel() for t in (x1, y1)]
         x = np.concatenate((x0, x1))
         y = np.concatenate((y0, y1))
         z = np.zeros_like(x)
-        cond = ~((x - b[0] > 1e-14) & (x - b[1] < 1e-14) & (y - b[2] > 1e-14) &
-                 (y - b[3] < 1e-14))
+        print(x[0])
+        cond = ~((x - b[0] + eps > 1e-14) & (x - b[1] - eps < 1e-14) &
+                 (y - b[2] + eps > 1e-14) & (y - b[3] - eps < 1e-14))
 
     elif dim == 3:
-        x0, y0, z0 = np.mgrid[b[0] - nl + dx:b[1] + nl:2 * dx,
-                              b[2] - nl + dx / 2:b[3] + nl:dx,
-                              b[4] - nl + dx / 2:b[5] + nl:dx]
-        x1, y1, z1 = np.mgrid[b[0] - nl:b[1] + nl:2 * dx,
-                              b[3] - nl:b[4] + nl:dx, b[5] - nl:b[6] + nl:dx]
+        x0, y0, z0 = np.mgrid[b[0] - nl + dx:b[1] - eps + nl:2 * dx,
+                              b[2] - nl + dx / 2:b[3] - eps + nl:dx,
+                              b[4] - nl + dx / 2:b[5] - eps + nl:dx]
+        x1, y1, z1 = np.mgrid[b[0] - nl:b[1] - eps + nl:2 * dx,
+                              b[2] - nl:b[3] - eps + nl:dx,
+                              b[4] - nl:b[5] - eps + nl:dx]
         x0, y0, z0 = [t.ravel() for t in (x0, y0, z0)]
         x1, y1, z1 = [t.ravel() for t in (x1, y1, z1)]
         x = np.concatenate((x0, x1))
         y = np.concatenate((y0, y1))
         z = np.concatenate((z0, z1))
-        cond = ~((x - b[0] > 1e-14) & (x - b[1] < 1e-14) & (y - b[2] > 1e-14) &
-                 (y - b[3] < 1e-14) & (z - b[4] > 1e-14) & (z - b[5] < 1e-14))
+        cond = ~((x - b[0] + eps > 1e-14) & (x - b[1] - eps < 1e-14) &
+                 (y - b[2] + eps > 1e-14) & (y - b[3] - eps < 1e-14) &
+                 (z - b[4] + eps > 1e-14) & (z - b[5] - eps < 1e-14))
 
     free = get_particle_array(
         x=x[cond], y=y[cond], z=z[cond], m=m,
@@ -362,35 +380,39 @@ def create_frozen_container(dx, hdx, rho, bound,
     frozen: pysph.base.utils.ParticleArray class instance
     """
     import numpy as np
+    eps = dx/10
     h = hdx * dx
     m = rho * dx**dim
     nl = l * dx
     b = bound
     if dim == 2:
-        x0, y0 = np.mgrid[b[0] - nl + dx:b[1] + nl:2 * dx,
-                          b[2] - nl + dx / 2:b[3] + nl:dx]
-        x1, y1 = np.mgrid[b[0] - nl:b[1] + nl:2 * dx, b[2] - nl:b[3] + nl:dx]
+        x0, y0 = np.mgrid[b[0] - nl + dx:b[1] - eps + nl:2 * dx,
+                          b[2] - nl + dx / 2:b[3] - eps + nl:dx]
+        x1, y1 = np.mgrid[b[0] - nl:b[1] - eps + nl:2 * dx,
+                          b[2] - nl:b[3] - eps + nl:dx]
         x0, y0 = [t.ravel() for t in (x0, y0)]
         x1, y1 = [t.ravel() for t in (x1, y1)]
         x = np.concatenate((x0, x1))
         y = np.concatenate((y0, y1))
         z = np.zeros_like(x)
-        cond = ~((x - b[0] > 1e-14) & (x - b[1] < 1e-14) & (y - b[2] > 1e-14) &
-                 (y - b[3] < 1e-14))
+        cond = ~((x - b[0] + eps > 1e-14) & (x - b[1] - eps < 1e-14) &
+                 (y - b[2] + eps > 1e-14) & (y - b[3] - eps < 1e-14))
 
     elif dim == 3:
-        x0, y0, z0 = np.mgrid[b[0] - nl + dx:b[1] + nl:2 * dx,
-                              b[2] - nl + dx / 2:b[3] + nl:dx,
-                              b[4] - nl + dx / 2:b[5] + nl:dx]
-        x1, y1, z1 = np.mgrid[b[0] - nl:b[1] + nl:2 * dx,
-                              b[3] - nl:b[4] + nl:dx, b[5] - nl:b[6] + nl:dx]
+        x0, y0, z0 = np.mgrid[b[0] - nl + dx:b[1] - eps + nl:2 * dx,
+                              b[2] - nl + dx / 2:b[3] - eps + nl:dx,
+                              b[4] - nl + dx / 2:b[5] - eps + nl:dx]
+        x1, y1, z1 = np.mgrid[b[0] - nl:b[1] - eps + nl:2 * dx,
+                              b[2] - nl:b[3] - eps + nl:dx,
+                              b[4] - nl:b[5] - eps + nl:dx]
         x0, y0, z0 = [t.ravel() for t in (x0, y0, z0)]
         x1, y1, z1 = [t.ravel() for t in (x1, y1, z1)]
         x = np.concatenate((x0, x1))
         y = np.concatenate((y0, y1))
         z = np.concatenate((z0, z1))
-        cond = ~((x - b[0] > 1e-14) & (x - b[1] < 1e-14) & (y - b[2] > 1e-14) &
-                 (y - b[3] < 1e-14) & (z - b[4] > 1e-14) & (z - b[5] < 1e-14))
+        cond = ~((x - b[0] + eps > 1e-14) & (x - b[1] - eps < 1e-14) &
+                 (y - b[2] + eps > 1e-14) & (y - b[3] - eps < 1e-14) &
+                 (z - b[4] + eps > 1e-14) & (z - b[5] - eps < 1e-14))
 
     frozen = get_particle_array(
         x=x[cond], y=y[cond], z=z[cond], m=m,
@@ -419,22 +441,27 @@ def create_free_particles(dx, hdx, rho, bound, dim=2, name='free'):
     free: pysph.base.utils.ParticleArray class instance
     """
     import numpy as np
+    eps = dx/10
     h = hdx * dx
     m = rho * dx**dim
     b = bound
     if dim == 2:
-        x0, y0 = np.mgrid[b[0] + dx:b[1]:2 * dx, b[2]:b[3] + dx / 2:dx]
-        x1, y1 = np.mgrid[b[0]:b[1] + dx:2 * dx, b[2] + dx / 2:b[3]:dx]
+        x0, y0 = np.mgrid[b[0] + dx:b[1] - eps:2 * dx,
+                          b[2]:b[3] - eps + dx / 2:dx]
+        x1, y1 = np.mgrid[b[0]:b[1] - eps + dx:2 * dx,
+                          b[2] + dx / 2:b[3] - eps:dx]
         x0, y0 = [t.ravel() for t in (x0, y0)]
         x1, y1 = [t.ravel() for t in (x1, y1)]
         x = np.concatenate((x0, x1))
         y = np.concatenate((y0, y1))
         z = np.zeros_like(x)
     elif dim == 3:
-        x0, y0, z0 = np.mgrid[b[0] + dx:b[1]:2 * dx, b[2]:b[3] + dx / 2:dx,
-                              b[4]:b[5] + dx / 2:dx]
-        x1, y1, z1 = np.mgrid[b[0]:b[1] + dx:2 * dx, b[2] + dx / 2:b[3]:dx,
-                              b[4] + dx / 2:b[5]:dx]
+        x0, y0, z0 = np.mgrid[b[0] + dx:b[1] - eps:2 * dx,
+                              b[2]:b[3] - eps + dx / 2:dx,
+                              b[4]:b[5] - eps + dx / 2:dx]
+        x1, y1, z1 = np.mgrid[b[0]:b[1] - eps + dx:2 * dx,
+                              b[2] + dx / 2:b[3] - eps:dx,
+                              b[4] + dx / 2:b[5] - eps:dx]
         x0, y0, z0 = [t.ravel() for t in (x0, y0, z0)]
         x1, y1, z1 = [t.ravel() for t in (x1, y1, z1)]
         x = np.concatenate((x0, x1))
@@ -1164,10 +1191,10 @@ class ParticlePacking(Scheme):
             return create_frozen_container(
                 self.dx, self.hdx, 1.0, bound, l=l, dim=self.dim, name=name)
 
-    def create_free_particles(self, bound, name='free', outer=False):
+    def create_free_particles(self, bound, l=5, name='free', outer=False):
         if outer:
             return create_free_particles_outer(
-                self.dx, self.hdx, 1.0, bound, dim=self.dim, name=name)
+                self.dx, self.hdx, 1.0, bound, l=l, dim=self.dim, name=name)
         else:
             return create_free_particles(
                 self.dx, self.hdx, 1.0, bound, dim=self.dim, name=name)
@@ -1630,4 +1657,7 @@ class ParticlePacking(Scheme):
                     self._check(particles, pa_fluid)
 
             if len(self.solids.keys()) == 0:
-                self._check(particles, pa_fluid)
+                for pa in particles:
+                    if self.fluids[0] == pa.name:
+                        pa_fluid = pa
+                self._is_volume_converged(pa_fluid)
