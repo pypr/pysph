@@ -856,5 +856,54 @@ def get_packed_particles(add_opt_func,
         return readdata(res_file)
 
 
+def create_fluid_around_packing(dx, xf, yf, L, B, zf=[0.0], H=0.0, **props):
+    from pysph.base.utils import get_particle_array
+    xmax = max(xf)
+    xmin = min(xf)
+    ymax = max(yf)
+    ymin = min(yf)
+    zmax = max(zf)
+    zmin = min(zf)
+
+    print(props)
+    if H < 1e-14:
+        eps = dx/10
+        x, y = np.mgrid[dx/2:L:dx, -B/2+dx/2:B/2:dx]
+        cond = ~(
+            (x - xmin + eps > 1e-14) &
+            (x - xmax - eps < 1e-14) &
+            (y - ymin + eps > 1e-14) &
+            (y - ymax - eps < 1e-14)
+        )
+        x = np.concatenate((x[cond], xf))
+        y = np.concatenate((y[cond], yf))
+        return get_particle_array(
+            name='fluid', x=x, y=y, **props)
+    else:
+        eps = dx/10
+        x, y, z = np.mgrid[dx/2:L:dx, -B/2+dx/2:B/2:dx, -H/2+dx/2:H/2:dx]
+        cond = ~(
+            (x - xmin + eps > 1e-14) &
+            (x - xmax - eps < 1e-14) &
+            (y - ymin + eps > 1e-14) &
+            (y - ymax - eps < 1e-14) &
+            (z - zmin + eps > 1e-14) &
+            (z - zmax - eps < 1e-14)
+        )
+        x = np.concatenate((x[cond], xf))
+        y = np.concatenate((y[cond], yf))
+        z = np.concatenate((z[cond], zf))
+        return get_particle_array(
+            name='fluid', x=x, y=y, z=z, **props)
+
+
+
+
+
+
+
+    
+
+
 
 
