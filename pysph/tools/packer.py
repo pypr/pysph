@@ -107,12 +107,15 @@ class Packer(Application):
         frozen = s.create_frozen_container(bound, name='frozen')
         particles = [free, frozen]
         if (self.filename is None) and (self.x is None):
+            free = s.create_free_particles(bound, name='free', rect=True)
+            frozen = s.create_frozen_container(bound, name='frozen', rect=True)
             np.random.seed(10)
             x = free.x
             free.x += (np.random.random(x) - 0.5) * self.dx
             free.y += (np.random.random(x) - 0.5) * self.dx
             if self.dim == 3:
                 free.z += (np.random.random(x) - 0.5) * self.dx
+            particles = [free, frozen]
         else:
             nodes = None
             if self.filename is None:

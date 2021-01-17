@@ -355,6 +355,98 @@ def create_free_particles_outer(dx, hdx, rho, bound, l=8, dim=2, name='free'):
     return free
 
 
+def create_frozen_container_rect(dx, hdx, rho, bound,
+                            l=3, dim=2,
+                            name='frozen'):
+    """function to create frozen particle lattice of given
+    size and spacing
+
+    Parameters
+    ----------
+
+    dx: required resolution 
+    hdx: h/dx ratio
+    rho: density of the particles
+    L: length of the domain
+    B: Breadth of the domain
+    l: number of layers
+    H: height of the domain
+    dim: dimension of the problem
+    name: name of the particle array
+
+    Returns
+    -------
+
+    frozen: pysph.base.utils.ParticleArray class instance
+    """
+    import numpy as np
+    eps = dx/10
+    h = hdx * dx
+    m = rho * dx**dim
+    nl = l * dx
+    b = bound
+    if dim == 2:
+        x0, y0 = np.mgrid[b[0] - nl + dx / 2:b[1] - eps + nl:dx,
+                          b[2] - nl + dx / 2:b[3] - eps + nl:dx]
+        x, y = [t.ravel() for t in (x0, y0)]
+        z = np.zeros_like(x)
+        cond = ~((x - b[0] > 1e-14) & (x - b[1] < 1e-14) &
+                 (y - b[2] > 1e-14) & (y - b[3] < 1e-14))
+
+    elif dim == 3:
+        x0, y0, z0 = np.mgrid[b[0] - nl + dx / 2:b[1] + nl:dx,
+                              b[2] - nl + dx / 2:b[3] + nl:dx,
+                              b[4] - nl + dx / 2:b[5] + nl:dx]
+        x, y, z = [t.ravel() for t in (x0, y0, z0)]
+        cond = ~((x - b[0] > 1e-14) & (x - b[1] < 1e-14) &
+                 (y - b[2] > 1e-14) & (y - b[3] < 1e-14) &
+                 (z - b[4] > 1e-14) & (z - b[5] < 1e-14))
+
+    frozen = get_particle_array(
+        x=x[cond], y=y[cond], z=z[cond], m=m,
+        rho=rho, h=h, name=name)
+    return frozen
+
+
+def create_free_particles_rect(dx, hdx, rho, bound, dim=2, name='free'):
+    """function to create free particle lattice of given size and spacing
+
+    Parameters
+    ----------
+
+    dx: required resolution 
+    hdx: h/dx ratio
+    rho: density of the particles
+    L: length of the domain
+    B: Breadth of the domain
+    H: height of the domain
+    dim: dimension of the problem
+    name: name of the particle array
+
+    Returns
+    -------
+
+    free: pysph.base.utils.ParticleArray class instance
+    """
+    import numpy as np
+    eps = dx/10
+    h = hdx * dx
+    m = rho * dx**dim
+    b = bound
+    if dim == 2:
+        x0, y0 = np.mgrid[b[0] + dx / 2:b[1]:dx,
+                          b[2] + dx / 2:b[3]:dx]
+        x, y = [t.ravel() for t in (x0, y0)]
+        z = np.zeros_like(x)
+    elif dim == 3:
+        x0, y0, z0 = np.mgrid[b[0] + dx / 2:b[1]:dx,
+                              b[2] + dx / 2:b[3]:dx,
+                              b[4] + dx / 2:b[5]:dx]
+        x, y, z = [t.ravel() for t in (x0, y0, z0)]
+    free = get_particle_array(x=x, y=y, z=z, m=m, rho=rho, h=h, name=name)
+    return free
+
+
 def create_frozen_container(dx, hdx, rho, bound,
                             l=3, dim=2,
                             name='frozen'):
@@ -503,12 +595,6 @@ def create_surface_from_stl(
     bodyx = scale * data.x
     bodyy = scale * data.y
     bodyz = scale * data.z
-    centerx = 0.5 * (max(bodyx.ravel()) + min(bodyx.ravel()))
-    centery = 0.5 * (max(bodyy.ravel()) + min(bodyy.ravel()))
-    centerz = 0.5 * (max(bodyz.ravel()) + min(bodyz.ravel()))
-    bodyx = bodyx - centerx
-    bodyy = bodyy - centery
-    bodyz = bodyz - centerz
 
     xc = np.sum(bodyx, axis=1) / 3
     yc = np.sum(bodyy, axis=1) / 3
@@ -584,10 +670,6 @@ isclosed, shift=True, invert=False, name='solid_nodes', hard={}):
         xa, ya = boundary[0], boundary[1]
     h = hdx * dx
     m = dx * dx * rho
-    shiftx = 0.5 * (max(xa) + min(xa))
-    shifty = 0.5 * (max(ya) + min(ya))
-    boundary[0] -= shiftx
-    boundary[1] -= shifty
     fact = 1.0
     _shift = 0.0
     if invert:
@@ -1183,17 +1265,23 @@ class ParticlePacking(Scheme):
         if self.tol is None:
             self.tol = 1e-2
 
-    def create_frozen_container(self, bound, l=5, name='frozen', outer=False):
+    def create_frozen_container(self, bound, l=5, name='frozen', outer=False, rect=False):
         if outer:
             return create_frozen_container_outer(
+                self.dx, self.hdx, 1.0, bound, l=l, dim=self.dim, name=name)
+        elif rect:
+            return create_frozen_container_rect(
                 self.dx, self.hdx, 1.0, bound, l=l, dim=self.dim, name=name)
         else:
             return create_frozen_container(
                 self.dx, self.hdx, 1.0, bound, l=l, dim=self.dim, name=name)
 
-    def create_free_particles(self, bound, l=5, name='free', outer=False):
+    def create_free_particles(self, bound, l=5, name='free', outer=False, rect=False):
         if outer:
             return create_free_particles_outer(
+                self.dx, self.hdx, 1.0, bound, l=l, dim=self.dim, name=name)
+        elif rect:
+            return create_free_particles_rect(
                 self.dx, self.hdx, 1.0, bound, l=l, dim=self.dim, name=name)
         else:
             return create_free_particles(
@@ -1369,7 +1457,7 @@ class ParticlePacking(Scheme):
         maxvel = max(vel)
         rel_dist = maxvel * self.solver.dt / h * 100
         self.converge.append([rel_dist, self.solver.t])
-        print('Convergence = ', rel_dist)
+        print('\nConvergence = ', rel_dist)
         if (rel_dist - self.tol < 1e-14) and (len(self.converge) > 10):
             self.solver.tf = self.solver.t
 
@@ -1388,9 +1476,9 @@ class ParticlePacking(Scheme):
                 xf = data['xf']
                 yf = data['yf']
                 zf = data['zf']
-                np.concatenate((xf, free.x))
-                np.concatenate((yf, free.y))
-                np.concatenate((zf, free.z))
+                xf = np.concatenate((xf, free.x))
+                yf = np.concatenate((yf, free.y))
+                zf = np.concatenate((zf, free.z))
             else:
                 xf = free.x
                 yf = free.y
@@ -1526,7 +1614,6 @@ class ParticlePacking(Scheme):
             ids = ids[0:n_pnts]
         else:
             num = self.divs
-            print('blank len is', len(self.blank))
             if self.do_check:
                 if len(self.blank) > 10:
                     if len(self.blank) == 11:
@@ -1557,7 +1644,6 @@ class ParticlePacking(Scheme):
         uids = self.remove_duplicates(neartag[ids], ids)
         pa_fluid.extract_particles(uids, pa_solid)
         pa_fluid.remove_particles(uids)
-        print('merging particles to ', len(uids))
 
         hard = pa_solid.hard
         cond = hard < 0.5
@@ -1620,7 +1706,7 @@ class ParticlePacking(Scheme):
                     elif self.solids[name] == pa.name:
                         pa_solid_nodes = pa
                         self.surface_points = int(pa.n_pnts[0])
-                        print('surface pnts', self.surface_points)
+                        print('\npredicted surface pnts', self.surface_points)
                     elif self.fluids[0] == pa.name:
                         pa_fluid = pa
                     elif self.frozen[0] == pa.name:
@@ -1634,7 +1720,7 @@ class ParticlePacking(Scheme):
                     self.freeze_particles(pa_fluid, pa_frozen)
 
                 N = len(pa_solid.x)
-                print('no of solids', N)
+                print('no of solids particles', N)
                 if N > 1.5 * self.surface_points:
                     print(
                         'boundary attracting too many particles - increase viscosity'
