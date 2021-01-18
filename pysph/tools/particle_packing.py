@@ -12,17 +12,19 @@ from compyle.api import declare
 import numpy
 
 
-def get_bounding_box(dx, x, y, z=[0], L=None, B=None, H=0.0):
+def get_bounding_box(dx, x, y, z=[0], L=0.0, B=0.0, H=0.0):
     """Returns the bounding box required by the packing method
     """
-    xmax = max(x)
-    xmin = min(x)
-    ymax = max(y)
-    ymin = min(y)
-    zmax = max(z)
-    zmin = min(z)
+    xmax, xmin, ymax, ymin, zmax, zmin = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+    if x is not None:
+        xmax = max(x)
+        xmin = min(x)
+        ymax = max(y)
+        ymin = min(y)
+        zmax = max(z)
+        zmin = min(z)
 
-    if L == None:
+    if L < 1e-14:
         lenx = dx * int((xmax - xmin)/dx)
         leny = dx * int((ymax - ymin)/dx)
         lenz = dx * int((zmax - zmin)/dx)
@@ -1282,7 +1284,7 @@ class ParticlePacking(Scheme):
                 self.dx, self.hdx, 1.0, bound, l=l, dim=self.dim, name=name)
         elif rect:
             return create_free_particles_rect(
-                self.dx, self.hdx, 1.0, bound, l=l, dim=self.dim, name=name)
+                self.dx, self.hdx, 1.0, bound, dim=self.dim, name=name)
         else:
             return create_free_particles(
                 self.dx, self.hdx, 1.0, bound, dim=self.dim, name=name)

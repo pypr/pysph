@@ -266,7 +266,7 @@ class TaylorGreen(Application):
             periodic_in_y=True
         )
 
-    def create_particles(self):
+    def create_fluid(self):
         # create the particles
         dx = self.dx
         _x = np.arange(dx / 2, L, dx)
@@ -295,6 +295,10 @@ class TaylorGreen(Application):
         # create the arrays
         fluid = get_particle_array(name='fluid', x=x, y=y, m=m, h=h, u=u0,
                                    v=v0, rho=rho0, p=p0, color=color0)
+        return fluid
+
+    def create_particles(self):
+        fluid = self.create_fluid()
 
         self.scheme.setup_properties([fluid])
 

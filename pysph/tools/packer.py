@@ -17,8 +17,8 @@ from pysph.tools.particle_packing import (
 
 class Packer(Application):
     def __init__(self, fname, output_dir, domain, add_opt_func, dx, out,
-                 dim=None, x=None, y=None, z=None, L=None, B=None,
-                 H=None, filename=None,
+                 dim=None, x=None, y=None, z=None, L=0.0, B=0.0,
+                 H=0.0, filename=None,
                  hardpoints=None, use_prediction=False,
                  filter_layers=False, reduce_dfreq=False,
                  tol=1e-2, scale=1.0, shift=False,
@@ -111,10 +111,10 @@ class Packer(Application):
             frozen = s.create_frozen_container(bound, name='frozen', rect=True)
             np.random.seed(10)
             x = free.x
-            free.x += (np.random.random(x) - 0.5) * self.dx
-            free.y += (np.random.random(x) - 0.5) * self.dx
+            free.x += (np.random.random(len(x)) - 0.5) * self.dx
+            free.y += (np.random.random(len(x)) - 0.5) * self.dx
             if self.dim == 3:
-                free.z += (np.random.random(x) - 0.5) * self.dx
+                free.z += (np.random.random(len(x)) - 0.5) * self.dx
             particles = [free, frozen]
         else:
             nodes = None
