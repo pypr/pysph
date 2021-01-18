@@ -26,7 +26,7 @@ from pysph.sph.wc.shift import ShiftPositions
 from pysph.sph.isph.sisph import SISPHScheme
 from pysph.sph.isph.isph import ISPHScheme
 
-
+#
 # domain and constants
 L = 1.0
 U = 1.0

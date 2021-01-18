@@ -15,6 +15,47 @@ from pysph.tools.particle_packing import (
     ParticlePacking, calculate_normal_2d_surface, shift_surface_inside)
 
 
+def get_packing_folders(folder, dx):
+    """Get all the required folder and files names for the packing.
+    This is done to avoid mixing of multiple particle spacing
+
+     Parameters
+    ----------
+    folder : name of the output folder from Application subclass
+    dx : required particles spacing
+
+    Returns
+    -------
+    preprocess_folder : The output folder for packing Application
+    layer_folder : The output folder for layer packing around the hexagonal
+                   packing
+    res_file : the name of the packed file containing the coordinates
+    """
+    import os
+    parent = os.path.dirname(folder)
+    basename = os.path.basename(folder)
+    preprocess_folder = os.path.join(parent, 'packing_%.4f' % dx)
+    layer_folder = os.path.join(parent, 'layer_%.4f' % dx)
+
+    res_folder = os.path.join(parent, 'preprocess')
+    os.makedirs(res_folder, exist_ok=True)
+
+    res_file = os.path.join(parent, 'preprocess', basename + '_%.4f.npz' % dx)
+
+    return preprocess_folder, layer_folder, res_file
+
+
+def readdata(resfile):
+    data = np.load(resfile)
+    xs = data['xs']
+    ys = data['ys']
+    zs = data['zs']
+    xf = data['xf']
+    yf = data['yf']
+    zf = data['zf']
+    return xs, ys, zs, xf, yf, zf
+
+
 class Packer(Application):
     def __init__(self, fname, output_dir, domain, add_opt_func, dx, out,
                  dim=None, x=None, y=None, z=None, L=0.0, B=0.0,
@@ -55,7 +96,7 @@ class Packer(Application):
         super(Packer, self).__init__(fname, output_dir, domain)
 
     def add_user_options(self, group):
-        self.add_opt_func(group) 
+        self.add_opt_func(group)
 
     def _get_bound(self):
         import sys
@@ -69,7 +110,7 @@ class Packer(Application):
             elif ext == '.stl':
                 self.dim = 3
             else:
-                print('file extension %s not supported'%ext)
+                print('file extension %s not supported' % ext)
                 sys.exit()
 
             if self.dim == 2:
@@ -77,7 +118,7 @@ class Packer(Application):
                     self.x, self.y = np.loadtxt(self.filename, unpack=True)
                     self.x *= self.scale
                     self.y *= self.scale
-                except:
+                except IOError:
                     print('read the file')
                     print('The supported file format is \"x y\"')
                     sys.exit()
@@ -88,16 +129,17 @@ class Packer(Application):
                     self.x = self.scale * data.x
                     self.y = self.scale * data.y
                     self.z = self.scale * data.z
-                except:
+                except IOError:
                     print('read the file')
                     print('The supported file format is \"x y\"')
                     sys.exit()
 
-        if self.z == None:
+        if self.z is None:
             self.dim = 2
             self.z = np.zeros_like(self.x)
 
-        return get_bounding_box(self.dx, self.x, self.y, self.z, self.L, self.B, self.H)
+        return get_bounding_box(
+            self.dx, self.x, self.y, self.z, self.L, self.B, self.H)
 
     def create_particles(self):
         s = self.scheme
@@ -141,20 +183,20 @@ class Packer(Application):
         if self.no_solid:
             s = ParticlePacking(
                 fluids=['free'], solids={}, frozen=['frozen'],
-                dim=self.dim, hdx=self.hdx, dx=self.dx, nu=self.nu, 
+                dim=self.dim, hdx=self.hdx, dx=self.dx, nu=self.nu,
                 pb=self.pb, k=self.k, tol=self.tol)
         else:
             s = ParticlePacking(
-                fluids=['free'], solids={'boundary': 'nodes'}, 
-                frozen=['frozen'], dim=self.dim, 
-                use_prediction=self.use_prediction, 
-                filter_layers=self.filter_layers, 
-                reduce_dfreq=self.reduce_dfreq, 
-                hdx=self.hdx, dx=self.dx, hardpoints=hardpoints, 
-                nu=self.nu, pb=self.pb, k=self.k, tol=self.tol, 
+                fluids=['free'], solids={'boundary': 'nodes'},
+                frozen=['frozen'], dim=self.dim,
+                use_prediction=self.use_prediction,
+                filter_layers=self.filter_layers,
+                reduce_dfreq=self.reduce_dfreq,
+                hdx=self.hdx, dx=self.dx, hardpoints=hardpoints,
+                nu=self.nu, pb=self.pb, k=self.k, tol=self.tol,
                 dfreq=self.dfreq)
 
-        s.configure_solver(dt = 1e-5)
+        s.configure_solver(dt=1e-5)
         return s
 
     def post_step(self, solver):
@@ -166,7 +208,7 @@ class Packer(Application):
         self.read_info(info_fname)
         if len(self.output_files) == 0:
             return
-        res = self.out 
+        res = self.out
         filename = self.output_files[-1]
         data = load(filename)
         free = data['arrays']['free']

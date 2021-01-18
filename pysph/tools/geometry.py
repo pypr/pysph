@@ -10,6 +10,7 @@ from pysph.tools.sph_evaluator import SPHEvaluator
 from pysph.base.particle_array import ParticleArray
 
 
+
 def distance(point1, point2=np.array([0.0, 0.0, 0.0])):
     return np.sqrt(sum((point1 - point2) * (point1 - point2)))
 
@@ -780,83 +781,357 @@ def show_3d(points, **kw):
     mlab.axes(xlabel='X', ylabel='Y', zlabel='Z')
 
 
-def get_packed_particles(add_opt_func,
-                         folder,
-                         dx,
-                         x=None,
-                         y=None,
-                         z=None,
-                         L=0.0,
-                         B=0.0,
-                         H=0.0,
-                         dim=None,
-                         xn=None,
-                         yn=None,
-                         zn=None,
-                         pb=None,
-                         nu=None,
-                         k=None,
-                         scale=1.0,
-                         shift=False,
-                         filename=None,
-                         dfreq=-1,
-                         invert_normal=False,
-                         hardpoints=None,
-                         use_prediction=False,
-                         filter_layers=False,
-                         reduce_dfreq=False,
-                         no_solid=False,
-                         tol=1e-2):
+def get_packed_periodic_packed_particles(add_opt_func, folder, dx, L, B, H=0,
+                                         dim=2, dfreq=-1, pb=None, nu=None,
+                                         k=None, tol=1e-2):
+    """ Creates a periodic packed 2D or 3D domain. It creates particles which
+    are not aligned but packed such that the number density is uniform.
 
+    Parameters
+    ----------
+    add_opt_func : options function from the parent Application class
+    folder : Application class output directory
+    dx : float
+        required particle spacing
+    L : float
+        length of the domain
+    B : float
+        Width of the domain
+    H : float
+        Height of the domain
+    dim : int
+        dimensionality of the problem
+    dfreq : int
+        projection frequency of particles
+    pb : float
+        background pressure (default: 1.0)
+    nu : float
+        viscosity coefficient (default: 0.3/dx)
+    k : float
+        coefficient of repulsion (default: 0.005*dx)
+    tol : float
+        tolerance value for convergence (default: 1e-2)
+
+    Returns
+    -------
+    xs: float
+        x coordinate of solid particles
+    ys: float
+        y coordinate of solid particles
+    zs: float
+        z coordinate of solid particles
+    xf: float
+        x coordinate of fluid particles
+    yf: float
+        y coordinate of fluid particles
+    zf: float
+        z coordinate of fluid particles
+    """
+    from pysph.tools.packer import get_packing_folders, readdata
     import os
-    parent = os.path.dirname(folder)
-    basename = os.path.basename(folder)
-    preprocess_folder = os.path.join(parent, 'packing_%.4f'%dx)
-    layer_folder = os.path.join(parent, 'layer_%.4f'%dx)
+    preprocess_folder, layer_folder, res_file = get_packing_folders(folder, dx)
+    no_solid = True
 
-    res_folder = os.path.join(parent, 'preprocess')
-    os.makedirs(res_folder, exist_ok=True)
+    if os.path.exists(res_file):
+        return readdata(res_file)
+    else:
+        from pysph.tools.packer import Packer
+        packer = Packer(
+            None, preprocess_folder, None, add_opt_func, dx, res_file, dim=dim,
+            L=L, B=B, H=H, pb=pb, nu=nu, k=k, dfreq=dfreq, no_solid=no_solid,
+            tol=tol
+        )
+        packer.run()
+        packer.post_process(packer.info_filename)
+        return readdata(res_file)
 
-    res_file = os.path.join(parent, 'preprocess', basename + '_%.4f.npz'%dx)
 
-    def readdata(resfile):
-        data = np.load(resfile)
-        xs = data['xs']
-        ys = data['ys']
-        zs = data['zs']
-        xf = data['xf']
-        yf = data['yf']
-        zf = data['zf']
-        return xs, ys, zs, xf, yf, zf
+def get_packed_2d_particles_from_surface_coordinates(
+        add_opt_func, folder, dx, x, y, pb=None, nu=None, k=None, scale=1.0,
+        shift=False, dfreq=-1, invert_normal=False, hardpoints=None,
+        use_prediction=False, filter_layers=False, reduce_dfreq=False,
+        tol=1e-2):
+    """ Creates a packed configuration of particles around the given
+    coordinates of a 2D geometry.
+
+    Parameters
+    ----------
+    add_opt_func : method
+        options function from the parent Application class
+    folder : string
+        Application class output directory
+    dx : float
+        required particle spacing
+    x : array
+        x coordinates of the geometry
+    y : array
+        y coordinates of the geometry
+    pb : float
+        background pressure (default: 1.0)
+    nu : float
+        viscosity coefficient (default: 0.3/dx)
+    k : float
+        coefficient of repulsion (default: 0.005*dx)
+    scale : float
+        the scaling factor for the coordinates
+    dfreq : int
+        projection frequency of particles
+    invert_normal : bool
+        if True the computed normals are inverted
+    hardpoints : dict
+        the dictionary of hardpoints
+    use_prediction : bool
+        if True, points are projected quickly to reach prediction points
+    filter_layers : bool
+        if True, particles away from boundary are frozen
+    reduce_dfreq : bool
+        if True, reduce projection frequency
+    tol : float
+        tolerance value for convergence (default: 1e-2)
+
+    Returns
+    -------
+    xs: float
+        x coordinate of solid particles
+    ys: float
+        y coordinate of solid particles
+    zs: float
+        z coordinate of solid particles
+    xf: float
+        x coordinate of fluid particles
+    yf: float
+        y coordinate of fluid particles
+    zf: float
+        z coordinate of fluid particles
+    """
+
+    from pysph.tools.packer import get_packing_folders, readdata
+    import os
+    preprocess_folder, layer_folder, res_file = get_packing_folders(folder, dx)
 
     if os.path.exists(res_file):
         return readdata(res_file)
     else:
         from pysph.tools.packer import Packer, HexaToRectLayer
         packer = Packer(
-            None, preprocess_folder, None, add_opt_func, dx, res_file, dim=dim, 
-            x=x, y=y, z=z, L=L, B=B, H=H, filename=filename, hardpoints=hardpoints, 
+            None, preprocess_folder, None, add_opt_func, dx, res_file, dim=2,
+            x=x, y=y, pb=pb, nu=nu, k=k, dfreq=dfreq, hardpoints=hardpoints,
             use_prediction=use_prediction, filter_layers=filter_layers,
-            reduce_dfreq=reduce_dfreq, tol=tol, scale=scale, shift=shift, 
-            invert_normal=invert_normal, pb=pb, nu=nu, k=k, dfreq=dfreq, no_solid=no_solid
-        )
+            reduce_dfreq=reduce_dfreq, tol=tol, scale=scale, shift=shift,
+            invert_normal=invert_normal)
         packer.run()
         packer.post_process(packer.info_filename)
 
-        if not no_solid:
-            hextorect = HexaToRectLayer(
-                None, layer_folder, None, add_opt_func, dx, res_file, dim=dim, 
-                x=x, y=y, z=z, L=L, B=B, H=H, filename=filename, hardpoints=hardpoints, 
-                use_prediction=use_prediction, filter_layers=filter_layers,
-                reduce_dfreq=reduce_dfreq, tol=tol, scale=scale, shift=shift, 
-                invert_normal=invert_normal, pb=pb, nu=nu, k=k, dfreq=dfreq, no_solid=True
-            )
-            hextorect.run()
-            hextorect.post_process(hextorect.info_filename)
+        hextorect = HexaToRectLayer(
+            None, layer_folder, None, add_opt_func, dx, res_file, dim=2, x=x,
+            y=y, pb=pb, nu=nu, k=k, dfreq=dfreq, hardpoints=hardpoints,
+            use_prediction=use_prediction, filter_layers=filter_layers,
+            reduce_dfreq=reduce_dfreq, tol=tol, scale=scale, shift=shift,
+            invert_normal=invert_normal, no_solid=True)
+        hextorect.run()
+        hextorect.post_process(hextorect.info_filename)
+
+        return readdata(res_file)
+
+
+def get_packed_2d_particles_from_surface_file(
+        add_opt_func, folder, dx, filename, pb=None, nu=None, k=None,
+        scale=1.0, shift=False, dfreq=-1, invert_normal=False,
+        hardpoints=None, use_prediction=False, filter_layers=False,
+        reduce_dfreq=False, tol=1e-2):
+    """ Creates a packed configuration of particles around the given geometry
+    file containing the x, y coordinates.
+
+    Parameters
+    ----------
+    add_opt_func : method
+        options function from the parent Application class
+    folder : string
+        Application class output directory
+    dx : float
+        required particle spacing
+    filename : string
+        file containing the x, y coordinates of the geometry
+    pb : float
+        background pressure (default: 1.0)
+    nu : float
+        viscosity coefficient (default: 0.3/dx)
+    k : float
+        coefficient of repulsion (default: 0.005*dx)
+    scale : float
+        the scaling factor for the coordinates
+    dfreq : int
+        projection frequency of particles
+    invert_normal : bool
+        if True the computed normals are inverted
+    hardpoints : dict
+        the dictionary of hardpoints
+    use_prediction : bool
+        if True, points are projected quickly to reach prediction points
+    filter_layers : bool
+        if True, particles away from boundary are frozen
+    reduce_dfreq : bool
+        if True, reduce projection frequency
+    tol : float
+        tolerance value for convergence (default: 1e-2)
+
+    Returns
+    -------
+    xs: float
+        x coordinate of solid particles
+    ys: float
+        y coordinate of solid particles
+    zs: float
+        z coordinate of solid particles
+    xf: float
+        x coordinate of fluid particles
+    yf: float
+        y coordinate of fluid particles
+    zf: float
+        z coordinate of fluid particles
+    """
+
+    from pysph.tools.packer import get_packing_folders, readdata
+    import os
+    preprocess_folder, layer_folder, res_file = get_packing_folders(folder, dx)
+
+    if os.path.exists(res_file):
+        return readdata(res_file)
+    else:
+        from pysph.tools.packer import Packer, HexaToRectLayer
+        packer = Packer(
+            None, preprocess_folder, None, add_opt_func, dx, res_file, dim=2,
+            filename=filename, pb=pb, nu=nu, k=k, dfreq=dfreq,
+            hardpoints=hardpoints, use_prediction=use_prediction,
+            filter_layers=filter_layers, reduce_dfreq=reduce_dfreq, tol=tol,
+            scale=scale, shift=shift, invert_normal=invert_normal)
+        packer.run()
+        packer.post_process(packer.info_filename)
+
+        hextorect = HexaToRectLayer(
+            None, layer_folder, None, add_opt_func, dx, res_file, dim=2,
+            filename=filename, pb=pb, nu=nu, k=k, dfreq=dfreq,
+            hardpoints=hardpoints, use_prediction=use_prediction,
+            filter_layers=filter_layers, reduce_dfreq=reduce_dfreq, tol=tol,
+            scale=scale, shift=shift, invert_normal=invert_normal,
+            no_solid=True)
+        hextorect.run()
+        hextorect.post_process(hextorect.info_filename)
+
+        return readdata(res_file)
+
+
+def get_packed_3d_particles_from_surface_file(
+        add_opt_func, folder, dx, filename, pb=None, nu=None, k=None,
+        scale=1.0, shift=False, dfreq=-1, invert_normal=False,
+        hardpoints=None, use_prediction=False, filter_layers=False,
+        reduce_dfreq=False, tol=1e-2):
+    """ Creates a packed configuration of particles around the given STL
+    file containing the x, y, z coordinates and normals.
+
+    Parameters
+    ----------
+    add_opt_func : method
+        options function from the parent Application class
+    folder : string
+        Application class output directory
+    dx : float
+        required particle spacing
+    filename : string
+        the STL filename
+    pb : float
+        background pressure (default: 1.0)
+    nu : float
+        viscosity coefficient (default: 0.3/dx)
+    k : float
+        coefficient of repulsion (default: 0.005*dx)
+    scale : float
+        the scaling factor for the coordinates
+    dfreq : int
+        projection frequency of particles
+    invert_normal : bool
+        if True the computed normals are inverted
+    hardpoints : dict
+        the dictionary of hardpoints
+    use_prediction : bool
+        if True, points are projected quickly to reach prediction points
+    filter_layers : bool
+        if True, particles away from boundary are frozen
+    reduce_dfreq : bool
+        if True, reduce projection frequency
+    tol : float
+        tolerance value for convergence (default: 1e-2)
+
+    Returns
+    -------
+    xs: float
+        x coordinate of solid particles
+    ys: float
+        y coordinate of solid particles
+    zs: float
+        z coordinate of solid particles
+    xf: float
+        x coordinate of fluid particles
+    yf: float
+        y coordinate of fluid particles
+    zf: float
+        z coordinate of fluid particles
+    """
+    from pysph.tools.packer import get_packing_folders, readdata
+    import os
+    preprocess_folder, layer_folder, res_file = get_packing_folders(folder, dx)
+
+    if os.path.exists(res_file):
+        return readdata(res_file)
+    else:
+        from pysph.tools.packer import Packer, HexaToRectLayer
+        packer = Packer(
+            None, preprocess_folder, None, add_opt_func, dx, res_file, dim=3,
+            filename=filename, pb=pb, nu=nu, k=k, dfreq=dfreq,
+            hardpoints=hardpoints, use_prediction=use_prediction,
+            filter_layers=filter_layers, reduce_dfreq=reduce_dfreq, tol=tol,
+            scale=scale, shift=shift, invert_normal=invert_normal)
+        packer.run()
+        packer.post_process(packer.info_filename)
+
+        hextorect = HexaToRectLayer(
+            None, layer_folder, None, add_opt_func, dx, res_file, dim=3,
+            filename=filename, pb=pb, nu=nu, k=k, dfreq=dfreq,
+            hardpoints=hardpoints, use_prediction=use_prediction,
+            filter_layers=filter_layers, reduce_dfreq=reduce_dfreq, tol=tol,
+            scale=scale, shift=shift, invert_normal=invert_normal,
+            no_solid=True)
+        hextorect.run()
+        hextorect.post_process(hextorect.info_filename)
+
         return readdata(res_file)
 
 
 def create_fluid_around_packing(dx, xf, yf, L, B, zf=[0.0], H=0.0, **props):
+    """ Create the outer fluid particles around the generated packing. It adds
+    the packed fluid particles and generate a concatenated particle array
+
+    Parameters
+    ----------
+    dx : float
+        particle spacing
+    xf : array
+        x coordinate of fluid particles
+    yf : array
+        y coordinate of fluid particles
+    L : float
+        length of the domain
+    B : float
+        width of the domain
+    zf : array
+        z coordinate of fluid particles
+    H : float
+        height of the domain
+
+    Returns
+    -------
+    Particle array of fluid
+    """
     from pysph.base.utils import get_particle_array
     xmax = max(xf)
     xmin = min(xf)
@@ -893,17 +1168,4 @@ def create_fluid_around_packing(dx, xf, yf, L, B, zf=[0.0], H=0.0, **props):
         x = np.concatenate((x[cond], xf))
         y = np.concatenate((y[cond], yf))
         z = np.concatenate((z[cond], zf))
-        return get_particle_array(
-            name='fluid', x=x, y=y, z=z, **props)
-
-
-
-
-
-
-
-    
-
-
-
-
+        return get_particle_array(name='fluid', x=x, y=y, z=z, **props)

@@ -58,8 +58,8 @@ def calculate_normal_2d_surface(boundary, shift, isclosed=True):
 
     xn: x coordinate of normal
     yn: y coordinate of normal
-    x: shifted x coordinate of curve 
-    y: shifted y coordinate of curve 
+    x: shifted x coordinate of curve
+    y: shifted y coordinate of curve
     area: length of the curve
     """
     import numpy as np
@@ -137,9 +137,9 @@ def shift_surface_inside(x, y, shift, xn, yn,
     Returns
     -------
 
-    x0: shifted x coordinate of boundary 
-    y0: shifted y coordinate of boundary 
-    z0: shifted z coordinate of boundary 
+    x0: shifted x coordinate of boundary
+    y0: shifted y coordinate of boundary
+    z0: shifted z coordinate of boundary
     """
     x0 = x - shift * xn
     y0 = y - shift * yn
@@ -158,7 +158,7 @@ def repair_boundary(x, y, hard):
 
     x: x coordinate of the boundary
     y: y coordinate of the boundary
-    hard: list of hard points 
+    hard: list of hard points
     """
     N = len(x)
     for id in hard:
@@ -208,16 +208,15 @@ def repair_boundary(x, y, hard):
         y[id1] = y[id] + fac * dy
 
 
-def create_frozen_container_outer(dx, hdx, rho, bound,
-                            l=8, dim=2,
-                            name='frozen'):
+def create_frozen_container_outer(
+        dx, hdx, rho, bound, layers=8, dim=2, name='frozen'):
     """function to create frozen particle lattice of given
     size and spacing
 
     Parameters
     ----------
 
-    dx: required resolution 
+    dx: required resolution
     hdx: h/dx ratio
     rho: density of the particles
     L: length of the domain
@@ -236,7 +235,7 @@ def create_frozen_container_outer(dx, hdx, rho, bound,
     eps = dx/10
     h = hdx * dx
     m = rho * dx**dim
-    nl = l * dx
+    nl = layers * dx
     b = bound
 
     if dim == 2:
@@ -284,7 +283,7 @@ def create_frozen_container_outer(dx, hdx, rho, bound,
                  (x - (b[1] + eps + nl) < 1e-14) &
                  (y - (b[2] - eps - nl) > 1e-14) &
                  (y - (b[3] + eps + nl) < 1e-14) &
-                 (z - (b[4] - eps - nl) > 1e-14) & 
+                 (z - (b[4] - eps - nl) > 1e-14) &
                  (z - (b[5] + eps + nl) < 1e-14))
 
     frozen = get_particle_array(
@@ -295,13 +294,14 @@ def create_frozen_container_outer(dx, hdx, rho, bound,
     return frozen
 
 
-def create_free_particles_outer(dx, hdx, rho, bound, l=8, dim=2, name='free'):
+def create_free_particles_outer(dx, hdx, rho, bound, layers=8, dim=2,
+                                name='free'):
     """function to create free particle lattice of given size and spacing
 
     Parameters
     ----------
 
-    dx: required resolution 
+    dx: required resolution
     hdx: h/dx ratio
     rho: density of the particles
     L: length of the domain
@@ -316,10 +316,10 @@ def create_free_particles_outer(dx, hdx, rho, bound, l=8, dim=2, name='free'):
     free: pysph.base.utils.ParticleArray class instance
     """
     import numpy as np
-    eps = dx/10
+    eps = dx / 10
     h = hdx * dx
     m = rho * dx**dim
-    nl = l * dx
+    nl = layers * dx
     b = bound
     if dim == 2:
         x0, y0 = np.mgrid[b[0] - nl + dx:b[1] - eps + nl:2 * dx,
@@ -357,16 +357,15 @@ def create_free_particles_outer(dx, hdx, rho, bound, l=8, dim=2, name='free'):
     return free
 
 
-def create_frozen_container_rect(dx, hdx, rho, bound,
-                            l=3, dim=2,
-                            name='frozen'):
+def create_frozen_container_rect(
+        dx, hdx, rho, bound, layers=3, dim=2, name='frozen'):
     """function to create frozen particle lattice of given
     size and spacing
 
     Parameters
     ----------
 
-    dx: required resolution 
+    dx: required resolution
     hdx: h/dx ratio
     rho: density of the particles
     L: length of the domain
@@ -385,7 +384,7 @@ def create_frozen_container_rect(dx, hdx, rho, bound,
     eps = dx/10
     h = hdx * dx
     m = rho * dx**dim
-    nl = l * dx
+    nl = layers * dx
     b = bound
     if dim == 2:
         x0, y0 = np.mgrid[b[0] - nl + dx / 2:b[1] - eps + nl:dx,
@@ -416,7 +415,7 @@ def create_free_particles_rect(dx, hdx, rho, bound, dim=2, name='free'):
     Parameters
     ----------
 
-    dx: required resolution 
+    dx: required resolution
     hdx: h/dx ratio
     rho: density of the particles
     L: length of the domain
@@ -450,7 +449,7 @@ def create_free_particles_rect(dx, hdx, rho, bound, dim=2, name='free'):
 
 
 def create_frozen_container(dx, hdx, rho, bound,
-                            l=3, dim=2,
+                            layers=3, dim=2,
                             name='frozen'):
     """function to create frozen particle lattice of given
     size and spacing
@@ -458,12 +457,12 @@ def create_frozen_container(dx, hdx, rho, bound,
     Parameters
     ----------
 
-    dx: required resolution 
+    dx: required resolution
     hdx: h/dx ratio
     rho: density of the particles
     L: length of the domain
     B: Breadth of the domain
-    l: number of layers
+    layers: number of layers
     H: height of the domain
     dim: dimension of the problem
     name: name of the particle array
@@ -477,7 +476,7 @@ def create_frozen_container(dx, hdx, rho, bound,
     eps = dx/10
     h = hdx * dx
     m = rho * dx**dim
-    nl = l * dx
+    nl = layers * dx
     b = bound
     if dim == 2:
         x0, y0 = np.mgrid[b[0] - nl + dx:b[1] - eps + nl:2 * dx,
@@ -520,7 +519,7 @@ def create_free_particles(dx, hdx, rho, bound, dim=2, name='free'):
     Parameters
     ----------
 
-    dx: required resolution 
+    dx: required resolution
     hdx: h/dx ratio
     rho: density of the particles
     L: length of the domain
@@ -566,15 +565,15 @@ def create_free_particles(dx, hdx, rho, bound, dim=2, name='free'):
 
 
 def create_surface_from_stl(
-    filename, dx, hdx, rho, scale=1.0, shift=True,
-    name='solid_nodes', hard={}, invert=False):
+        filename, dx, hdx, rho, scale=1.0, shift=True, name='solid_nodes',
+        hard={}, invert=False):
     """function to create solid nodes particle from a 3D Stl
 
     Parameters
     ----------
 
     filename: stl file name
-    dx: required resolution 
+    dx: required resolution
     hdx: h/dx ratio
     rho: density of the particles
     scale: scale factor
@@ -640,15 +639,16 @@ def create_surface_from_stl(
     return solid_nodes
 
 
-def create_surface_from_file(filename, points, dx, hdx, rho,
-isclosed, shift=True, invert=False, name='solid_nodes', hard={}):
+def create_surface_from_file(
+        filename, points, dx, hdx, rho, isclosed, shift=True, invert=False,
+        name='solid_nodes', hard={}):
     """function to create solid nodes particle from a x,y data file
 
     Parameters
     ----------
 
     filename: stl file name
-    dx: required resolution 
+    dx: required resolution
     hdx: h/dx ratio
     rho: density of the particles
     isclosed: True if the curve is closed
@@ -733,8 +733,8 @@ class FindExternalParticles(Equation):
 
     Parameters:
 
-    dest: pysph.base.utils.ParticleArray 
-        Free particles array 
+    dest: pysph.base.utils.ParticleArray
+        Free particles array
 
     sources: list of pysph.base.utils.ParticleArray
         Boundary nodes array
@@ -754,12 +754,12 @@ class FindExternalParticles(Equation):
 
 
 class FindNearNodes(Equation):
-    """Tag the neighboring particles inside if the dest particle is interior 
+    """Tag the neighboring particles inside if the dest particle is interior
 
     Parameters:
 
-    dest: pysph.base.utils.ParticleArray 
-        Free particles array 
+    dest: pysph.base.utils.ParticleArray
+        Free particles array
 
     sources: list of pysph.base.utils.ParticleArray
         Free particles array
@@ -778,8 +778,8 @@ class SPHApprox(Equation):
 
     Parameters:
 
-    dest: pysph.base.utils.ParticleArray 
-        any particles array 
+    dest: pysph.base.utils.ParticleArray
+        any particles array
 
     sources: list of pysph.base.utils.ParticleArray
         any particles array other than dest
@@ -793,8 +793,8 @@ class SPHDerivativeApprox(Equation):
 
     Parameters:
 
-    dest: pysph.base.utils.ParticleArray 
-        any particles array 
+    dest: pysph.base.utils.ParticleArray
+        any particles array
 
     sources: list of pysph.base.utils.ParticleArray
         any particles array other than dest
@@ -808,8 +808,8 @@ class FindNearestNode(Equation):
 
     Parameters:
 
-    dest: pysph.base.utils.ParticleArray 
-        Free or boundary particle 
+    dest: pysph.base.utils.ParticleArray
+        Free or boundary particle
 
     sources: list of pysph.base.utils.ParticleArray
         Boundary nodes array
@@ -843,10 +843,10 @@ class EvaluateAdaptiveTime(Equation):
 
     Parameters:
 
-    dest: pysph.base.utils.ParticleArray 
-        Free or boundary particle 
+    dest: pysph.base.utils.ParticleArray
+        Free or boundary particle
 
-    sources: None 
+    sources: None
     """
     def initialize(self, d_idx, d_dt_adapt, d_u, d_v, d_w, d_au, d_av, d_aw,
                    dt, t, d_h, d_pb, d_nu):
@@ -872,11 +872,11 @@ class SummationDensity(Equation):
 
     Parameters:
 
-    dest: pysph.base.utils.ParticleArray 
-        Free or boundary particle 
+    dest: pysph.base.utils.ParticleArray
+        Free or boundary particle
 
     sources: list of pysph.base.utils.ParticleArray
-        All particle arrays (not nodes) 
+        All particle arrays (not nodes)
     """
     def initialize(self, d_idx, d_V, d_rho):
         d_V[d_idx] = 0.0
@@ -892,8 +892,8 @@ class NumberDensityGradient(Equation):
 
     Parameters:
 
-    dest: pysph.base.utils.ParticleArray 
-        Free or boundary particle 
+    dest: pysph.base.utils.ParticleArray
+        Free or boundary particle
 
     sources: list of pysph.base.utils.ParticleArray
         All particle arrays (not nodes)
@@ -917,12 +917,12 @@ class NumberDensityGradient(Equation):
 
 
 class ViscousDamping(Equation):
-    """Evaluate acceleration due to damping 
+    """Evaluate acceleration due to damping
 
     Parameters:
 
-    dest: pysph.base.utils.ParticleArray 
-        Free or boundary particle 
+    dest: pysph.base.utils.ParticleArray
+        Free or boundary particle
 
     sources: list of pysph.base.utils.ParticleArray
         All particle arrays (not nodes)
@@ -941,20 +941,19 @@ class ViscousDamping(Equation):
         d_aw[d_idx] += -etai * d_w[d_idx]
 
 
-
 class RepulsionForce(Equation):
     """accelearion due to repulsion force
 
     Parameters:
 
-    dest: pysph.base.utils.ParticleArray 
-        free or boundary particles 
+    dest: pysph.base.utils.ParticleArray
+        free or boundary particles
 
     sources: pysph.base.utils.ParticleArray
         all particles (not nodes)
 
-    hdx: double 
-        h/dx ratio 
+    hdx: double
+        h/dx ratio
     """
     def __init__(self, dest, sources, hdx):
         self.hdx = hdx
@@ -989,11 +988,11 @@ class FindBoundaryNodeDirection(Equation):
 
     Parameters:
 
-    dest: pysph.base.utils.ParticleArray 
-        boundary particles 
+    dest: pysph.base.utils.ParticleArray
+        boundary particles
 
     sources: pysph.base.utils.ParticleArray
-        corresponding boundary node array 
+        corresponding boundary node array
     """
     def initialize(self, d_idx, d_dmin, d_xr, d_yr, d_zr):
         d_dmin[d_idx] = 10000
@@ -1017,11 +1016,11 @@ class FilterLayers(Equation):
 
     Parameters:
 
-    dest: pysph.base.utils.ParticleArray 
-        Boundary nodes 
+    dest: pysph.base.utils.ParticleArray
+        Boundary nodes
 
     sources: list of pysph.base.utils.ParticleArray
-        all free particles 
+        all free particles
     """
     def loop(self, s_filter, s_idx, t):
         if t < 1e-14:
@@ -1033,11 +1032,11 @@ class FindNearestNodeToHardPoint(Equation):
 
     Parameters:
 
-    dest: pysph.base.utils.ParticleArray 
-        Boundary nodes 
+    dest: pysph.base.utils.ParticleArray
+        Boundary nodes
 
     sources: list of pysph.base.utils.ParticleArray
-        all free particles 
+        all free particles
     """
     def initialize(self, d_idx, d_nearest, d_neartag, d_xn, d_yn, d_zn):
         d_nearest[d_idx] = 10000.0
@@ -1056,11 +1055,11 @@ class ProjectionToSurfaceBoundary(Equation):
 
     Parameters:
 
-    dest: pysph.base.utils.ParticleArray 
-        free particles 
+    dest: pysph.base.utils.ParticleArray
+        free particles
 
     sources: list of pysph.base.utils.ParticleArray
-        geometry nodes 
+        geometry nodes
     """
     def loop(self, d_idx, s_idx, XIJ, s_xn, s_yn, s_zn,
              d_neartag, d_u, d_v, d_w, d_h, d_nearest):
@@ -1076,41 +1075,41 @@ class ParticlePacking(Scheme):
     Methods
     -------
     create_frozen_container(L, B, H=0, l=5, name='frozen')
-        Creates the outer container of ghost particles 
+        Creates the outer container of ghost particles
 
     create_free_particles(L, B, H=0, name='free')
         Creates array of free particles
 
     create_agitators(free, solid_nodes, L, B, H=0, name='agitator')
-        Creates agitator particles [Not used] 
+        Creates agitator particles [Not used]
 
     create_boundary_node(filename, scale=1.0, shift=True,
                          invert=False, name='solid_nodes', isclosed=True)
-        Creates boundary node arrays 
+        Creates boundary node arrays
 
     _is_volume_converged(pa)
-        Checks for convergence 
+        Checks for convergence
 
     post_process(free, solid, solid_nodes, frozen, dx, filename)
-        Method to split free particles into solid and fluid 
+        Method to split free particles into solid and fluid
 
     setup_hardpoints(pa_solid_nodes, pa_fluid, pa_solid)
-        Sets a free particle near to a hard point on the boundary node 
+        Sets a free particle near to a hard point on the boundary node
 
     _project_particles_to_boundary(pa_fluid, pa_solid)
-        Method to project free particles to surface  
+        Method to project free particles to surface
 
     remove_duplicates(neartag, ids)
-        Remove duplicates from the near tagged free particles list 
+        Remove duplicates from the near tagged free particles list
 
     freeze_particles(pa_fluid, pa_frozen)
-        freezes particles outside the filtered layers 
+        freezes particles outside the filtered layers
 
     _check(particles, pa_fluid)
         Checks for convergence and decreases projection frequency
 
     post_step(particles, solver)
-        methods runs post every iteration 
+        methods runs post every iteration
     """
     def __init__(self, fluids, solids, frozen, dim, hdx=1.2,
                  dx=0.1, nu=None, pb=None, k=None, dfreq=-1,
@@ -1120,10 +1119,10 @@ class ParticlePacking(Scheme):
         ----------
 
         fluids: list
-            list of free particles 
+            list of free particles
 
         solids: dict
-            dict with boundary and boundary nodes pair 
+            dict with boundary and boundary nodes pair
 
         frozen: list
             list of frozen particles arrays
@@ -1135,9 +1134,9 @@ class ParticlePacking(Scheme):
             h/dx ratio
 
         dx: double
-            expected resolution 
+            expected resolution
 
-        nu: double    
+        nu: double
             damping constant
 
         pb: double
@@ -1185,9 +1184,12 @@ class ParticlePacking(Scheme):
         self.dfreq = dfreq
         self.surface_points = 0
         self.do_check = False
-        self.use_prediction = True if use_prediction is None else use_prediction
-        self.filter_layers = True if filter_layers is None else filter_layers
-        self.reduce_dfreq = True if reduce_dfreq is None else reduce_dfreq
+        self.use_prediction = True if use_prediction is None\
+            else use_prediction
+        self.filter_layers = True if filter_layers is None\
+            else filter_layers
+        self.reduce_dfreq = True if reduce_dfreq is None\
+            else reduce_dfreq
         self.converge = []
         self.blank = []
         self.divs = 10
@@ -1233,7 +1235,6 @@ class ParticlePacking(Scheme):
                           help='reduce update frequency for faster conv',
                           default=None)
 
-
     def consume_user_options(self, options):
         vars = [
             'dfreq', 'pb', 'nu', 'k', 'dx', 'use_prediction',
@@ -1267,38 +1268,95 @@ class ParticlePacking(Scheme):
         if self.tol is None:
             self.tol = 1e-2
 
-    def create_frozen_container(self, bound, l=5, name='frozen', outer=False, rect=False):
+    def create_frozen_container(self,
+                                bound,
+                                layers=5,
+                                name='frozen',
+                                outer=False,
+                                rect=False):
         if outer:
-            return create_frozen_container_outer(
-                self.dx, self.hdx, 1.0, bound, l=l, dim=self.dim, name=name)
+            return create_frozen_container_outer(self.dx,
+                                                 self.hdx,
+                                                 1.0,
+                                                 bound,
+                                                 layers=layers,
+                                                 dim=self.dim,
+                                                 name=name)
         elif rect:
-            return create_frozen_container_rect(
-                self.dx, self.hdx, 1.0, bound, l=l, dim=self.dim, name=name)
+            return create_frozen_container_rect(self.dx,
+                                                self.hdx,
+                                                1.0,
+                                                bound,
+                                                layers=layers,
+                                                dim=self.dim,
+                                                name=name)
         else:
-            return create_frozen_container(
-                self.dx, self.hdx, 1.0, bound, l=l, dim=self.dim, name=name)
+            return create_frozen_container(self.dx,
+                                           self.hdx,
+                                           1.0,
+                                           bound,
+                                           layers=layers,
+                                           dim=self.dim,
+                                           name=name)
 
-    def create_free_particles(self, bound, l=5, name='free', outer=False, rect=False):
+    def create_free_particles(self,
+                              bound,
+                              layers=5,
+                              name='free',
+                              outer=False,
+                              rect=False):
         if outer:
-            return create_free_particles_outer(
-                self.dx, self.hdx, 1.0, bound, l=l, dim=self.dim, name=name)
+            return create_free_particles_outer(self.dx,
+                                               self.hdx,
+                                               1.0,
+                                               bound,
+                                               layers=layers,
+                                               dim=self.dim,
+                                               name=name)
         elif rect:
-            return create_free_particles_rect(
-                self.dx, self.hdx, 1.0, bound, dim=self.dim, name=name)
+            return create_free_particles_rect(self.dx,
+                                              self.hdx,
+                                              1.0,
+                                              bound,
+                                              dim=self.dim,
+                                              name=name)
         else:
-            return create_free_particles(
-                self.dx, self.hdx, 1.0, bound, dim=self.dim, name=name)
+            return create_free_particles(self.dx,
+                                         self.hdx,
+                                         1.0,
+                                         bound,
+                                         dim=self.dim,
+                                         name=name)
 
-    def create_boundary_node(self, filename, points=None, scale=1.0, shift=True, invert=False,
-                             name='solid_nodes', isclosed=True):
+    def create_boundary_node(self,
+                             filename,
+                             points=None,
+                             scale=1.0,
+                             shift=True,
+                             invert=False,
+                             name='solid_nodes',
+                             isclosed=True):
         if self.dim == 2:
-            return create_surface_from_file(
-                filename, points, self.dx, self.hdx, 1.0, isclosed, invert=invert,
-                shift=shift, name=name, hard=self.hardpoints)
+            return create_surface_from_file(filename,
+                                            points,
+                                            self.dx,
+                                            self.hdx,
+                                            1.0,
+                                            isclosed,
+                                            invert=invert,
+                                            shift=shift,
+                                            name=name,
+                                            hard=self.hardpoints)
         elif self.dim == 3:
-            return create_surface_from_stl(
-                filename, self.dx, self.hdx, 1.0, scale=scale, shift=shift,
-                name=name, hard=self.hardpoints, invert=invert)
+            return create_surface_from_stl(filename,
+                                           self.dx,
+                                           self.hdx,
+                                           1.0,
+                                           scale=scale,
+                                           shift=shift,
+                                           name=name,
+                                           hard=self.hardpoints,
+                                           invert=invert)
 
     def configure_solver(self, kernel=None, integrator_cls=None,
                          extra_steppers=None, **kw):
@@ -1325,8 +1383,8 @@ class ParticlePacking(Scheme):
 
         from pysph.solver.solver import Solver
         self.solver = Solver(
-            dim=self.dim, integrator=integrator, kernel=kernel,
-            n_damp=10, adaptive_timestep=True, pfreq=3000, tf=200, max_steps=40000, **kw)
+            dim=self.dim, integrator=integrator, kernel=kernel, n_damp=10,
+            adaptive_timestep=True, pfreq=3000, tf=200, max_steps=40000, **kw)
 
     def get_equations(self):
 
@@ -1376,14 +1434,20 @@ class ParticlePacking(Scheme):
                 g3.append(ViscousDamping(dest=name, sources=all))
         for name in self.fluids:
             g3.append(
-                RepulsionForce(dest=name, sources=all, hdx=self.cutoff / self.hdx))
+                RepulsionForce(dest=name,
+                               sources=all,
+                               hdx=self.cutoff / self.hdx))
         source = self.fluids + self.frozen
         for name in self.solids:
             g3.append(
-                RepulsionForce(dest=name, sources=source, hdx=self.cutoff / self.hdx))
+                RepulsionForce(dest=name,
+                               sources=source,
+                               hdx=self.cutoff / self.hdx))
         for name in self.solids:
             g3.append(
-                RepulsionForce(dest=name, sources=[name], hdx=self.cutoff / self.hdx))
+                RepulsionForce(dest=name,
+                               sources=[name],
+                               hdx=self.cutoff / self.hdx))
         equations.append(Group(equations=g3, real=False))
 
         g4 = []
@@ -1467,7 +1531,7 @@ class ParticlePacking(Scheme):
         import numpy as np
         free_n = free.name
 
-        if solid == None:
+        if solid is None:
             import os
             xs, ys, zs, xf, yf, zf = None, None, None, None, None, None
             if os.path.exists(filename):
@@ -1488,8 +1552,7 @@ class ParticlePacking(Scheme):
                 xs = []
                 ys = []
                 zs = []
-            return np.savez(filename, xs=xs, ys=ys, zs=zs,
-                     xf=xf, yf=yf, zf=zf)
+            return np.savez(filename, xs=xs, ys=ys, zs=zs, xf=xf, yf=yf, zf=zf)
 
         solid_nodes_n = solid_nodes.name
         frozen_n = frozen.name
@@ -1566,7 +1629,7 @@ class ParticlePacking(Scheme):
 
     def setup_hardpoints(self, pa_solid_nodes, pa_fluid, pa_solid):
         if self.solver.t < 1e-14:
-            ### replace nearest point from hard pint
+            # replace nearest point from hard pint
             import numpy as np
             xh = pa_solid_nodes.x
             yh = pa_solid_nodes.y
@@ -1597,7 +1660,8 @@ class ParticlePacking(Scheme):
             pa_fluid.remove_particles(ids)
 
             pa_add = get_particle_array(
-                x=x, y=y, z=z, xn=xn, yn=yn, zn=zn, m=m, h=h, rho=rho, hard=1.0)
+                x=x, y=y, z=z, xn=xn, yn=yn, zn=zn, m=m, h=h, rho=rho,
+                hard=1.0)
             pa_solid.add_particles(**pa_add.get_property_arrays())
 
     def _project_particles_to_boundary(self, pa_fluid, pa_solid):
@@ -1715,7 +1779,7 @@ class ParticlePacking(Scheme):
                         pa_frozen = pa
 
                 if t < 1e-14:
-                    pa_frozen.filter[:] = 1  #done to remerge the fluid back
+                    pa_frozen.filter[:] = 1  # done to remerge the fluid back
                 if self.hardpoints:
                     self.setup_hardpoints(pa_solid_nodes, pa_fluid, pa_solid)
                 if self.filter_layers and t < 1e-14:
@@ -1725,7 +1789,8 @@ class ParticlePacking(Scheme):
                 print('no of solids particles', N)
                 if N > 1.5 * self.surface_points:
                     print(
-                        'boundary attracting too many particles - increase viscosity'
+                        'boundary attracting too many particles - increase'
+                        'viscosity'
                     )
                     import sys
                     sys.exit()

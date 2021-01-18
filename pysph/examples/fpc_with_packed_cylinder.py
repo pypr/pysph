@@ -5,25 +5,26 @@ import numpy as np
 import tempfile
 import os
 
-USE_COORDS = True
+# fluid mechanical/numerical parameters
+rho = 1000
+umax = 1.0
+c0 = 10 * umax
+p0 = rho * c0 * c0
+use_coords = True
+
+# creating the files and coordinates of the cylinder surface for demonstration
 xc, yc = [], []
 cyl_file = os.path.join(tempfile.gettempdir(), 'cylinder.txt')
 print(cyl_file)
 fp = open(cyl_file, 'w')
 for i in range(0, 100):
-    _x = cos(2*pi*i/100)+ 5.0
-    _y = sin(2*pi*i/100)
+    _x = cos(2 * pi * i / 100) + 5.0
+    _y = sin(2 * pi * i / 100)
     xc.append(_x)
     yc.append(_y)
-    fp.write('%.3f %.3f\n'%(_x, _y))
-print(xc, yc)
+    fp.write('%.3f %.3f\n' % (_x, _y))
 fp.close()
 
-# Fluid mechanical/numerical parameters
-rho = 1000
-umax = 1.0
-c0 = 10 * umax
-p0 = rho * c0 * c0
 
 class FPCWithPackedCylinder(WindTunnel):
     def _get_packed_points(self):
@@ -31,14 +32,19 @@ class FPCWithPackedCylinder(WindTunnel):
         returns
         xs, ys, zs, xf, yf, zf
         '''
-        from pysph.tools.geometry import get_packed_particles
+        from pysph.tools.geometry import (
+            get_packed_2d_particles_from_surface_coordinates,
+            get_packed_2d_particles_from_surface_file)
         folder = self.output_dir
         dx = self.dx
-        if USE_COORDS:
-            return get_packed_particles(
-                self.add_user_options, folder, dx, x=np.array(xc), y=np.array(yc), shift=True)
+        if use_coords:
+            return get_packed_2d_particles_from_surface_coordinates(
+                self.add_user_options, folder, dx, x=np.array(xc),
+                y=np.array(yc), shift=True)
         else:
-            return get_packed_particles(self.add_user_options, folder, dx, filename=cyl_file, shift=True)
+            return get_packed_2d_particles_from_surface_file(
+                self.add_user_options, folder, dx, filename=cyl_file,
+                shift=True)
 
     def _create_solid(self):
         xs, ys, zs, xf, yf, zf = self._get_packed_points()
@@ -59,7 +65,9 @@ class FPCWithPackedCylinder(WindTunnel):
         L = self.Lt
         B = self.Wt * 2.0
 
-        fluid = create_fluid_around_packing(dx, xf-dx/2, yf, L, B, m=volume*rho, rho=rho, h=h0, V=1.0/volume) 
+        fluid = create_fluid_around_packing(
+            dx, xf-dx/2, yf, L, B, m=volume*rho, rho=rho, h=h0, V=1.0/volume,
+            u=umax, p=0.0, uhat=umax)
 
         return fluid
 
@@ -89,7 +97,6 @@ class FPCWithPackedCylinder(WindTunnel):
             outlet.uta[:] = 1.0
 
         return particles
-
 
 
 if __name__ == '__main__':
