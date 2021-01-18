@@ -69,3 +69,15 @@ The following functions can be used to convert a mesh file supported by
 `meshio <https://github.com/nschloe/meshio>`_ to a set of surface points.
 
 .. autofunction:: pysph.tools.read_mesh.mesh2points
+
+Particle Packer
+---------------
+
+The following functions can be used to create a domain with particle packed
+around a solid surface in both 2D and 3D.
+
+.. autofunction:: pysph.tools.geometry.get_packed_periodic_packed_particles
+.. autofunction:: pysph.tools.geometry.get_packed_2d_particles_from_surface_coordinates
+.. autofunction:: pysph.tools.geometry.get_packed_2d_particles_from_surface_file
+.. autofunction:: pysph.tools.geometry.get_packed_3d_particles_from_surface_file
+.. autofunction:: pysph.tools.geometry.create_fluid_around_packing
