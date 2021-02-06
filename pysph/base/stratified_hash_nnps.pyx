@@ -162,10 +162,16 @@ cdef class StratifiedHashNNPS(NNPS):
         cdef HashTable* hash_level = NULL
         cdef HashEntry* candidate_cell = NULL
 
-        for i from 0<=i<self.num_levels:
+        cdef double hmax_level
 
-            h_max = fmax(self.radius_scale*h, self._get_h_max(self.current_cells, i))
-            H = <int> ceil(h_max*self.H/self._get_h_max(self.current_cells, i))
+        for i from 0<=i<self.num_levels:
+            hash_level = self.current_hash[i]
+            if hash_level.number_of_particles() == 0:
+                continue
+
+            hmax_level = self._get_h_max(self.current_cells, i)
+            h_max = fmax(self.radius_scale*h, hmax_level)
+            H = <int> ceil(h_max*self.H / hmax_level)
 
             mask_len = (2*H+1)*(2*H+1)*(2*H+1)
 
@@ -173,12 +179,11 @@ cdef class StratifiedHashNNPS(NNPS):
             y_boxes = <int*> malloc(mask_len*sizeof(int))
             z_boxes = <int*> malloc(mask_len*sizeof(int))
 
-            hash_level = self.current_hash[i]
             find_cell_id_raw(
                     x - xmin[0],
                     y - xmin[1],
                     z - xmin[2],
-                    self._get_h_max(self.current_cells, i)/self.H,
+                    hmax_level / self.H,
                     &c_x, &c_y, &c_z
                     )
 
@@ -277,7 +282,6 @@ cdef class StratifiedHashNNPS(NNPS):
     @cython.cdivision(True)
     cpdef _refresh(self):
         self.interval_size = (self.cell_size - self.hmin)/self.num_levels + EPS
-
         cdef HashTable** current_hash
         cdef int i, j
         for i from 0<=i<self.narrays:
