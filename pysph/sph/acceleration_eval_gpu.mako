@@ -61,13 +61,13 @@ ${helper.get_post_loop_kernel(g_idx, sg_idx, group, dest, all_eqs)}
 <% helper.call_reduce(all_eqs, dest) %>
 % endif
 // Finished destination ${dest}.
+% endfor
 #######################################################################
 ## Update NNPS locally if needed
 #######################################################################
 % if group.update_nnps:
 <% helper.call_update_nnps(group) %>
 % endif
-% endfor
 #######################################################################
 ## Call any `post` functions
 #######################################################################
