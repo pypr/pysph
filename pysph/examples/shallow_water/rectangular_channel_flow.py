@@ -76,7 +76,7 @@ class RectangularOpenChannelFlow(Application):
 
         # Inlet and Outlet
         self.num_inlet_pa = 2
-        self.num_outlet_pa = 2
+        self.num_outlet_pa = 3
         self.x_max_inlet = 0.
         self.x_min_inlet = -self.dx * self.num_inlet_pa
         self.x_min_outlet = self.le
@@ -93,8 +93,8 @@ class RectangularOpenChannelFlow(Application):
         w = self.w
         le = self.le
         # Inlet Properties
-        y = arange(dx/2, w-(dx/4.), dx)
-        x = zeros_like(y) - 0.5*dx
+        x, y = np.mgrid[-self.num_inlet_pa*dx + dx/2.:0:dx, dx/2:w-(dx/4.):dx]
+        x, y = (np.ravel(t) for t in (x, y))
 
         u_inlet = self.u_inlet
 
@@ -155,7 +155,7 @@ class RectangularOpenChannelFlow(Application):
         outlet.add_property('x0')
 
         # Bed Properties
-        xb, yb = np.mgrid[-5*dx:le+5*dx:dx, 0:w+dx/2.:dx]
+        xb, yb = np.mgrid[-5*dx:le*1.6+5*dx:dx, 0:w+dx/2.:dx]
         xb = np.ravel(xb)
         yb = np.ravel(yb)
 
@@ -166,12 +166,12 @@ class RectangularOpenChannelFlow(Application):
         bed = gpa_swe(name='bed', x=xb, y=yb, V=Vb, n=nb, h=hb)
 
         # Closed Boundary
-        xcb_top = np.arange(self.x_min_inlet, self.x_max_outlet+dx, dx)
+        xcb_top = np.arange(self.x_min_inlet - 2.0*dx, self.x_max_outlet*1.6, dx)
         ycb_top = np.concatenate((ones_like(xcb_top)*(w+0.5*dx),
                                   ones_like(xcb_top)*(w+1.5*dx)), axis=0)
         xcb_top = np.tile(xcb_top, 2)
 
-        xcb_bottom = np.arange(self.x_min_inlet, self.x_max_outlet+dx, dx)
+        xcb_bottom = np.arange(self.x_min_inlet - 2.0*dx, self.x_max_outlet*1.6, dx)
         ycb_bottom = np.concatenate((zeros_like(xcb_bottom)-0.5*dx,
                                      zeros_like(xcb_bottom)-1.5*dx), axis=0)
         xcb_bottom = np.tile(xcb_bottom, 2)
@@ -229,7 +229,7 @@ class RectangularOpenChannelFlow(Application):
         kernel = CubicSpline(dim=2)
         integrator = SWEIntegrator(inlet=InletStep(), fluid=SWEStep(),
                                    outlet=OutletStep())
-        tf = 50
+        tf = 100
         solver = Solver(
             kernel=kernel,
             dim=2,
@@ -244,42 +244,22 @@ class RectangularOpenChannelFlow(Application):
         equations = [
             Group(
                 equations=[
-                    Group(
-                        equations=[
-                            GatherDensityEvalNextIteration(
-                                dest='fluid', sources=['inlet', 'fluid',
-                                                       'outlet', 'boundary']
-                                ),
-                            ]
-                        ),
-                    Group(
-                        equations=[
-                            NonDimensionalDensityResidual(dest='fluid')
-                            ]
-                        ),
-                    Group(
-                        equations=[
-                            UpdateSmoothingLength(dim=dim, dest='fluid')
-                            ], update_nnps=True
-                        ),
-                    Group(
-                        equations=[
-                            CheckConvergenceDensityResidual(dest='fluid')
-                            ],
-                    )], iterate=True, max_iterations=10
+                    GatherDensityEvalNextIteration(
+                        dest='fluid', sources=['inlet', 'fluid',
+                                               'outlet', 'boundary']),
+                    NonDimensionalDensityResidual(dest='fluid'),
+                    UpdateSmoothingLength(dim=dim, dest='fluid'),
+                    CheckConvergenceDensityResidual(dest='fluid')
+                ], iterate=True, max_iterations=10
             ),
             Group(
                 equations=[
                     CorrectionFactorVariableSmoothingLength(
                         dest='fluid', sources=['fluid', 'inlet', 'outlet',
-                                               'boundary'])
-                        ]
-                ),
-            Group(
-                equations=[
-                    SWEOS(dest='fluid'),
-                    ]
-                ),
+                                               'boundary']),
+                    SWEOS(dest='fluid')
+                ]
+            ),
             Group(
                 equations=[
                     BoundaryInnerReimannStateEval(dest='inlet',
@@ -331,7 +311,7 @@ class RectangularOpenChannelFlow(Application):
 
     def _plot_vel_and_depth_at_channel_mid_section(self):
         from matplotlib import pyplot as plt
-        t_to_plot = [50.]
+        t_to_plot = [100.]
         fname_for_plot = []
         for fname in self.output_files:
             data = load(fname)
