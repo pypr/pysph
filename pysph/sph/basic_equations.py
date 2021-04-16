@@ -1,6 +1,16 @@
-"""
-Basic SPH Equations
+"""Basic SPH Equations
 ###################
+
+
+References
+----------
+
+.. [Monaghan1992] J. Monaghan, Smoothed Particle Hydrodynamics, "Annual Review
+    of Astronomy and Astrophysics", 30 (1992), pp. 543-574.
+
+.. [Monaghan2005] J. Monaghan, "Smoothed particle hydrodynamics", Reports on
+    Progress in Physics, 68 (2005), pp. 1703-1759.
+
 """
 
 from pysph.sph.equation import Equation
@@ -209,10 +219,6 @@ class MonaghanArtificialViscosity(Equation):
 
         \bar{\rho}_{ab}&=&\frac{\rho_{a}+\rho_{b}}{2}
 
-    References
-    ----------
-    .. [Monaghan2005] J. Monaghan, "Smoothed particle hydrodynamics",
-        Reports on Progress in Physics, 68 (2005), pp. 1703-1759.
     """
     def __init__(self, dest, sources, alpha=1.0, beta=1.0):
         r"""
@@ -259,10 +265,6 @@ class XSPHCorrection(Equation):
         \frac{d\mathbf{r}_{a}}{dt}=\mathbf{\hat{v}}_{a}=\mathbf{v}_{a}-
         \epsilon\sum_{b}m_{b}\frac{\mathbf{v}_{ab}}{\bar{\rho}_{ab}}W_{ab}
 
-    References
-    ----------
-    .. [Monaghan1992] J. Monaghan, Smoothed Particle Hydrodynamics, "Annual
-        Review of Astronomy and Astrophysics", 30 (1992), pp. 543-574.
     """
     def __init__(self, dest, sources, eps=0.5):
         r"""
@@ -309,10 +311,6 @@ class XSPHCorrectionForLeapFrog(Equation):
         \frac{d\mathbf{r}_{a}}{dt}=\mathbf{\hat{v}}_{a}= -
         \epsilon\sum_{b}m_{b}\frac{\mathbf{v}_{ab}}{\bar{\rho}_{ab}}W_{ab}
 
-    References
-    ----------
-    .. [Monaghan1992] J. Monaghan, Smoothed Particle Hydrodynamics, "Annual
-        Review of Astronomy and Astrophysics", 30 (1992), pp. 543-574.
     """
     def __init__(self, dest, sources, eps=0.5):
         r"""

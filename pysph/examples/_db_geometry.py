@@ -402,7 +402,8 @@ class DamBreak3DGeometry(object):
         if self.with_obstacle:
             no = obstacle.get_number_of_particles()
             print(
-                "3D dam break with %d fluid, %d boundary, %d obstacle particles" %
+                "3D dam break with %d fluid, %d boundary, "
+                "%d obstacle particles" %
                 (nf, nb, no))
         else:
             print(
@@ -410,16 +411,16 @@ class DamBreak3DGeometry(object):
                 (nf, nb))
 
         # load balancing props for the arrays
-        # fluid.set_lb_props(['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm', 'gid',
-        #                    'x0', 'y0', 'z0', 'u0', 'v0', 'w0', 'rho0'])
+        # fluid.set_lb_props(['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm',
+        #                   'gid', 'x0', 'y0', 'z0', 'u0', 'v0', 'w0', 'rho0'])
         fluid.set_lb_props(list(fluid.properties.keys()))
 
         #boundary.set_lb_props(['x', 'y', 'z', 'rho', 'h', 'm', 'gid', 'rho0'])
         #obstacle.set_lb_props(['x', 'y', 'z', 'rho', 'h', 'm', 'gid', 'rho0'])
         boundary.set_lb_props(list(boundary.properties.keys()))
 
-        # boundary and obstacle particles can do with a reduced list of properties
-        # to be saved to disk since they are fixed
+        # boundary and obstacle particles can do with a reduced list of
+        # properties to be saved to disk since they are fixed
         boundary.set_output_arrays(
             ['x', 'y', 'z', 'rho', 'm', 'h', 'p', 'tag', 'pid', 'gid'])
 

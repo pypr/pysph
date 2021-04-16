@@ -49,6 +49,7 @@ cdef class ParticleArrayExchange:
     # list of load balancing props
     cdef public list lb_props
     cdef public int nprops
+    cdef public double lb_weight
 
     # Import/Export lists for particles
     cdef public UIntArray exportParticleGlobalids

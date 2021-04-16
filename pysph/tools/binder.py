@@ -10,6 +10,7 @@ import argparse
 import sys
 import re
 import glob
+from textwrap import dedent
 
 
 def find_viewer_type(path):
@@ -54,6 +55,12 @@ def make_notebook(path, sim_name, config_dict={}):
                  ex. {'fluid': {'frame': 20}}
     '''
 
+    fname = os.path.join(path, sim_name+'.ipynb')
+    if os.path.exists(fname):
+        print('Jupyter notebook file {} already exists!'.format(fname))
+        print('Remove it to regenerate.')
+        return
+
     viewer_type = find_viewer_type(path)
     cell1_src = [
         "import os\n",
@@ -75,21 +82,17 @@ def make_notebook(path, sim_name, config_dict={}):
         nbf.v4.new_code_cell(source=cell3_src)
     ]
 
-    nbf.write(
-        nb,
-        os.path.join(
-            path,
-            sim_name+'.ipynb'
-        )
-    )
+    nbf.write(nb, fname)
     return
 
 
-def find_sim_dirs(path, sim_paths_list=[]):
+def find_sim_dirs(path, sim_paths_list=None):
     '''
     Finds all the directories in a given directory that
     contain pysph output files.
     '''
+    if sim_paths_list is None:
+        sim_paths_list = []
     path = os.path.abspath(path)
     sim_files = get_files(path)
     if len(sim_files) != 0:
@@ -97,7 +100,7 @@ def find_sim_dirs(path, sim_paths_list=[]):
     elif len(sim_files) == 0:
         files = os.listdir(path)
         files = [f for f in files if os.path.isdir(f)]
-        files = [os.path.abspath(f) for f in files if not f.startswith('.')]
+        files = [os.path.join(path, f) for f in files if not f.startswith('.')]
         for f in files:
             sim_paths_list = find_sim_dirs(f, sim_paths_list)
 
@@ -116,6 +119,51 @@ def find_dir_size(path):
                 total_size += os.path.getsize(fp)
 
     return total_size
+
+
+def _write_readme_requrements(path):
+    reqs = os.path.join(path, 'requirements.txt')
+    if os.path.exists(reqs):
+        print('Requirements file {} already exists!'.format(reqs))
+        print('Remove it to regenerate.')
+        return
+    else:
+        with open(reqs, 'w') as file:
+            file.write(
+                dedent('''\
+                ipympl
+                matplotlib
+                ipyvolume
+                numpy
+                pytools
+                Beaker
+                mako
+                Cython
+                h5py
+                meshio
+                https://github.com/pypr/cyarray/zipball/master
+                https://github.com/pypr/compyle/zipball/master
+                https://github.com/pypr/pysph/zipball/master
+                ''')
+            )
+
+    readme = os.path.join(path, 'README.md')
+    if os.path.exists(readme):
+        print("README exists, not clobbering.")
+    else:
+        with open(os.path.join(path, 'README.md'), 'w') as file:
+            file.write(
+                dedent('''\
+            # Title
+            [![Binder](https://mybinder.org/badge_logo.svg)]
+            (https://mybinder.org/v2/gh/user_name/repo_name/branch_name)
+
+            [comment]: # (The above link is for repositories hosted on GitHub.
+            For links corresponding to other hosting services,
+            please visit https://mybinder.org or
+            https://mybinder.readthedocs.io)
+            ''')
+            )
 
 
 def make_binder(path):
@@ -145,27 +193,7 @@ def make_binder(path):
                     print('file: ', f[0])
                     print('error: ', f[1], '\n')
 
-    with open(os.path.join(src_path, 'requirements.txt'), 'w') as file:
-        file.write(
-            "ipympl\n" +
-            "matplotlib\n" +
-            "ipyvolume\n" +
-            "numpy\n" +
-            "pytools\n" +
-            "-e git+https://github.com/pypr/compyle#egg=compyle\n" +
-            "-e git+https://github.com/pypr/pysph#egg=pysph"
-        )
-
-    with open(os.path.join(src_path, 'README.md'), 'w') as file:
-        file.write(
-            "# Title\n" +
-            "[![Binder](https://mybinder.org/badge_logo.svg)]" +
-            "(https://mybinder.org/v2/gh/user_name/repo_name/branch_name)" +
-            "\n" +
-            "[comment]: # (The above link is for repositories hosted " +
-            "on GitHub. For links corresponding to other hosting services, " +
-            "please visit https://mybinder.readthedocs.io)"
-        )
+    _write_readme_requrements(src_path)
 
 
 def main(argv=None):

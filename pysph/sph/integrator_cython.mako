@@ -9,6 +9,8 @@ ${' '*4*level}${l}
 
 from libc.math cimport *
 
+import time
+from compyle.profile import ProfileContext
 from cython import address
 from pysph.base.nnps_base cimport NNPS
 
@@ -84,6 +86,7 @@ cdef class Integrator:
 
     % for method in helper.get_stepper_method_wrapper_names():
     cdef ${method}(self):
+        _prof = ProfileContext("Integrator.${method}")
         cdef long NP_DEST
         cdef long d_idx
         cdef ParticleArrayWrapper dst
@@ -106,4 +109,5 @@ cdef class Integrator:
             ${indent(helper.get_stepper_loop(dest, method), 3)}
         % endif
         % endfor
+        _prof.stop()
     % endfor

@@ -66,6 +66,20 @@ def get_free_port(start, skip=None):
                         raise
 
 
+def is_using_ipython():
+    """Return True if the code is being run from an IPython session or
+    notebook.
+    """
+    try:
+        # If this is being run inside an IPython console or notebook
+        # then this is defined.
+        __IPYTHON__
+    except NameError:
+        return False
+    else:
+        return True
+
+
 def check_array(x, y):
     """Check if two arrays are equal with an absolute tolerance of
     1e-16."""
@@ -123,7 +137,7 @@ class ProgressBar(object):
         self.ascii = ascii
         if not ascii and not _supports_unicode(self.file):
             self.ascii = True
-        if not self.file.isatty():
+        if not self.file.isatty() and not is_using_ipython():
             self.show = False
         self.display()
 

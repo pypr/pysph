@@ -294,6 +294,15 @@ class TestGeometry(unittest.TestCase):
                 count += 1
         assert count == 0
 
+    def test_remove_repeated_points(self):
+        EPS = np.finfo(float).eps
+        x = np.array([0, EPS, -1*EPS, 2*EPS, EPS/2, EPS*0.9, EPS*1.1, EPS, 10*EPS])
+        y = np.zeros_like(x)
+        z = np.zeros_like(x)
+        xf, yf, zf = G.remove_repeated_points(x, y, z, EPS)
+        np.testing.assert_array_equal(np.array([0, 10*EPS]), xf)
+        np.testing.assert_array_equal(np.zeros(2), yf)
+        np.testing.assert_array_equal(np.zeros(2), zf)
 
 if __name__ == "__main__":
     unittest.main()

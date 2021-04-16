@@ -272,12 +272,15 @@ class Monaghan92Accelerations(Equation):
 
 
 class ADKEAccelerations(Equation):
-    """
-    Reference
-    ---------
-    ..  A comparison of SPH schemes for the compressible Euler equations,
+    """ADKE as discussed in the reference [KP14].
+
+    References
+    ----------
+
+    .. [KP14] A comparison of SPH schemes for the compressible Euler equations,
         2014, Journal of Computational Physics, 256, pp 308 -- 333
-            (http://dx.doi.org/10.1016/j.jcp.2013.08.060)
+        (http://dx.doi.org/10.1016/j.jcp.2013.08.060)
+
     """
     def __init__(self, dest, sources, alpha, beta, g1, g2, k, eps):
         self.alpha = alpha

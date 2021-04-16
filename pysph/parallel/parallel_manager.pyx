@@ -9,6 +9,8 @@ import mpi4py.MPI as mpi
 
 from cpython.list cimport PyList_Append, PyList_GET_SIZE
 
+from compyle.profile import profile_ctx, ProfileContext
+
 # PyZoltan
 from pyzoltan.czoltan cimport czoltan
 from pyzoltan.czoltan.czoltan cimport Zoltan_Struct
@@ -79,11 +81,17 @@ cdef class ParticleArrayExchange:
         self.numParticleImport = 0
 
         # load balancing props are taken from the particle array
-        lb_props = pa.get_lb_props()
+        lb_props = list(pa.get_lb_props())
         lb_props.sort()
 
         self.lb_props = lb_props
         self.nprops = len( lb_props )
+        # If an lb_weight  constant is present in the array, this
+        # is the weight to use for the load balancing for those particles.
+        if 'lb_weight' in pa.constants:
+            self.lb_weight = pa.constants.get('lb_weight')[0]
+        else:
+            self.lb_weight = 1.0
 
         # exchange flags
         self.lb_exchange = True
@@ -101,6 +109,7 @@ cdef class ParticleArrayExchange:
         arrays re-sized. MPI is then used to send and receive the data
 
         """
+        _p = ProfileContext('PAExchange.lb_exchange_data')
         # data array
         cdef ParticleArray pa = self.pa
 
@@ -124,16 +133,17 @@ cdef class ParticleArrayExchange:
         cdef dict sendbufs = self.get_sendbufs( exportLocalids )
 
         # remove particles to be exported
-        pa.remove_particles(exportLocalids)
-        pa.align_particles()
+        pa.remove_particles(exportLocalids, align=True)
 
         # old and new sizes
         cdef int current_size = self.num_local
         cdef int count = current_size - numExport
         cdef int newsize = count + numImport
 
-        # resize the particle array to accomodate the receive
-        pa.resize( newsize )
+        # resize the particle array to accomodate the receive.
+        # remove_particles updates the size, so count is the
+        # current size of the array.
+        self.extend(count, newsize)
 
         # exchange data
         self.exchange_data(zcomm, sendbufs, count)
@@ -144,6 +154,7 @@ cdef class ParticleArrayExchange:
 
         # update the number of particles
         self.num_local = newsize
+        _p.stop()
 
     def remote_exchange_data(self):
         """Share particle info after computing remote particles.
@@ -157,6 +168,7 @@ cdef class ParticleArrayExchange:
         to reflect the new particles that come in as remote particles.
 
         """
+        _p = ProfileContext('PAExchange.remote_exchange_data')
         # data arrays
         cdef ParticleArray pa = self.pa
 
@@ -186,7 +198,7 @@ cdef class ParticleArrayExchange:
         cdef dict sendbufs = self.get_sendbufs( exportLocalids )
 
         # update the size of the array
-        pa.resize( newsize )
+        self.extend(current_size, newsize)
         self.exchange_data(zcomm, sendbufs, count)
 
         # set tags for all received particles as Remote
@@ -195,6 +207,7 @@ cdef class ParticleArrayExchange:
 
         # store the number of remote particles
         self.num_remote = newsize - current_size
+        _p.stop()
 
     cdef exchange_data(self, ZComm zcomm, dict sendbufs, int count):
         cdef ParticleArray pa = self.pa
@@ -205,33 +218,34 @@ cdef class ParticleArrayExchange:
 
         cdef list props = self.lb_props
 
-        for i in range(nprops):
-            prop = props[i]
+        with profile_ctx('PAExchange.exchange_data'):
+            for i in range(nprops):
+                prop = props[i]
 
-            prop_arr = pa.properties[prop].get_npy_array()
-            nbytes = prop_arr.dtype.itemsize
-            stride = pa.stride.get(prop, 1)
+                prop_arr = pa.properties[prop].get_npy_array()
+                nbytes = prop_arr.dtype.itemsize
+                stride = pa.stride.get(prop, 1)
 
-            # the send and receive buffers
-            sendbuf = sendbufs[prop]
-            recvbuf = prop_arr[count*stride:]
+                # the send and receive buffers
+                sendbuf = sendbufs[prop]
+                recvbuf = prop_arr[count*stride:]
 
-            # tag for this property
-            prop_tag = i
+                # tag for this property
+                prop_tag = i
 
-            # set the nbytes and tag for the zoltan communicator
-            zcomm.set_nbytes( nbytes*stride )
-            zcomm.set_tag( prop_tag )
+                # set the nbytes and tag for the zoltan communicator
+                zcomm.set_nbytes( nbytes*stride )
+                zcomm.set_tag( prop_tag )
 
-            # exchange the data
-            zcomm.Comm_Do( sendbuf, recvbuf )
+                # exchange the data
+                zcomm.Comm_Do( sendbuf, recvbuf )
 
     def remove_remote_particles(self):
         self.num_local = self.pa.get_number_of_particles(real=True)
         cdef int num_local = self.num_local
 
         # resize the particle array
-        self.pa.resize( num_local )
+        self.pa.resize(num_local)
         self.pa.align_particles()
 
         # reset the number of remote particles
@@ -295,7 +309,12 @@ cdef class ParticleArrayExchange:
         self.importParticleProcs.reset()
 
     def extend(self, int currentsize, int newsize):
-        self.pa.resize( newsize )
+        if newsize <= currentsize:
+            self.pa.resize(newsize)
+        else:
+            # We use extend so any non lb_prop props are reset.
+            # resize does not set the values to any defaults.
+            self.pa.extend(newsize - currentsize)
 
     def get_sendbufs(self, UIntArray exportIndices):
         cdef ParticleArray pa = self.pa
@@ -311,7 +330,7 @@ cdef class ParticleArrayExchange:
             if stride > 1:
                 s_indices[stride] = get_strided_indices(indices, stride)
 
-        for prop in pa.properties:
+        for prop in self.lb_props:
             prop_arr = pa.properties[prop].get_npy_array()
             stride = pa.stride.get(prop, 1)
             sendbufs[prop] = prop_arr[s_indices[stride]]
@@ -491,6 +510,7 @@ cdef class ParallelManager:
             self.num_global[i] = pa_exchange.num_global
 
     def update(self):
+        _p = ProfileContext("ParallelManager.update")
         cdef int lb_freq = self.lb_freq
         cdef int lb_count = self.lb_count
 
@@ -500,11 +520,14 @@ cdef class ParallelManager:
         self.remove_remote_particles()
 
         if ( lb_count == lb_freq ):
-            self.update_partition()
+            with profile_ctx('ParallelManager.update_partition'):
+                self.update_partition()
             self.lb_count = 0
         else:
-            self.migrate_partition()
+            with profile_ctx('ParallelManager.migrate_partition'):
+                self.migrate_partition()
             self.lb_count = lb_count
+        _p.stop()
 
     def update_partition(self):
         """Update the partition.
@@ -561,7 +584,8 @@ cdef class ParallelManager:
 
         if self.in_parallel:
             # use Zoltan to get the cell import/export lists
-            self.load_balance()
+            with profile_ctx('ParallelManager.load_balance'):
+                self.load_balance()
 
             # move the data to the new partitions
             if self.changes == 1:
@@ -612,12 +636,13 @@ cdef class ParallelManager:
         cdef int narrays = self.narrays
         cdef ParticleArrayExchange pa_exchange
 
-        for i in range(narrays):
-            pa_exchange = self.pa_exchanges[i]
-            pa_exchange.remove_remote_particles()
+        with profile_ctx('ParallelManager.remove_remote_particles'):
+            for i in range(narrays):
+                pa_exchange = self.pa_exchanges[i]
+                pa_exchange.remove_remote_particles()
 
-            self.num_local[i] = pa_exchange.num_local
-            self.num_remote[i] = pa_exchange.num_remote
+                self.num_local[i] = pa_exchange.num_local
+                self.num_remote[i] = pa_exchange.num_remote
 
     def local_bin(self):
         """Create the local cell map.
@@ -698,6 +723,7 @@ cdef class ParallelManager:
         cdef int ncells_total = 0
         cdef int narrays = self.narrays
         cdef int layers = self.ghost_layers
+        cdef double lb_weight = self.pa_exchanges[pa_index].lb_weight
 
         # now bin the particles
         num_particles = indices.length
@@ -730,7 +756,7 @@ cdef class ParallelManager:
 
             # increment the size of the cells to reflect the added
             # particle. The size will be used to set the weights.
-            cell.size += 1
+            cell.size += lb_weight
 
         # update the total number of cells
         self.ncells_total = self.ncells_total + ncells_total

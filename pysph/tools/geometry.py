@@ -5,6 +5,9 @@ from pysph.base.nnps import LinkedListNNPS
 from pysph.base.utils import get_particle_array, get_particle_array_wcsph
 from cyarray.api import UIntArray
 from numpy.linalg import norm, matrix_power
+from pysph.sph.equation import Equation
+from pysph.tools.sph_evaluator import SPHEvaluator
+from pysph.base.particle_array import ParticleArray
 
 
 def distance(point1, point2=np.array([0.0, 0.0, 0.0])):
@@ -650,6 +653,29 @@ def get_naca_wing(dx=0.01, airfoil='0012', span=1.0, chord=1.0):
     elif len(airfoil) == 5:
         x, y = get_5digit_naca_airfoil(dx, airfoil, chord)
     return extrude(x, y, dx, span)
+
+
+class FindRepeatedPoints(Equation):
+    def loop_all(self, d_idx, d_min_idx, NBRS, N_NBRS):
+        d_min_idx[d_idx] = NBRS[0]
+        for i in range(N_NBRS):
+            if NBRS[i] < d_min_idx[d_idx]:
+                d_min_idx[d_idx] = NBRS[i]
+
+
+def remove_repeated_points(x, y, z, dx_triangle):
+    EPS = np.finfo(float).eps
+    pa_mesh = ParticleArray(name='mesh', x=x, y=y, z=z, h=EPS)
+    pa_grid = ParticleArray(name='grid', x=x, y=y, z=z, h=EPS)
+    pa_mesh.add_property(name='min_idx')
+
+    equation = [FindRepeatedPoints(dest='mesh', sources=['grid'])]
+    sph_eval = SPHEvaluator([pa_mesh, pa_grid], equation, dim=3)
+    sph_eval.evaluate()
+
+    idx = list(set(pa_mesh.min_idx))
+    idx = np.array(idx, dtype=int)
+    return pa_mesh.x[idx], pa_mesh.y[idx], pa_mesh.z[idx]
 
 
 def find_overlap_particles(fluid_parray, solid_parray, dx_solid, dim=3):

@@ -73,6 +73,7 @@ idea is very simple.
 '''
 from functools import partial
 import inspect
+import logging
 import os
 import re
 import sys
@@ -87,8 +88,9 @@ from pysph.base.device_helper import DeviceHelper
 from pysph.sph.acceleration_nnps_helper import generate_body, \
     get_kernel_args_list
 
-from compyle.ext_module import get_platform_dir
+from compyle.ext_module import get_platform_dir, get_md5
 from compyle.config import get_config
+from compyle.profile import profile_ctx
 from compyle.translator import (CStructHelper, CUDAConverter, OpenCLConverter,
                                 ocl_detect_type, ocl_detect_pointer_base_type)
 
@@ -96,6 +98,8 @@ from .equation import get_predefined_types, KnownType
 from .acceleration_eval_cython_helper import (
     get_all_array_names, get_known_types_for_arrays
 )
+
+logger = logging.getLogger(__name__)
 
 getfullargspec = getattr(
     inspect, 'getfullargspec', inspect.getargspec
@@ -311,8 +315,10 @@ class GPUAccelerationEval(object):
         raise NotImplementedError('GPU backend is incomplete')
 
     def update_nnps(self):
-        self.nnps.update_domain()
-        self.nnps.update()
+        with profile_ctx('Integrator.update_domain'):
+            self.nnps.update_domain()
+        with profile_ctx('nnps.update'):
+            self.nnps.update()
 
     def do_reduce(self, eqs, dest, t, dt):
         for eq in eqs:
@@ -628,13 +634,24 @@ class AccelerationEvalGPUHelper(object):
         ))
         if not os.path.exists(path):
             os.makedirs(path)
-        fname = os.path.join(path, 'generated' + ext)
-        with open(fname, 'w') as fp:
-            fp.write(code)
-            print("{backend} code written to {fname}".format(
-                backend=backend, fname=fname)
+        md5 = get_md5(code)
+        fname = os.path.join(path, 'm_{0}{1}'.format(md5, ext))
+        # If the file already exists, we use it, this allows to write our
+        # own edited version if we wish to.
+        if os.path.exists(fname):
+            msg = 'Reading code from {}'.format(fname)
+            logger.info(msg)
+            print(msg)
+            with open(fname, 'r') as fp:
+                code = fp.read()
+        else:
+            with open(fname, 'w') as fp:
+                fp.write(code)
+            msg = "{backend} code written to {fname}".format(
+                backend=backend, fname=fname
             )
-        code = code.encode('ascii') if sys.version_info.major < 3 else code
+            print(msg)
+            logger.info(msg)
 
         if self.backend == 'opencl':
             import pyopencl as cl
@@ -736,10 +753,10 @@ class AccelerationEvalGPUHelper(object):
         if source is None:
             # We only need the dest arrays here as these are simple kernels
             # without a loop so there is no "source".
-            _args = list(d_ary)
+            _args = sorted(d_ary)
         else:
             d_ary.update(s_ary)
-            _args = list(d_ary)
+            _args = sorted(d_ary)
         py_args.extend(_args)
         all_args.extend(self._get_typed_args(_args))
         all_args.extend(
@@ -933,7 +950,7 @@ class AccelerationEvalGPUHelper(object):
         s_ary, d_ary = eq_group.get_array_names()
         s_ary.update(d_ary)
 
-        _args = list(s_ary)
+        _args = sorted(s_ary)
         py_args.extend(_args)
         all_args.extend(self._get_typed_args(_args))
 
@@ -1014,7 +1031,7 @@ class AccelerationEvalGPUHelper(object):
 
         s_ary.update(d_ary)
 
-        _args = list(s_ary)
+        _args = sorted(s_ary)
         py_args.extend(_args)
 
         _args_modified = [modify_var_name(x) for x in _args]

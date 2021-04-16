@@ -11,6 +11,7 @@ from pysph.tools import run_parallel_script
 
 MY_DIR = run_parallel_script.get_directory(__file__)
 
+
 def get_example_script(script):
     """Given a relative posix path to a script located inside the
     pysph.examples package, return the full path to it.
@@ -142,24 +143,24 @@ class ExampleTestCase(unittest.TestCase):
 
     def _test(self, serial, parallel, atol, nprocs):
         # make sure the arrays are at the same time
-        self.assertAlmostEqual( serial.time, parallel.time, 12)
+        self.assertAlmostEqual(serial.time, parallel.time, 12)
 
         # test the results.
-        xs, ys, zs, rhos  = serial.get("x","y", "z", "rho")
+        xs, ys, zs, rhos = serial.get("x", "y", "z", "rho")
         xp, yp, zp, rhop, gid = parallel.get("x", "y", "z", "rho", 'gid')
 
         if nprocs == 1:
             # Not really a parallel run (used for openmp support).
             gid = np.arange(xs.size)
 
-        self.assertTrue( xs.size, xp.size )
+        self.assertTrue(xs.size, xp.size)
 
         x_err = np.max(xs[gid] - xp)
         y_err = np.max(ys[gid] - yp)
         z_err = np.max(zs[gid] - zp)
         self.assertTrue(np.allclose(xs[gid], xp, atol=atol, rtol=0),
-                        "Max x_error %s"%x_err)
+                        "Max x_error %s" % x_err)
         self.assertTrue(np.allclose(ys[gid], yp, atol=atol, rtol=0),
-                        "Max y_error %s"%y_err)
+                        "Max y_error %s" % y_err)
         self.assertTrue(np.allclose(zs[gid], zp, atol=atol, rtol=0),
-                        "Max z_error %s"%z_err)
+                        "Max z_error %s" % z_err)

@@ -45,6 +45,11 @@ def cull_files(args):
     main(args)
 
 
+def manage_cache(args):
+    from pysph.tools.manage_cache import main
+    main(args)
+
+
 def main():
     parser = ArgumentParser(description=__doc__, add_help=False)
     parser.add_argument(
@@ -91,6 +96,13 @@ def main():
         add_help=False
     )
     cull.set_defaults(func=cull_files)
+
+    cache = subparsers.add_parser(
+        'cache',
+        help='Show cache directories or clear them',
+        add_help=False
+    )
+    cache.set_defaults(func=manage_cache)
 
     if (len(sys.argv) == 1 or (len(sys.argv) > 1 and
                                sys.argv[1] in ['-h', '--help'])):

@@ -133,7 +133,14 @@ def main():
     comm.Bcast(buf=GID, root=0)
 
     # create the local particle arrays and exchange objects
-    pa = get_particle_array_wcsph(name='test', x=x, y=y, gid=gid)
+    u = np.ones_like(x)
+    pa = get_particle_array_wcsph(name='test', x=x, y=y, u=u, gid=gid)
+    # Squeeze the arrays so that they are forced to resize when doing
+    # the lb exchange.
+    for arr in pa.properties.values():
+        arr.squeeze()
+    pa.set_lb_props(['x', 'y', 'u', 'gid'])
+
     pae = ParticleArrayExchange(pa_index=0, pa=pa, comm=comm)
 
     # set the export indices for each array
@@ -163,6 +170,11 @@ def main():
         assert (abs(X[pa.gid[i]] - pa.x[i]) < 1e-15)
         assert (abs(Y[pa.gid[i]] - pa.y[i]) < 1e-15)
         assert (GID[pa.gid[i]] == pa.gid[i])
+
+    # Check that all non-load balanced props are not garbage values
+    for prop in ('z', 'v', 'w', 'p'):
+        np.testing.assert_array_almost_equal(pa.get(prop), 0.0)
+    np.testing.assert_array_almost_equal(pa.u, 1.0)
 
 
 if __name__ == '__main__':

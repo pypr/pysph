@@ -118,17 +118,17 @@ ${indent(all_eqs.get_reduce_code(), 0)}
 
 # Destination ${dest} done.
 # ---------------------------------------------------------------------
-
+% endfor
 #######################################################################
 ## Update NNPS locally if needed
 #######################################################################
 % if group.update_nnps:
 # Updating NNPS.
-nnps.update_domain()
-nnps.update()
+with profile_ctx("Integrator.update_domain"):
+    nnps.update_domain()
+with profile_ctx("nnps.update"):
+    nnps.update()
 % endif
-
-% endfor
 #######################################################################
 ## Call any `post` functions
 #######################################################################
@@ -150,6 +150,7 @@ prange = range
 from cython.parallel import parallel, prange, threadid
 % endif
 
+from compyle.profile import profile_ctx
 from pysph.base.particle_array cimport ParticleArray
 from pysph.base.nnps_base cimport NNPS
 from pysph.base.reduce_array import serial_reduce_array

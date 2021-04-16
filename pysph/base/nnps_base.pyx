@@ -1080,7 +1080,7 @@ cdef class Cell:
         self.nbrprocs = IntArray(0)
 
         # current size of the cell
-        self.size = 0
+        self.size = 0.0
 
     #### Public protocol ################################################
     def get_centroid(self, Point pnt):

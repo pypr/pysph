@@ -9,6 +9,7 @@ from the `sph_eval` module.
 from numpy import sqrt
 import numpy as np
 
+from compyle.profile import profile_ctx, profile
 # Local imports.
 from .integrator_step import IntegratorStep
 
@@ -52,6 +53,12 @@ class Integrator(object):
         args = ', '.join(['%s=%s' % (k, s[k]) for k in s])
         return '%s(%s)' % (name, args)
 
+    def _my_max(self, x):
+        if len(x) > 0:
+            return np.max(x)
+        else:
+            return -1.0
+
     def _get_dt_adapt_factors(self):
         a_eval = self.acceleration_evals[0]
         factors = [-1.0, -1.0, -1.0]
@@ -62,7 +69,7 @@ class Integrator(object):
                     if pa.gpu:
                         prop_names.append(name)
                     else:
-                        max_val = np.max(pa.get(name))
+                        max_val = self._my_max(pa.get(name))
                         factors[i] = max(factors[i], max_val)
             if pa.gpu:
                 pa.gpu.update_minmax_cl(prop_names, only_max=True)
@@ -269,13 +276,16 @@ class Integrator(object):
             # update NNPS since particles have moved
             if self.parallel_manager:
                 self.parallel_manager.update()
-            self.nnps.update()
+            with profile_ctx('nnps.update'):
+                self.nnps.update()
 
         # Evaluate
         c_integrator = self.c_integrator
         a_eval = self.acceleration_evals[index]
-        a_eval.compute(c_integrator.t, c_integrator.dt)
+        with profile_ctx('acceleration_eval_%d' % index):
+            a_eval.compute(c_integrator.t, c_integrator.dt)
 
+    @profile
     def initial_acceleration(self, t, dt):
         """Compute the initial accelerations if needed before the iterations start.
 
@@ -286,6 +296,7 @@ class Integrator(object):
         """
         self.acceleration_evals[0].compute(t, dt)
 
+    @profile
     def update_domain(self):
         """Update the domain of the simulation.
 
@@ -379,8 +390,10 @@ class EPECIntegrator(Integrator):
 
     In the EPEC mode, the final corrector can be modified to:
 
-    :math:`y^{n+1} = y^n + \frac{\Delta t}{2}\left( F(y^n) +
-                                F(y^{n+\frac{1}{2}}) \right)`
+    .. math::
+
+        y^{n+1} = y^n + \frac{\Delta t}{2}\left( F(y^n) +
+                                F(y^{n+\frac{1}{2}}) \right)
 
     This would require additional storage for the accelerations.
 

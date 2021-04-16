@@ -4,7 +4,6 @@ from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
 from pysph.sph.scheme import ADKEScheme, GasDScheme, GSPHScheme, SchemeChooser
 from pysph.sph.wc.crksph import CRKSPHScheme
 from pysph.base.nnps import DomainManager
-import numpy
 
 # Numerical constants
 dim = 1
@@ -50,41 +49,52 @@ class SodShockTube(ShockTubeSetup):
         self.ml = self.dxl * self.rhol
         self.h0 = self.hdx * self.dxr
         self.hdx = self.hdx
+        self.dt = dt
+        self.tf = tf
 
     def create_particles(self):
-        return self.generate_particles(xmin=self.xmin, xmax=self.xmax,
-                                       dxl=self.dxl, dxr=self.dxr,
-                                       m=self.ml, pl=self.pl, pr=self.pr,
-                                       h0=self.h0, bx=0.03, gamma1=gamma1,
-                                       ul=self.ul, ur=self.ur)
+        # Boundary particles are not needed as we are mirroring the particles
+        # using the domain manager. Hence, bx is set to 0.0.
+        f, b = self.generate_particles(
+            xmin=self.xmin, xmax=self.xmax, dxl=self.dxl, dxr=self.dxr,
+            m=self.ml, pl=self.pl, pr=self.pr, h0=self.h0, bx=0.00,
+            gamma1=gamma1, ul=self.ul, ur=self.ur
+        )
+        self.scheme.setup_properties([f, b])
+        return [f]
 
     def create_domain(self):
         return DomainManager(
-            xmin=self.xmin, xmax=self.xmax, mirror_in_x=True
+            xmin=self.xmin, xmax=self.xmax, mirror_in_x=True,
+            n_layers=2
         )
 
+    def configure_scheme(self):
+        scheme = self.scheme
+        if self.options.scheme in ['gsph', 'mpm']:
+            scheme.configure(kernel_factor=self.hdx)
+        scheme.configure_solver(tf=self.tf, dt=self.dt)
+
     def create_scheme(self):
-        self.dt = dt
-        self.tf = tf
         adke = ADKEScheme(
-            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             alpha=1, beta=1.0, k=0.3, eps=0.5, g1=0.2, g2=0.4)
 
         mpm = GasDScheme(
-            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
-            kernel_factor=1.2, alpha1=1.0, alpha2=0.1,
-            beta=2.0, update_alpha1=True, update_alpha2=True
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            kernel_factor=None, alpha1=1.0, alpha2=0.1,
+            beta=2.0, update_alpha1=True, update_alpha2=True,
         )
         gsph = GSPHScheme(
-            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
-            kernel_factor=1.0,
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            kernel_factor=None,
             g1=0.2, g2=0.4, rsolver=2, interpolation=1, monotonicity=1,
-            interface_zero=True, hybrid=False, blend_alpha=2.0,
+            interface_zero=True, hybrid=True, blend_alpha=2.0,
             niter=20, tol=1e-6
         )
         crk = CRKSPHScheme(
-            fluids=['fluid'], dim=dim, rho0=0, c0=0, nu=0, h0=0, p0=0,
-            gamma=gamma, cl=3
+            fluids=['fluid'], dim=dim, rho0=0, c0=0,
+            nu=0, h0=0, p0=0, gamma=gamma, cl=3
         )
         s = SchemeChooser(
             default='adke', adke=adke, mpm=mpm, gsph=gsph, crk=crk

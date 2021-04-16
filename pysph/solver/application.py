@@ -1,5 +1,6 @@
 # Standard imports.
 from argparse import ArgumentDefaultsHelpFormatter
+import atexit
 from compyle.utils import ArgumentParser
 import glob
 import inspect
@@ -25,8 +26,9 @@ from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
 
 from pysph.base import kernels
 from compyle.config import get_config
-from pysph.solver.controller import CommandManager
-from pysph.solver.utils import mkdir, load, get_files, get_free_port
+from compyle.profile import print_profile, profile2csv, get_profile_info
+from .controller import CommandManager
+from .utils import mkdir, load, get_files, get_free_port, is_using_ipython
 
 # conditional parallel imports
 from pysph import has_mpi, has_zoltan, in_parallel
@@ -36,20 +38,6 @@ if in_parallel():
     import mpi4py.MPI as mpi
 
 logger = logging.getLogger(__name__)
-
-
-def is_using_ipython():
-    """Return True if the code is being run from an IPython session or
-    notebook.
-    """
-    try:
-        # If this is being run inside an IPython console or notebook
-        # then this is defined.
-        __IPYTHON__
-    except NameError:
-        return False
-    else:
-        return True
 
 
 def list_all_kernels():
@@ -162,7 +150,7 @@ class Application(object):
       :py:class:`pysph.parallel.parallel_manager.ParallelManager`.
 
     - ``particles``: list of
-      :py:class:`pysph.base.particle_array.ParticleArray`s.
+      :py:class:`pysph.base.particle_array.ParticleArray`.
 
     - ``rank``: Rank of this process.
 
@@ -170,7 +158,7 @@ class Application(object):
 
     - ``solver``: the solver instance, :py:class:`pysph.solver.solver.Solver`.
 
-    - ``tools``: a list of possible :py:class:`pysph.solver.tools.Tool`s.
+    - ``tools``: a list of possible :py:class:`pysph.solver.tools.Tool`.
 
     """
 
@@ -607,8 +595,9 @@ class Application(object):
             "--zoltan-lb-method",
             action="store",
             dest="zoltan_lb_method",
-            default="RCB",
-            help="Choose the Zoltan load balancnig method")
+            default='HSFC',
+            choices=['RCB', 'RIB', 'HSFC'],
+            help="Choose the Zoltan load balancing method")
 
         zoltan.add_argument(
             "--rcb-lock",
@@ -636,8 +625,10 @@ class Application(object):
             action='store',
             dest="zoltan_rcb_set_direction",
             default=0,
+            choices=[0, 1, 2, 3, 4, 5, 6],
             type=int,
-            help="Set the order of the RCB cuts")
+            help="Set the order of the RCB cuts (0: no order, 1:'xyz', "
+                 "2:'xzy', 3:'yzx', 4:'yxz', 5:'zxy', 6:'zyx')")
 
         zoltan.add_argument(
             "--zoltan-weights",
@@ -651,7 +642,7 @@ class Application(object):
             "--ghost-layers",
             action='store',
             dest='ghost_layers',
-            default=3.0,
+            default=1.0,
             type=float,
             help=('Number of ghost cells to share for remote neighbors'))
 
@@ -771,6 +762,10 @@ class Application(object):
             options = self.arg_parse.parse_args([])
         else:
             options = self.arg_parse.parse_args(self.args)
+
+        if options.profile:
+            # Remove the default callback from compyle.
+            atexit.unregister(print_profile)
 
         self.options = options
 
@@ -1160,7 +1155,7 @@ class Application(object):
         solver.set_disable_output(options.disable_output)
 
         if options.reorder_freq is None:
-            if options.with_opencl:
+            if options.with_opencl or options.with_cuda:
                 solver.set_reorder_freq(50)
         else:
             solver.set_reorder_freq(options.reorder_freq)
@@ -1393,11 +1388,25 @@ class Application(object):
         """Write the information dictionary to given filename. Any extra
         keyword arguments are written to the file.
         """
-        info = dict(
-            fname=self.fname, output_dir=self.output_dir, args=self.args)
-        info.update(kw)
-        with open(filename, 'w') as f:
-            json.dump(info, f)
+        if self.rank == 0:
+            info = dict(
+                fname=self.fname, output_dir=self.output_dir, args=self.args)
+            info.update(kw)
+            with open(filename, 'w') as f:
+                json.dump(info, f)
+
+    def _write_profile_info(self):
+        # Note that this is called when the run method ends and NOT
+        # at exit, so any post-processing will be after this is dumped.
+        fname = join(self.output_dir, 'profile_info.csv')
+        data = None
+        if self.num_procs > 1:
+            data = dict(get_profile_info())
+            data = self.comm.gather(data, root=0)
+        if self.rank == 0:
+            profile2csv(fname, info=data)
+        if self.options.profile and self.rank == 0:
+            print_profile()
 
     def _log_solver_info(self, solver):
         sep = '-'*70
@@ -1515,6 +1524,38 @@ class Application(object):
 
     def run(self, argv=None):
         """Run the application.
+
+        This basically calls ``setup()`` and then ``solve()``.
+
+        Parameters
+        ----------
+
+        argv: list
+            Optional command line arguments.  Handy when running
+            interactively.
+        """
+        self.setup(argv)
+        self.solve()
+
+    def set_args(self, args):
+        self.args = args
+
+    def setup(self, argv=None):
+        """Setup the application.
+
+        This may be used to setup the various pieces of infrastructure to run
+        an SPH simulation, for example, this will parse the command line
+        arguments passed, setup the scheme, solver, equations etc. It will not
+        call the solver's solve method though. This can be useful if you wish
+        to manually run the solver.
+
+        Parameters
+        ----------
+
+        argv: list
+            Optional command line arguments.  Handy when running
+            interactively.
+
         """
         if argv is not None:
             self.set_args(argv)
@@ -1559,91 +1600,24 @@ class Application(object):
 
         self.customize_output()
 
+    def solve(self):
+        """This runs the solver.
+
+        Note that this method expects that ``setup`` has already been called.
+
+        Don't use this method unless you really know what you are doing.
+        """
         start_time = time.time()
         self.solver.solve(not self.options.quiet)
         end_time = time.time()
         run_duration = end_time - start_time
         self._message("Run took: %.5f secs" % (run_duration))
         self._write_info(
-            self.info_filename, completed=True, cpu_time=run_duration)
+            self.info_filename, completed=True, cpu_time=run_duration
+        )
 
         self._stop_interfaces()
-
-    def set_args(self, args):
-        self.args = args
-
-    def setup(self, solver, equations, nnps=None, inlet_outlet_factory=None,
-              particle_factory=None, *args, **kwargs):
-        """Setup the application's solver.
-
-        This will parse the command line arguments (if this is not called from
-        within an IPython notebook or shell) and then using those parameters
-        and any additional parameters and call the solver's setup method.
-
-        Parameters
-        ----------
-        solver: pysph.solver.solver.Solver
-            The solver instance.
-
-        equations: list
-            A list of Groups/Equations.
-
-        nnps: pysph.base.nnps_base.NNPS
-            Optional NNPS instance. If None is given a default NNPS is created.
-
-        inlet_outlet_factory: callable or None
-            The `inlet_outlet_factory` is passed a dictionary of the particle
-            arrays.  The factory should return a list of inlets and outlets.
-
-        particle_factory : callable or None
-            If supplied, particles will be created for the solver using the
-            particle arrays returned by the callable. Else particles for the
-            solver need to be set before calling this method
-
-        args:
-            extra positional arguments passed on to the `particle_factory`.
-
-        kwargs:
-            extra keyword arguments passed to the `particle_factory`.
-
-
-        Examples
-        --------
-
-        >>> def create_particles():
-        ...    ...
-        ...
-        >>> solver = Solver(...)
-        >>> equations = [...]
-        >>> app = Application()
-        >>> app.setup(solver=solver, equations=equations,
-        ...           particle_factory=create_particles)
-        >>> app.run()
-        """
-        start_time = time.time()
-        self.solver = solver
-        self.equations = equations
-        solver.get_options(self.arg_parse)
-        self._parse_command_line()
-        self._process_command_line()
-        self._setup_logging()
-        self._configure_global_config()
-
-        # Create particles either from scratch or restart
-        self._create_particles(particle_factory, *args, **kwargs)
-
-        # This must be done before the initial load balancing
-        # as the inlets will create new particles.
-        self._create_inlet_outlet(inlet_outlet_factory)
-        if nnps is not None:
-            self.nnps = nnps
-
-        self._configure_solver()
-
-        end_time = time.time()
-        setup_duration = end_time - start_time
-        self._message("Setup took: %.5f secs" % (setup_duration))
-        self._write_info(self.info_filename, completed=False, cpu_time=0)
+        self._write_profile_info()
 
     ######################################################################
     # User methods that could be overloaded.

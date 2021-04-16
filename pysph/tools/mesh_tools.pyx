@@ -1,11 +1,12 @@
 from pysph.base.particle_array import ParticleArray
 from pysph.base import nnps
+from pysph.tools.geometry import remove_repeated_points
 import numpy as np
-from stl import mesh
 from numpy.linalg import norm
 from cyarray.api import UIntArray
 cimport cython
 cimport numpy as np
+import meshio
 
 DTYPE = np.float
 ctypedef np.float_t DTYPE_t
@@ -97,44 +98,33 @@ def _fill_triangle(triangle, h=0.1):
     return result[:, 0], result[:, 1], result[:, 2]
 
 
-def _get_stl_mesh(stl_fname, dx_triangle, uniform = False):
-    """Interpolates points within triangles in the stl file"""
-    m = mesh.Mesh.from_file(stl_fname)
+def _get_surface_mesh(x, y, z, cells, dx_triangle, uniform = False):
+    """Interpolates points within triangles spaced by dx_triangle"""
+    vectors = np.zeros((len(cells), 3, 3))
     x_list, y_list, z_list = [], [], []
-    for i in range(len(m.vectors)):
-        x1, y1, z1 = _fill_triangle(m.vectors[i], dx_triangle)
-        x2, y2, z2 = _get_triangle_sides(m.vectors[i], dx_triangle)
+    for i, cell in enumerate(cells):
+        idx1, idx2, idx3 = cell
+
+        vector = np.array([[x[idx1], y[idx1], z[idx1]],
+                           [x[idx2], y[idx2], z[idx2]],
+                           [x[idx3], y[idx3], z[idx3]]])
+
+        x1, y1, z1 = _fill_triangle(vector, dx_triangle)
+        x2, y2, z2 = _get_triangle_sides(vector, dx_triangle)
         x_list.append(np.r_[x1, x2])
         y_list.append(np.r_[y1, y2])
         z_list.append(np.r_[z1, z2])
 
-    x = np.concatenate(x_list)
-    y = np.concatenate(y_list)
-    z = np.concatenate(z_list)
+        vectors[i] = vector
+
+    xm = np.concatenate(x_list)
+    ym = np.concatenate(y_list)
+    zm = np.concatenate(z_list)
+
     if uniform:
-        return x, y, z, x_list, y_list, z_list, m
+        return xm, ym, zm, x_list, y_list, z_list, vectors
     else:
-        return x, y, z
-
-
-def remove_repeated_points(x, y, z, dx_triangle):
-    EPS = np.finfo(float).eps
-    pa_mesh = ParticleArray(name="mesh", x=x, y=y, z=z, h=EPS)
-    pa_grid = ParticleArray(name="grid", x=x, y=y, z=z, h=EPS)
-    pa_list = [pa_mesh, pa_grid]
-    nps = nnps.LinkedListNNPS(dim=3, particles=pa_list, radius_scale=1)
-    cdef int src_index = 1, dst_index = 0
-    nps.set_context(src_index=1, dst_index=0)
-    nbrs = UIntArray()
-    cdef list idx = []
-    cdef int i = 0
-    for i in range(len(x)):
-        nps.get_nearest_particles(src_index, dst_index, i, nbrs)
-        neighbours = nbrs.get_npy_array()
-        idx.append(neighbours.min())
-    idx_set = set(idx)
-    idx = list(idx_set)
-    return pa_mesh.x[idx], pa_mesh.y[idx], pa_mesh.z[idx]
+        return xm, ym, zm
 
 
 def prism(tri_normal, tri_points, dx_sph):
@@ -167,7 +157,7 @@ def prism(tri_normal, tri_points, dx_sph):
     for m in range(3):
         prism_points[m] = tri_points[m]
 
-    # second triangular face at a distance h from STL triangle.
+    # second triangular face at a distance h from triangle.
     for m in range(3):
         for n in range(3):
             prism_points[m+3][n] = tri_points[m][n] - tri_normal[n]*h
@@ -214,10 +204,11 @@ def prism(tri_normal, tri_points, dx_sph):
 
 
 def get_points_from_mgrid(pa_grid, pa_mesh, x_list, y_list, z_list,
-                          float radius_scale, float dx_sph, my_mesh):
+                          float radius_scale, float dx_sph, vectors,
+                          normals):
     """
     The function finds nearest neighbours for a given mesh on a given grid
-    and only returns those points which lie within the volume of the stl
+    and only returns those points which lie within the volume of the
     object
     Parameters
     ----------
@@ -239,7 +230,7 @@ def get_points_from_mgrid(pa_grid, pa_mesh, x_list, y_list, z_list,
     # Iterating over each triangle
     for i in range(np.shape(x_list)[0]):
         prism_normals, prism_points, prism_face_centres = prism(
-            my_mesh.normals[i], my_mesh.vectors[i], dx_sph
+            normals[i], vectors[i], dx_sph
         )
         # Iterating over surface points in triangle to find nearest
         # neighbour on grid.
@@ -285,22 +276,32 @@ cdef double dot(double[:] normal, double[:] point, double[:] face_centre):
            normal[1]*(point[1]-face_centre[1]) + \
            normal[2]*(point[2]-face_centre[2])
 
-def get_stl_surface_uniform(stl_fname, dx_sph=1, h_sph=1,
-                            radius_scale=1.0, dx_triangle=None):
-    """Generate points to cover surface described by stl file
-    The function generates a grid with a spacing of dx_sph and keeps points
-    on the grid which lie within the STL object.
 
-    The algorithm for this is straightforward and consists of the following
+def surf_points_uniform(x, y, z, cells, normals, dx_sph=1,
+                        h_sph=1, radius_scale=1.0,
+                        dx_triangle=None):
+    """Generates points to cover surface described by a set of points
+    The function generates a grid with a spacing of dx_sph and keeps points
+    on the grid which lie within the object.
+
+    The algorithm for this is consists of the following
     steps:
-    1. Interpolate a set of points over the STL triangles
-    2. Create a grid that covers the entire STL object
-    3. Remove grid points generated outside the given STL object by checking
+    1. Interpolate a set of points over the triangles
+    2. Create a grid that covers the entire object
+    3. Remove grid points generated outside the given object by checking
        if the points lie within prisms formed by the triangles.
     Parameters
     ----------
-    stl_fname : str
-        File name of STL file
+    x : ndarray
+        1d numpy array with x coordinates of surface points
+    y : ndarray
+        1d numpy array with y coordinates of surface points
+    z : ndarray
+        1d numpy array with z coordinates of surface points
+    cells : ndarray
+        2d numpy array of triplets containing vertices of the triangles as indices
+    normals : ndarray
+        2d numpy array of triplets containing outward normals at each cell
     dx_sph : float
         Spacing in generated grid points
     h_sph : float
@@ -320,40 +321,54 @@ def get_stl_surface_uniform(stl_fname, dx_sph=1, h_sph=1,
     Raises
     ------
     PolygonMeshError
-        If polygons in STL file are not all triangles
+        If polygons in file are not all triangles
     """
     if dx_triangle is None:
         dx_triangle = 0.5 * dx_sph
 
-    x, y, z, x_list, y_list, z_list, my_mesh = \
-        _get_stl_mesh(stl_fname, dx_triangle, unifrom = True)
-    pa_mesh = ParticleArray(name='mesh', x=x, y=y, z=z, h=h_sph)
+    xm, ym, zm, x_list, y_list, z_list, vectors = \
+        _get_surface_mesh(x, y, z, cells, dx_triangle, uniform = True)
+
+    pa_mesh = ParticleArray(name='mesh', x=xm, y=ym, z=zm, h=h_sph)
     offset = radius_scale * h_sph
+
     x_grid, y_grid, z_grid = np.meshgrid(
-        np.arange(x.min() - offset, x.max() + offset, dx_sph),
-        np.arange(y.min() - offset, y.max() + offset, dx_sph),
-        np.arange(z.min() - offset, z.max() + offset, dx_sph)
+        np.arange(xm.min() - offset, xm.max() + offset, dx_sph),
+        np.arange(ym.min() - offset, ym.max() + offset, dx_sph),
+        np.arange(zm.min() - offset, zm.max() + offset, dx_sph)
     )
 
     pa_grid = ParticleArray(name='grid', x=x_grid, y=y_grid, z=z_grid, h=h_sph)
     xf, yf, zf = get_points_from_mgrid(pa_grid, pa_mesh, x_list,
                                        y_list, z_list, radius_scale,
-                                       dx_sph, my_mesh)
+                                       dx_sph, vectors, normals)
     return xf, yf, zf
 
 
-def get_stl_surface(stl_fname, dx_triangle, radius_scale=1.0):
-    """ Generate points to cover surface described by stl file
+def surface_points(x, y, z, cells, dx_triangle):
+    """ Generates points to cover surface described by given set of connected points
+    Parameters
+    ----------
+    x : ndarray
+        1d numpy array with x coordinates of surface points
+    y : ndarray
+        1d numpy array with y coordinates of surface points
+    z : ndarray
+        1d numpy array with z coordinates of surface points
+    cells : ndarray
+        2d numpy array of triplets containing vertices of the triangles as indices
+    dx_triangle : float
+        Required spacing between generated particles
     Returns
     -------
-    x : ndarray
-        1d numpy array with x coordinates of surface grid
-    y : ndarray
-        1d numpy array with y coordinates of surface grid
-    z : ndarray
-        1d numpy array with z coordinates of surface grid
+    xf : ndarray
+        1d numpy array with x coordinates of covered surface
+    yf : ndarray
+        1d numpy array with y coordinates of covered surface
+    zf : ndarray
+        1d numpy array with z coordinates of covered surface
     """
 
-    x, y, z = _get_stl_mesh(stl_fname, dx_triangle, uniform = False)
-    xf, yf, zf = remove_repeated_points(x, y, z, dx_triangle)
+    xm, ym, zm = _get_surface_mesh(x, y, z, cells, dx_triangle, uniform = False)
+    xf, yf, zf = remove_repeated_points(xm, ym, zm, dx_triangle)
     return xf, yf, zf

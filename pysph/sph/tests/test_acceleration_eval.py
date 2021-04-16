@@ -1,9 +1,5 @@
 # Standard library imports.
-try:
-    # This is for Python-2.6.x
-    import unittest2 as unittest
-except ImportError:
-    import unittest
+import unittest
 
 # Library imports.
 import pytest
@@ -13,6 +9,8 @@ import numpy as np
 from pysph.base.utils import get_particle_array
 from compyle.config import get_config
 from compyle.api import declare
+from compyle.profile import get_profile_info
+
 from pysph.sph.equation import Equation, Group
 from pysph.sph.acceleration_eval import (
     AccelerationEval, MegaGroup, CythonGroup,
@@ -665,6 +663,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         return GPUNNPS
 
     def _make_accel_eval(self, equations, cache_nnps=True):
+        pytest.importorskip('pyopencl')
         pytest.importorskip('pysph.base.gpu_nnps')
         GPUNNPS = self._get_nnps_cls()
         arrays = [self.pa]
@@ -946,6 +945,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         self.assertEqual(eq.called_with, (1.0, 0.1))
 
     def test_get_equations_with_converged(self):
+        pytest.importorskip('pyopencl')
         pytest.importorskip('pysph.base.gpu_nnps')
         from pysph.sph.acceleration_eval_gpu_helper import \
             get_equations_with_converged
@@ -1229,3 +1229,105 @@ class TestAccelerationEval1DCUDA(TestAccelerationEval1DGPU):
         call = h.calls[4]
         assert call['type'] == 'kernel'
         assert call['loop'] is True
+
+
+class TestAEvalMultipleDests(unittest.TestCase):
+    def setUp(self):
+        self.dim = 1
+        n = 10
+        dx = 1.0 / (n - 1)
+        x = np.linspace(0, 1, n)
+        m = np.ones_like(x)
+        h = np.ones_like(x) * dx * 1.05
+        self.pa1 = get_particle_array(name='f1', x=x, h=h, m=m)
+        self.pa2 = get_particle_array(name='f2', x=x + dx/2, h=h, m=m)
+
+    def _make_accel_eval(self, equations, cache_nnps=False):
+        arrays = [self.pa1, self.pa2]
+        kernel = CubicSpline(dim=self.dim)
+        a_eval = AccelerationEval(
+            particle_arrays=arrays, equations=equations, kernel=kernel
+        )
+        comp = SPHCompiler(a_eval, integrator=None)
+        comp.compile()
+        nnps = NNPS(dim=kernel.dim, particles=arrays, cache=cache_nnps)
+        nnps.update()
+        a_eval.set_nnps(nnps)
+        return a_eval
+
+    def test_update_nnps_should_only_be_called_once_per_group(self):
+        # Given
+        eqs = [
+            SummationDensity(dest='f1', sources=['f1', 'f2']),
+            SummationDensity(dest='f2', sources=['f1', 'f2']),
+        ]
+        equations = [Group(equations=eqs, update_nnps=True)]
+        a_eval = self._make_accel_eval(equations)
+
+        # This is quite ugly, it is not easy to mock out the set_nnps on an
+        # acceleration eval as that requires a Cython object and not a mock
+        # instance.
+        profile_info = get_profile_info()
+        n_up_dom = profile_info[0]['Integrator.update_domain']['calls']
+        n_up = profile_info[0]['nnps.update']['calls']
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        profile_info = get_profile_info()
+        ncall = profile_info[0]['Integrator.update_domain']['calls']
+        self.assertEqual(ncall, n_up_dom + 1)
+        ncall = profile_info[0]['nnps.update']['calls']
+        self.assertEqual(ncall, n_up + 1)
+
+
+class TestAEvalMultipleDestsGPU(unittest.TestCase):
+    def setUp(self):
+        self.dim = 1
+        n = 10
+        dx = 1.0 / (n - 1)
+        x = np.linspace(0, 1, n)
+        m = np.ones_like(x)
+        h = np.ones_like(x) * dx * 1.05
+        self.pa1 = get_particle_array(name='f1', x=x, h=h, m=m)
+        self.pa2 = get_particle_array(name='f2', x=x + dx/2, h=h, m=m)
+
+    def _get_nnps_cls(self):
+        from pysph.base.gpu_nnps import ZOrderGPUNNPS as GPUNNPS
+        return GPUNNPS
+
+    def _make_accel_eval(self, equations, cache_nnps=True):
+        pytest.importorskip('pyopencl')
+        pytest.importorskip('pysph.base.gpu_nnps')
+        GPUNNPS = self._get_nnps_cls()
+        arrays = [self.pa1, self.pa2]
+        kernel = CubicSpline(dim=self.dim)
+        a_eval = AccelerationEval(
+            particle_arrays=arrays, equations=equations, kernel=kernel,
+            backend='opencl'
+        )
+        comp = SPHCompiler(a_eval, integrator=None)
+        comp.compile()
+        self.sph_compiler = comp
+        nnps = GPUNNPS(dim=kernel.dim, particles=arrays, cache=cache_nnps,
+                       backend='opencl')
+        nnps.update()
+        a_eval.set_nnps(nnps)
+        return a_eval
+
+    def test_update_nnps_should_only_be_called_once_per_group(self):
+        # Given
+        eqs = [
+            SummationDensity(dest='f1', sources=['f1', 'f2']),
+            SummationDensity(dest='f2', sources=['f1', 'f2']),
+        ]
+        equations = [Group(equations=eqs, update_nnps=True)]
+
+        # When
+        a_eval = self._make_accel_eval(equations)
+
+        # Then
+        h = a_eval.c_acceleration_eval.helper
+        update_nnps = [call for call in h.calls
+                       if call['method'] == 'update_nnps']
+        self.assertEqual(len(update_nnps), 1)

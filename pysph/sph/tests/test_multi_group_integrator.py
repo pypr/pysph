@@ -98,6 +98,7 @@ class TestMultiGroupIntegrator(unittest.TestCase):
 
 class TestMultiGroupIntegratorGPU(TestMultiGroupIntegrator):
     def setUp(self):
+        pytest.importorskip('pyopencl')
         pytest.importorskip('pysph.base.gpu_nnps')
         super(TestMultiGroupIntegratorGPU, self).setUp()
         from pysph.base.gpu_nnps import ZOrderGPUNNPS
