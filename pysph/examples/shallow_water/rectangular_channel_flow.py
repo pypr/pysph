@@ -166,13 +166,13 @@ class RectangularOpenChannelFlow(Application):
         bed = gpa_swe(name='bed', x=xb, y=yb, V=Vb, n=nb, h=hb)
 
         # Closed Boundary
-        xcb_top = np.arange(self.x_min_inlet-2.0*dx, 
+        xcb_top = np.arange(self.x_min_inlet-2.0*dx,
                             self.x_max_outlet*1.6, dx)
         ycb_top = np.concatenate((ones_like(xcb_top)*(w+0.5*dx),
                                   ones_like(xcb_top)*(w+1.5*dx)), axis=0)
         xcb_top = np.tile(xcb_top, 2)
 
-        xcb_bottom = np.arange(self.x_min_inlet-2.0*dx, 
+        xcb_bottom = np.arange(self.x_min_inlet-2.0*dx,
                                self.x_max_outlet*1.6, dx)
         ycb_bottom = np.concatenate((zeros_like(xcb_bottom)-0.5*dx,
                                      zeros_like(xcb_bottom)-1.5*dx), axis=0)
