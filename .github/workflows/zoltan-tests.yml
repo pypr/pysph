@@ -1,0 +1,53 @@
+name: ZOLTAN/MPI Tests
+
+on: pull_request
+
+jobs:
+  tests:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: [3.9]
+
+    env:
+      USE_TRILINOS: 1
+      ZOLTAN_INCLUDE: /usr/include/trilinos
+      ZOLTAN_LIBRARY: /usr/lib/x86_64-linux-gnu
+
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Linux packages ZOLTAN support
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openmpi-bin libopenmpi-dev libtrilinos-zoltan-dev
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          python-version: ${{ matrix.python-version }}
+          channels: conda-forge
+      - name: Install dependencies
+        run: |
+          conda info
+          conda install -c conda-forge numpy cython
+          python -m pip install https://github.com/pypr/pyzoltan/zipball/master
+          python -m pip install -r requirements.txt
+          python -m pip install coverage codecov
+          python -m pip install -e ".[dev]"
+      - name: Run tests
+        run: |
+          coverage erase
+          coverage run -m pytest -v -m 'slow or parallel'
+      - name: Report
+        if: ${{ success() }}
+        run: coverage report
+      #- name: Upload Coverage to Codecov
+      #  uses: codecov/codecov-action@v1
+      #  with:
+      #    env_vars: ${{ matrix.os }}, ${{ matrix.python-version }}
