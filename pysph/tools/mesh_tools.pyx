@@ -8,7 +8,7 @@ cimport cython
 cimport numpy as np
 import meshio
 
-DTYPE = np.float
+DTYPE = np.float64
 ctypedef np.float_t DTYPE_t
 
 
