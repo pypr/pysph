@@ -1,7 +1,7 @@
 PySPH: a Python-based SPH framework
 ------------------------------------
 
-|Travis Status|  |Shippable Status|  |Appveyor Status|  |Codeship Status|
+|CI Status|  |MPI Build status|  |Documentation Status|
 
 
 PySPH is an open source framework for Smoothed Particle Hydrodynamics
@@ -17,14 +17,14 @@ OpenMP, OpenCL, and MPI.
 The latest documentation for PySPH is available at
 `pysph.readthedocs.org <http://pysph.readthedocs.org>`_.
 
-.. |Travis Status| image:: https://travis-ci.org/pypr/pysph.svg?branch=master
-    :target: https://travis-ci.org/pypr/pysph
-.. |Shippable Status| image:: https://api.shippable.com/projects/59272c73b2b3a60800b215d7/badge?branch=master
-   :target: https://app.shippable.com/github/pypr/pysph
-.. |Codeship Status| image:: https://app.codeship.com/projects/37370120-23ab-0135-b8f4-5ed227e7b019/status?branch=master
-   :target: https://codeship.com/projects/222098
-.. |Appveyor Status| image:: https://ci.appveyor.com/api/projects/status/q7ujoef1xbguk4wx
-   :target: https://ci.appveyor.com/project/prabhuramachandran/pysph-00bq8
+.. |CI Status| image:: https://github.com/pypr/pysph/actions/workflows/tests.yml/badge.svg
+    :target: https://github.com/pypr/pysph/actions/workflows/tests.yml
+.. |MPI Build Status| image:: https://github.com/pypr/pysph/actions/workflows/zoltan-tests.yml/badge.svg
+    :target: https://github.com/pypr/pysph/actions/workflows/zoltan-tests.yml
+.. |Documentation Status| image:: https://readthedocs.org/projects/pysph/badge/?version=latest
+    :target: https://pysph.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
+
 
 Here are `videos
 <https://www.youtube.com/playlist?list=PLH8Y2KepC2_VPLrcTiWGaYYh88gGVAuVr>`_
