@@ -25,8 +25,8 @@ jobs:
       - name: Install dependencies on Linux/MacOS
         run: |
           conda info
-          conda install -c conda-forge pocl=1.5 pyopencl
-          python -c 'import pyopencl as cl'
+          #conda install -c conda-forge pocl=1.5 pyopencl
+          #python -c 'import pyopencl as cl'
         if: ${{ runner.os != 'Windows' }}
       - name: Install dependencies
         run: |
