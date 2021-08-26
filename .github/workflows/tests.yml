@@ -33,16 +33,7 @@ jobs:
           conda info
           conda install -c conda-forge numpy cython
           python -m pip install -r requirements.txt
-          python -m pip install coverage codecov
           python -m pip install -e ".[dev]"
       - name: Run tests
         run: |
-          coverage erase
-          coverage run -m pytest -v -m 'not slow or slow'
-      - name: Report
-        if: ${{ success() }}
-        run: coverage report
-      - name: Upload Coverage to Codecov
-        uses: codecov/codecov-action@v1
-        with:
-          env_vars: ${{ matrix.os }}, ${{ matrix.python-version }}
+          python -m pytest -v -m 'not slow or slow'

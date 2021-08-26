@@ -12,7 +12,7 @@ import numpy
 # this is due to the hash implementation
 cdef int IntPoint_maxint = 2**20
 
-DTYPE = numpy.float
+DTYPE = numpy.float64
 ctypedef numpy.float_t DTYPE_t
 
 

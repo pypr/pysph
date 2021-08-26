@@ -44,12 +44,4 @@ jobs:
           python setup.py develop
       - name: Run tests
         run: |
-          coverage erase
-          coverage run -m pytest -v -m 'slow or parallel'
-      - name: Report
-        if: ${{ success() }}
-        run: coverage report
-      #- name: Upload Coverage to Codecov
-      #  uses: codecov/codecov-action@v1
-      #  with:
-      #    env_vars: ${{ matrix.os }}, ${{ matrix.python-version }}
+          python -m pytest -v -m 'slow or parallel'
