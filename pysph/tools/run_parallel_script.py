@@ -36,7 +36,7 @@ def run(filename, args=None, nprocs=2, timeout=30.0, path=None):
     file_path = abspath(join(path, filename))
     cmd = [sys.executable, file_path] + args
     if nprocs > 1:
-        cmd = ['mpiexec', '-n', str(nprocs)] + cmd
+        cmd = ['mpiexec', '-n', str(nprocs), '--oversubscribe'] + cmd
 
     print('running test:', cmd)
 
