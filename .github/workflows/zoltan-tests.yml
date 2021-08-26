@@ -39,6 +39,7 @@ jobs:
           python -m pip install mpi4py cyarray
           python -m pip install --no-build-isolation https://github.com/pypr/pyzoltan/zipball/master
           python -m pip install -r requirements.txt
+          python -m pip install -r requirements-test.txt
           python -m pip install coverage codecov
           python setup.py develop
       - name: Run tests

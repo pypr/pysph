@@ -43,7 +43,7 @@ class TestLinalg(unittest.TestCase):
         expect = np.zeros((2, 4))
         expect[:, :2] = a[:2, :2]
         expect[:, 2:] = b[:2, :]
-        expect.resize(3, 5)
+        expect.resize((3, 5), refcheck=False)
         # When
         augmented_matrix(a.ravel(), b.ravel(), 2, 2, 3, res)
         res = self._to_array(res, (3, 5))
