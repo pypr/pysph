@@ -4,12 +4,12 @@ from math import floor
 from pytools import memoize
 
 
-@memoize(key=lambda *args: tuple(args))
+@memoize(key=lambda *args, **kw: tuple(args))
 def get_elwise(f, backend):
     return Elementwise(f, backend=backend)
 
 
-@memoize(key=lambda *args: tuple(args))
+@memoize(key=lambda *args, **kw: tuple(args))
 def get_scan(inp_f, out_f, dtype, backend):
     return Scan(input=inp_f, output=out_f, dtype=dtype,
                 backend=backend)
