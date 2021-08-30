@@ -339,7 +339,7 @@ class CUDAAccelerationEval(GPUAccelerationEval):
             n = dest.get_number_of_particles(info.get('real', True))
         else:
             n = self._get_index(dest, stop_idx)
-        n_iter = n - start_idx
+        n_iter = int(n - start_idx)
 
         # args is actually [queue, None, None, actual_meaningful_args]
         # we do not need the first 3 args on CUDA.
