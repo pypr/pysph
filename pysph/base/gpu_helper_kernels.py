@@ -4,12 +4,16 @@ from math import floor
 from pytools import memoize
 
 
-@memoize(key=lambda *args: tuple(args))
+def key_func(*args, **kw):
+    return args, frozenset(kw.items())
+
+
+@memoize(key=key_func)
 def get_elwise(f, backend):
     return Elementwise(f, backend=backend)
 
 
-@memoize(key=lambda *args: tuple(args))
+@memoize(key=key_func)
 def get_scan(inp_f, out_f, dtype, backend):
     return Scan(input=inp_f, output=out_f, dtype=dtype,
                 backend=backend)
