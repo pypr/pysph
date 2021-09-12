@@ -534,7 +534,7 @@ cdef class ParallelManager:
 
         This is the main entry point for the parallel manager. Given
         particles distributed across processors, we bin them, assign
-        uniqe global indices for the cells and particles and
+        unique global indices for the cells and particles and
         subsequently perform the following steps:
 
         (a) Call a load balancing function to get import and export
@@ -559,7 +559,7 @@ cdef class ParallelManager:
 
         now that the data movement is done,
 
-        (g) Update the local cell map to accomodate remote particles.
+        (g) Update the local cell map to accommodate remote particles.
 
         Notes
         -----
@@ -604,7 +604,7 @@ cdef class ParallelManager:
             for i in range(self.narrays):
                 self.pa_exchanges[i].remote_exchange_data()
 
-            # update the local cell map to accomodate remote particles
+            # update the local cell map to accommodate remote particles
             self.update_remote_data()
 
             # set the particle pids now that we have the partitions
