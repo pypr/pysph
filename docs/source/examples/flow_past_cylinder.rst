@@ -1,19 +1,26 @@
 .. _flow_past_cylinder:
 
 Flow past a circular cylinder using open boundary conditions
-----------------------------------------------
+------------------------------------------------------------
 
-This example demonstrates the API of inlet and outlet boundary conditions in PySPH. The flow past a circular cylinder is one the example which uses both inlet and outlet boundary condition.
-To run it one may do::
+This example demonstrates the API of inlet and outlet boundary conditions in
+PySPH. The flow past a circular cylinder is an example which uses both
+inlet and outlet boundary conditions. To run it one may do::
 
-  $ cd ~/pysph/pysph/examples/
-  $ python flow_past_cylinder_2d.py
+  $ pysph run flow_past_cylinder_2d
 
 There are many command line options that this example provides, check them out with::
 
-  $ python flow_past_cylinder_2d.py -h
+  $ pysph run flow_past_cylinder_2d -h
 
-The example source can be seen at `flow_past_cylinder_2d.py
+In this example, we have a wind tunnel with two bounding slip walls on the top
+and bottom of the tunnel. The inlet is on the left and the outlet is on the
+right. In order to perform the simulation five particle arrays, ``solid``,
+``fluid``, ``wall``, ``inlet`` and ``outlet`` are generated. ``fluid``,
+``solid`` and ``wall`` has to solved using ``edac`` scheme, whereas ``inlet``
+and ``outlet`` are solved according to the equations provided by the Inlet
+Outlet Manager (IOM). The example source can be seen at
+`flow_past_cylinder_2d.py
 <https://github.com/pypr/pysph/tree/master/pysph/examples/flow_past_cylinder_2d.py>`_.
 
 
@@ -23,7 +30,10 @@ This example demonstrates:
 * Setting up inlet and outlet boundary condition
 * Force evaluation on the solid body of interest
 
-The IOM is created in the application class however, it is passed to a scheme and used through the scheme only. The IOM has the following functions:
+The IOM is created in the :py:class:`Application` instance however, it is passed
+to a :py:class:`Scheme` instance and most of its methods are called in the
+scheme only. We discuss the implementation in the EDAC :py:class:`Scheme` in
+:ref:`iom`. The IOM has the following functions:
 
 * Creation of ghost particle arrays
 * Creation of inlet outlet stepper
@@ -85,6 +95,8 @@ info contains specific information about inlet and outlet that enables IOM to
 create equations, stepper and updater. In ``_create_inlet_outlet_manager``
 the IOM is created using the info objects.
 
+Note that the extra properties required by the equations are also passed by the IOM.
+
 Passing IOM to scheme
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -104,18 +116,11 @@ Passing IOM to scheme
 
 
 The IOM object of the application is initialized in the method
-``configure_scheme`` of the ``Application`` class. All the
-post-initialization method could be called here e.g. ``update_dx``.
+``configure_scheme`` of the ``Application`` class. All the post-initialization
+method which require data from user could be called here e.g. ``update_dx``.
 
 Creating ghost particles
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-In this example, we have a wind tunnel with two bounding slip walls on the
-top and below of the tunnel. The inlet is on the left and the outlet is on
-the right. In order to perform the simulation five particle arrays,
-``solid``, ``fluid``, ``wall``, ``inlet`` and ``outlet`` are generated.
-``fluid``, ``solid`` and ``wall`` has to obey ``edac`` scheme, whereas
-``inlet`` and ``outlet`` are solved according to the boundary conditions.
 
 .. code:: python
 
@@ -153,9 +158,11 @@ direction at t=0.
 Creating updater
 ~~~~~~~~~~~~~~~~~
 
-The purpose of the updater is to remove particle from ``inlet`` and add them
-to ``fluid`` whenever a particle crosses the inlet-outlet interface. Similarly,
-it is done in case of the ``oulet``. It also adds new particle to ``inlet`` as required and remove a particle from the simulation when they flow past ``outlet``.
+The purpose of the updater is to remove particle from ``inlet`` and add them to
+``fluid`` whenever a particle crosses the inlet-outlet interface. Similarly, it
+is done in case of the ``oulet``. It also adds new particle to ``inlet`` as
+required and remove a particle from the simulation when they flow past
+``outlet``.
 
 .. code:: python
 
@@ -165,7 +172,7 @@ it is done in case of the ``oulet``. It also adds new particle to ``inlet`` as r
         return io
 
 the function ``create_inlet_outlet`` takes the updater ``io`` created by the
-IOM and plugs it into the update routine of the application class.
+IOM and plugs it into the update routine of the application class automatically.
 
 Overall setup
 ~~~~~~~~~~~~~
@@ -177,28 +184,28 @@ In the scheme, the IOM object must be implemented in the manner as described in
 A few points to note while dealing with inlet outlet boundary condition,
 
 1. Construction of the IOM happens after the scheme is created with a
-``void`` IOM.
+   ``void`` IOM.
 
-.. code:: python
+    .. code:: python
 
-    def create_scheme(self):
-        h = nu = None
-        s = EDACScheme(
-            ['fluid'], ['solid'], dim=2, rho0=rho, c0=c0, h=h, pb=p0,
-            nu=nu, inlet_outlet_manager=None,
-            inviscid_solids=['wall']
-        )
-        return s
+        def create_scheme(self):
+            h = nu = None
+            s = EDACScheme(
+                ['fluid'], ['solid'], dim=2, rho0=rho, c0=c0, h=h, pb=p0,
+                nu=nu, inlet_outlet_manager=None,
+                inviscid_solids=['wall']
+            )
+            return s
 
 
 2. The IOM must be configured in the ``configure_scheme`` function.
 
 3. In case you change the integrator of the function, make sure the updater
-``io`` is updating in the appropriate stage. For example, in case of a
-``PECIntegrator`` class of integrator, the particles integrated half step in
-stage 1 and finally advected in stage 2 then ``io`` updates the particle
-arrays after stage 2 is complete. In case one wants to do the update in stage
-1 (while using another integrator) the arguments must be passed to the updater appropriately.
+   ``io`` is updating in the appropriate stage. For example, in case of a
+   ``PECIntegrator`` class of integrator, the particles integrated half step in
+   stage 1 and finally advected in stage 2 then ``io`` updates the particle
+   arrays after stage 2 is complete. In case one wants to do the update in stage
+   1 (while using another integrator) the arguments must be passed to the updater appropriately.
 
 
 Evaluating forces on solid
