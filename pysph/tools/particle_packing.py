@@ -593,9 +593,9 @@ def create_surface_from_stl(
     import meshio
     data = meshio.read(filename, file_format="stl")
     triangles = data.cells_dict['triangle']
-    normals =  data.cell_data['facet_normals'][0]
+    normals = data.cell_data['facet_normals'][0]
     xc, yc, zc = [], [], []
-    xn, yn, zn = normals[:,0], normals[:,1], normals[:,2]
+    xn, yn, zn = normals[:, 0], normals[:, 1], normals[:, 2]
     area = []
     for tri in triangles:
         centroid = np.average(data.points[tri], axis=0)
