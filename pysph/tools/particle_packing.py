@@ -589,27 +589,36 @@ def create_surface_from_stl(
     """
     import numpy as np
     from stl import stl
-    data = stl.StlMesh(filename)
+    from pysph.tools.geometry import evaluate_area_of_triangle
+    import meshio
+    data = meshio.read(filename, file_format="stl")
+    triangles = data.cells_dict['triangle']
+    normals =  data.cell_data['facet_normals'][0]
+    xc, yc, zc = [], [], []
+    xn, yn, zn = normals[:,0], normals[:,1], normals[:,2]
+    area = []
+    for tri in triangles:
+        centroid = np.average(data.points[tri], axis=0)
+        xc.append(centroid[0])
+        yc.append(centroid[1])
+        zc.append(centroid[2])
+        _area = evaluate_area_of_triangle(data.points[tri])
+        area.append(_area)
+
+    xc, yc, zc, area = [np.array(t) for t in (xc, yc, zc, area)]
+
     h = hdx * dx
     m = dx * dx * dx * rho
 
-    bodyx = scale * data.x
-    bodyy = scale * data.y
-    bodyz = scale * data.z
-
-    xc = np.sum(bodyx, axis=1) / 3
-    yc = np.sum(bodyy, axis=1) / 3
-    zc = np.sum(bodyz, axis=1) / 3
+    xx = scale * xc
+    yx = scale * yc
+    zx = scale * zc
 
     if invert:
-        xn = -data.normals[:, 0]
-        yn = -data.normals[:, 1]
-        zn = -data.normals[:, 2]
-    else:
-        xn = data.normals[:, 0]
-        yn = data.normals[:, 1]
-        zn = data.normals[:, 2]
-    area = data.areas.ravel() * scale**2
+        xn = -xn
+        yn = -xn
+        zn = -xn
+    area = area * scale**2
     n_pnts = sum(area) / dx**2
     d = np.sqrt(xn**2 + yn**2 + zn**2)
     if shift:
@@ -621,16 +630,10 @@ def create_surface_from_stl(
     solid_nodes = get_particle_array(
         x=x, y=y, z=z, m=m, rho=rho, h=h, name=name, xn=xn / d,
         yn=yn / d, zn=zn / d, area=area, hard=0.0)
-    solid_nodes.add_property('px', stride=3)
-    solid_nodes.add_property('py', stride=3)
-    solid_nodes.add_property('pz', stride=3)
     solid_nodes.add_property('xc')
     solid_nodes.add_property('yc')
     solid_nodes.add_property('zc')
     solid_nodes.add_constant('n_pnts', n_pnts)
-    solid_nodes.px[:] = bodyx.ravel()
-    solid_nodes.py[:] = bodyy.ravel()
-    solid_nodes.pz[:] = bodyz.ravel()
     solid_nodes.xc[:] = xc
     solid_nodes.yc[:] = yc
     solid_nodes.zc[:] = zc
@@ -1481,7 +1484,6 @@ class ParticlePacking(Scheme):
         nearest: distance of nearest particle
         neartag: id of nearest particle
         filter: 1 if the particle is near boundary node
-        px, py, pz: actual point list of 3D triangle
         nu: damping constant
         pb: background pressure
         k: repulsion force constant
@@ -1494,8 +1496,8 @@ class ParticlePacking(Scheme):
         ]
         output_props = [
             'x', 'y', 'z', 'u', 'v', 'w', 'V', 'rho', 'xn', 'yn', 'zn', 'm',
-            'au', 'av', 'aw', 'h', 'xc', 'yc', 'zc', 'px', 'py', 'pz',
-            'neartag', 'nearest', 'filter', 'hard'
+            'au', 'av', 'aw', 'h', 'xc', 'yc', 'zc', 'neartag', 'nearest',
+            'filter', 'hard'
         ]
 
         newarr = []
@@ -1504,9 +1506,6 @@ class ParticlePacking(Scheme):
             self._ensure_properties(pa, prop_to_ensure, clean=False)
             pa.add_property('neartag', type='int')
             pa.add_property('filter', type='int')
-            pa.add_property('px', stride=3)
-            pa.add_property('py', stride=3)
-            pa.add_property('pz', stride=3)
             pa.add_constant('nu', self.nu)
             pa.add_constant('pb', self.pb)
             pa.add_constant('k', self.k)

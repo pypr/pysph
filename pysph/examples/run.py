@@ -50,6 +50,7 @@ def get_all_examples():
     basedir = HERE
     examples = []
     _ignore = [['run.py'], ['ghia_cavity_data.py'], ['db_exp_data.py'],
+               ['fpc_with_packed_cylinder.py'], ['tg_with_packed_particles.py'],
                ['tests', 'test_examples.py'],
                ['tests', 'test_riemann_solver.py'],
                ['gas_dynamics', 'shocktube_setup.py'],
