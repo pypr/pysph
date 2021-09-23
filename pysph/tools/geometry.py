@@ -664,6 +664,34 @@ class FindRepeatedPoints(Equation):
                 d_min_idx[d_idx] = NBRS[i]
 
 
+def evaluate_area_of_triangle(points=[]):
+    """Calculate are of a triangle
+
+    Parameters
+    ---------
+    Points: array
+
+    Returns
+    -------
+    Area of the triangle
+    """
+    from math import sqrt
+    x1 = points[0, 0]
+    y1 = points[0, 1]
+    z1 = points[0, 2]
+    x2 = points[1, 0]
+    y2 = points[1, 1]
+    z2 = points[1, 2]
+    x3 = points[2, 0]
+    y3 = points[2, 1]
+    z3 = points[2, 2]
+    v1 = (z2-z3) * (y2-y1) - (z2-z1) * (y2-y3)
+    v2 = - (z2-z3) * (x2-x1) + (z2-z1) * (x2-x3)
+    v3 = (y2-y3) * (x2-x1) - (y2-y1) * (x2-x3)
+    ar = 0.5 * sqrt(v1*v1 + v2*v2 + v3*v3)
+    return ar
+
+
 def remove_repeated_points(x, y, z, dx_triangle):
     EPS = np.finfo(float).eps
     pa_mesh = ParticleArray(name='mesh', x=x, y=y, z=z, h=EPS)
