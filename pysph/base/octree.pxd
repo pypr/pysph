@@ -98,6 +98,13 @@ cdef class Octree:
             vector[u_int]* indices, double* xmin, double length,
             cOctreeNode* node, int level) nogil
 
+    cdef int _c_build_tree_level1(self, NNPSParticleArrayWrapper pa,
+             double* xmin, double length, cOctreeNode* node, int num_threads) nogil    
+    
+    cdef int _c_build_tree_bfs(self, NNPSParticleArrayWrapper pa,
+            u_int* p_indices, vector[cOctreeNode *]* level_nodes,
+            int level) nogil
+
     cdef void _plot_tree(self, OctreeNode node, ax)
 
     cdef int c_build_tree(self, NNPSParticleArrayWrapper pa_wrapper)
@@ -133,3 +140,7 @@ cdef class CompressedOctree(Octree):
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
             vector[u_int]* indices, double* xmin, double length,
             cOctreeNode* node, int level) nogil
+    
+    cdef int c_build_tree(self, NNPSParticleArrayWrapper pa_wrapper)
+    
+    
