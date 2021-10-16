@@ -622,7 +622,7 @@ cdef class Octree:
         cdef int num_threads = get_number_of_threads()
 
         #Use the serial method
-        if (num_threads < 4):
+        if (num_threads < 4 or num_particles < 40000):
             self._next_pid = 0
             for i from 0<=i<num_particles:
                 indices_ptr.push_back(i)
