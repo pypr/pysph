@@ -14,30 +14,13 @@ from cython.parallel import parallel, prange, threadid
 # EPS_MAX is maximum value of eps in tree building
 DEF EPS_MAX = 1e-3
 
-IF OPENMP:
-    cimport openmp
-    cpdef int get_number_of_threads():
-        cdef int i, n
-        with nogil, parallel():
-            for i in prange(1):
-                n = openmp.omp_get_num_threads()
-        return n
-    cpdef set_number_of_threads(int n):
-        openmp.omp_set_num_threads(n)
-ELSE:
-    cpdef int get_number_of_threads():
-        return 1
-    cpdef set_number_of_threads(int n):
-        print("OpenMP not available, cannot set number of threads.")
-
 IF UNAME_SYSNAME == "Windows":
     cdef inline double fmin(double x, double y) nogil:
         return x if x < y else y
     cdef inline double fmax(double x, double y) nogil:
         return x if x > y else y
 
-
-ctypedef cOctreeNode * node_ptr    
+ctypedef cOctreeNode* node_ptr   
 ########################################################################
 
 cdef class OctreeNode:
@@ -376,7 +359,7 @@ cdef class Octree:
     @cython.boundscheck(False) 
     cdef int _c_build_tree_level1(self, NNPSParticleArrayWrapper pa, double* xmin, double length,
             cOctreeNode* node, int num_threads) nogil:
-        
+
         cdef double* src_x_ptr = pa.x.data
         cdef double* src_y_ptr = pa.y.data
         cdef double* src_z_ptr = pa.z.data
@@ -385,16 +368,16 @@ cdef class Octree:
         cdef double xmin_new[3]
         cdef double hmax_children[8]
         cdef cOctreeNode* new_node
-        cdef int i, j, k, c, tid, oct_cid, count_thread, n
-        cdef u_int p, q
+        cdef int i, j, k, c, tid, oct_cid, oct_id, count_thread, n, p
+        cdef u_int  q
         for i from 0<=i<8:
             hmax_children[i] = 0
-        cdef int oct_id
 
         # This is required to fix floating point errors. One such case
         # is mentioned in pysph.base.tests.test_octree
         cdef double eps = 2*self._get_eps(length, xmin)
         n =  node.num_particles
+
         if (n < self.leaf_max_particles) or (eps > EPS_MAX):
             for i from 0<=i<n:
                 self.pids[i] = i
@@ -407,13 +390,13 @@ cdef class Octree:
         cdef vector[vector[double]] threads_hmax = vector[vector[double]](num_threads)
         cdef vector[int] count = vector[int](8)
 
-        
         for i from 0<=i<num_threads:
             cumulative_map[i] = vector[int](8)
             threads_hmax[i] = vector[double](8)
+
         with nogil, parallel():
-            #Required to ensure cython treats i,j,k as private-variables for each thread
-            i=j=k=-1
+            # Required to ensure cython treats i,j,k as private-variables for each thread
+            i = j = k = -1
             for p in prange(n,schedule='static'):
                 tid = threadid()
                 find_cell_id_raw(
@@ -436,7 +419,6 @@ cdef class Octree:
                 count[oct_id] += count_thread
                 hmax_children[oct_id] = fmax(threads_hmax[tid][oct_id], hmax_children[oct_id])
 
-
         cdef double length_padded = (length/2)*(1 + 2*eps)
         cdef vector[cOctreeNode *]* next_level_nodes = new vector[node_ptr]()
 
@@ -447,7 +429,7 @@ cdef class Octree:
 
                     oct_id = k+2*j+4*i
 
-                    if (count[oct_id]==0):
+                    if (count[oct_id] == 0):
                         continue
 
                     xmin_new[0] = xmin[0] + (i - eps)*length/2
@@ -468,10 +450,10 @@ cdef class Octree:
                         continue
                     next_level_nodes.push_back(new_node)
 
-        #Assign p_indices directly according to which child the index belongs to and 
-        #where each child of root starts 
+        # Assign p_indices directly according to which child the index belongs to and 
+        # where each child of root starts 
         with nogil, parallel():
-            for p in prange(n,schedule='static'):
+            for p in prange(n, schedule='static'):
                 tid = threadid()
                 oct_id = deref(child_indices)[p]
                 oct_cid = count[oct_id] + cumulative_map[tid][oct_id]
@@ -495,25 +477,26 @@ cdef class Octree:
         cdef double* src_h_ptr = pa.h.data
         cdef double eps
         cdef cOctreeNode* node
-        cdef int i, j, k, n, num_nodes, l, start, num_p, oct_id
+        cdef int i, j, k, n, num_nodes, l, start, num_p, oct_id, m
         cdef u_int p, q, c
-
-        cdef double* xmin_new
-        cdef double* xmin
         cdef vector[double] hmax_children
         cdef vector[vector[u_int]] new_indices
         cdef double length_padded, length 
+        cdef double* xmin_new
+        cdef double* xmin
         num_nodes = level_nodes.size()
 
         with nogil, parallel():
+            xmin_new = <double *> malloc(3 * sizeof(double))
+            xmin = <double *> malloc(3 * sizeof(double))
+            hmax_children = vector[double](8)
+            new_indices = vector[vector[u_int]](8)
+            for m from 0<=m<8:
+                new_indices[m] = vector[u_int]()
+            
             for n in prange(num_nodes):
-                #Initialisation done inside to ensure these variables are treated as private
-                new_indices = vector[vector[u_int]](8)
-                hmax_children = vector[double](8)
-                xmin = <double *> malloc(3 * sizeof(double))
-                xmin_new = <double *> malloc(3 * sizeof(double)) 
                 for i from 0<=i<8:
-                    new_indices[i] = vector[u_int]()
+                    new_indices[i].clear()
                 for i from 0<=i<8:
                     hmax_children[i] = 0
                 
@@ -525,8 +508,8 @@ cdef class Octree:
                 xmin[1] = node.xmin[1]
                 xmin[2] = node.xmin[2]
 
-                #Necessary to ensure i,j,k are treated as private variables
-                i=j=k=-1
+                # Necessary to ensure i,j,k are treated as private variables
+                i = j = k = -1
                 for p from start<=p<(start+num_p):
                     q = p_indices[p]
                     find_cell_id_raw(
@@ -561,27 +544,29 @@ cdef class Octree:
                             node.children[oct_id].start_index = c
                             node.children[oct_id].num_particles = new_indices[oct_id].size()
 
-                            #Change the position of the indices in p_indices 
-                            #according to which child they belong to
+                            # Change the position of the indices in p_indices 
+                            # according to which child they belong to
                             for l from 0<=l<new_indices[oct_id].size():
                                 p_indices[c+l] = new_indices[oct_id][l]   
                             c = c + new_indices[oct_id].size()
 
 
         cdef vector[cOctreeNode *]* next_level_nodes = new vector[node_ptr]()
-        #All non-NULL nodes & non-leaf nodes are added to next_level_nodes, to process in next level
+
+        # All non-NULL nodes & non-leaf nodes are added to next_level_nodes, to process in next level
         for i from 0<=i<level_nodes.size():
             for j from 0<=j<8:
-                if(deref(level_nodes)[i].children[j] != NULL):
+                if (deref(level_nodes)[i].children[j] != NULL):
                     node = deref(level_nodes)[i].children[j] 
                     eps = 2*self._get_eps(node.length, node.xmin)
                     if (node.num_particles < self.leaf_max_particles) or (eps > EPS_MAX):
                         node.is_leaf = True
                         continue
                     next_level_nodes.push_back(node)
+
         del level_nodes
 
-        if(next_level_nodes.size()==0):
+        if (next_level_nodes.size() == 0):
             self.pids = p_indices
             return (level+2)
         else:
@@ -637,7 +622,7 @@ cdef class Octree:
         cdef int num_threads = get_number_of_threads()
 
         #Use the serial method
-        if(num_threads<2):
+        if (num_threads < 4):
             self._next_pid = 0
             for i from 0<=i<num_particles:
                 indices_ptr.push_back(i)
