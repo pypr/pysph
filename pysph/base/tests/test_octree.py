@@ -146,7 +146,7 @@ class SimpleOctreeTestCase(unittest.TestCase):
         # number of particles
         self.assertTrue(pa.get_number_of_particles() == sum_indices[0])
         self.tree.delete_tree()
-    
+
     def test_all_indices_are_unique(self):
         pa = get_particle_array(x=self.x, y=self.y, z=self.z, h=self.h)
         self.tree.build_tree(pa)
@@ -159,7 +159,7 @@ class SimpleOctreeTestCase(unittest.TestCase):
                 all_indices.append(i)
             children = node.get_children()
             for child in children:
-                if child == None:
+                if child is None:
                     continue
                 _find_indices(child)
 
@@ -167,7 +167,6 @@ class SimpleOctreeTestCase(unittest.TestCase):
         # Test that indices are unique
         self.assertTrue(len(all_indices) == len(set(all_indices)))
         self.tree.delete_tree()
-
 
     def test_plot_root(self):
         pa = get_particle_array(x=self.x, y=self.y, z=self.z, h=self.h)
