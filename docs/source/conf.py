@@ -14,6 +14,12 @@
 import sys
 import os
 from os.path import join
+try:
+    # When translating the docs to another language, this variable is set 
+    # elsewhere, so if it is not set, set it to a suitable default.
+    basedir
+except NameError:
+    basedir = os.path.dirname(os.path.abspath(__file__))
 
 
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -64,7 +70,7 @@ copyright = u'2013-2018, PySPH developers'
 # built documents.
 #
 _d = {}
-fname = join(os.pardir, os.pardir, 'pysph', '__init__.py')
+fname = join(basedir, os.pardir, os.pardir, 'pysph', '__init__.py')
 exec(compile(open(fname).read(), fname, 'exec'), _d)
 version = release = _d['__version__']
 
