@@ -74,7 +74,7 @@ cdef class Octree:
     cdef public double hmax
     cdef public double length
     cdef public int depth
-
+    cdef public int threshold
     cdef double machine_eps
 
     cdef double xmin[3]
@@ -107,7 +107,7 @@ cdef class Octree:
 
     cdef void _plot_tree(self, OctreeNode node, ax)
 
-    cdef int c_build_tree(self, NNPSParticleArrayWrapper pa_wrapper)
+    cdef int c_build_tree(self, NNPSParticleArrayWrapper pa_wrapper, int threshold = *)
 
     cdef void _c_get_leaf_cells(self, cOctreeNode* node)
 
@@ -115,7 +115,7 @@ cdef class Octree:
 
     cdef cOctreeNode* c_find_point(self, double x, double y, double z)
 
-    cpdef int build_tree(self, ParticleArray pa)
+    cpdef int build_tree(self, ParticleArray pa, int threshold = *)
 
     cpdef delete_tree(self)
 
@@ -141,6 +141,6 @@ cdef class CompressedOctree(Octree):
             vector[u_int]* indices, double* xmin, double length,
             cOctreeNode* node, int level) nogil
     
-    cdef int c_build_tree(self, NNPSParticleArrayWrapper pa_wrapper)
+    cdef int c_build_tree(self, NNPSParticleArrayWrapper pa_wrapper, int threshold = *)
     
     
