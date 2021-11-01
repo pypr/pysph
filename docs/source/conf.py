@@ -72,7 +72,7 @@ copyright = u'2013-2018, PySPH developers'
 # built documents.
 #
 _d = {}
-fname = join(basedir, os.pardir, os.pardir, 'pysph', '__init__.py')
+fname = join(basedir, '..', '..', 'pysph', '__init__.py')
 exec(compile(open(fname).read(), fname, 'exec'), _d)
 version = release = _d['__version__']
 
