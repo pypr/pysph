@@ -22,7 +22,7 @@ cdef class OctreeNNPS(NNPS):
     """
     def __init__(self, int dim, list particles, double radius_scale = 2.0,
             int ghost_layers = 1, domain=None, bint fixed_h = False,
-            bint cache = False, bint sort_gids = False, int leaf_max_particles = 10):
+            bint cache = False, bint sort_gids = False, int leaf_max_particles = 10, int threshold = 40000):
         NNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
             cache, sort_gids
@@ -38,6 +38,9 @@ cdef class OctreeNNPS(NNPS):
         self.leaf_max_particles = leaf_max_particles
         self.current_tree = NULL
         self.current_pids = NULL
+
+        for i in range(self.narrays):
+            self.tree[i].threshold = threshold
 
         self.sort_gids = sort_gids
         self.domain.update()
@@ -159,7 +162,7 @@ cdef class OctreeNNPS(NNPS):
     cpdef _refresh(self):
         cdef int i
         for i from 0<=i<self.narrays:
-            (<Octree>self.tree[i]).c_build_tree(self.pa_wrappers[i])
+            (<Octree>self.tree[i]).c_build_tree(self.pa_wrappers[i], self.tree[i].threshold)
         self.current_tree = (<Octree>self.tree[self.src_index]).root
         self.current_pids = (<Octree>self.tree[self.src_index]).pids
 
