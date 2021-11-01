@@ -14,6 +14,8 @@
 import sys
 import os
 from os.path import join
+
+
 # When translating the docs to another language, this variable is set 
 # elsewhere, so if it is not set, set it to a suitable default.
 try:
