@@ -242,7 +242,7 @@ def test_compressed_octree_has_lesser_depth_than_parallel_octree():
 
 @mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
 class SimpleParallelOctreeTestCase(unittest.TestCase):
-    """Simple test case for Octree
+    """Simple test case for Parallel Octree
     """
     def setUp(self):
         N = 50
@@ -357,7 +357,6 @@ class SimpleParallelOctreeTestCase(unittest.TestCase):
 
         self.tree.delete_tree()
 
-
 class TestOctreeFor2DDataset(SimpleOctreeTestCase):
     """Test Octree for 2D dataset
     """
@@ -384,6 +383,55 @@ class TestOctreeFor1DDataset(SimpleOctreeTestCase):
         self.tree = Octree(100)
 
 class TestOctreeForFloatingPointError(SimpleOctreeTestCase):
+    """Test Octree for floating point error
+    """
+    def setUp(self):
+        N = 50
+        x, y, z = np.mgrid[-1:1:N*1j, -1:1:N*1j, -1:1:N*1j]
+        self.x = x.ravel()
+        self.y = y.ravel()
+        self.z = z.ravel()
+
+        x1 = np.array([-1e-20])
+        y1 = np.array([1e-20])
+        z1 = np.array([1e-20])
+
+        self.x = np.concatenate([self.x, x1])
+        self.y = np.concatenate([self.y, y1])
+        self.z = np.concatenate([self.z, z1])
+
+        self.h = np.ones_like(self.x)
+        self.tree = Octree(10)
+
+@mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
+class TestOctreeFor2DDataset(SimpleParallelOctreeTestCase):
+    """Test Octree for 2D dataset
+    """
+    def setUp(self):
+        N = 500
+        x, y = np.mgrid[0:1:N*1j, 0:1:N*1j]
+        self.x = x.ravel()
+        self.y = y.ravel()
+        self.z = np.zeros_like(self.x)
+        self.h = np.ones_like(self.x)
+
+        self.tree = Octree(10)
+
+@mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
+class TestOctreeFor1DDataset(SimpleParallelOctreeTestCase):
+    """Test Octree for 1D dataset
+    """
+    def setUp(self):
+        N = int(1e5)
+        self.x = np.linspace(0, 1, num=N)
+        self.y = np.zeros_like(self.x)
+        self.z = np.zeros_like(self.x)
+        self.h = np.ones_like(self.x)
+
+        self.tree = Octree(100)
+
+@mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
+class TestOctreeForFloatingPointError(SimpleParallelOctreeTestCase):
     """Test Octree for floating point error
     """
     def setUp(self):
