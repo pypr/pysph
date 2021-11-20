@@ -623,6 +623,7 @@ cdef class Octree:
 
         #Use the serial method
         if (num_threads < 4 or num_particles < threshold):
+            self.method = 0
             self._next_pid = 0
             for i from 0<=i<num_particles:
                 indices_ptr.push_back(i)
@@ -631,6 +632,7 @@ cdef class Octree:
 
         #Use the parallel method
         else: 
+            self.method = 1
             self.root.start_index = 0
             self.root.num_particles = num_particles
             self.depth = self._c_build_tree_level1(pa_wrapper, self.root.xmin,
@@ -683,7 +685,7 @@ cdef class Octree:
 
         """
         cdef NNPSParticleArrayWrapper pa_wrapper = NNPSParticleArrayWrapper(pa)
-        return self.c_build_tree(pa_wrapper, threshold = 40000)
+        return self.c_build_tree(pa_wrapper, threshold)
 
     cpdef delete_tree(self):
         """ Delete tree"""

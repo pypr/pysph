@@ -240,6 +240,27 @@ class DictBoxSortNNPS2DTestCase(NNPS2DTestCase):
         self.test_neighbors_ba()
         self.test_neighbors_bb()
 
+@mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
+def test_parallel_method_is_tested():
+    x = numpy.array([
+        -1.5, 0.33, 1.25, 0.05, -0.5, -0.75, -1.25, 0.5, 0.5, 0.5])
+
+    y = numpy.array([
+        0.25, -0.25, -1.25, 1.25, 0.5, 0.75, 0.5, 1.5, -0.5, 1.75])
+
+    z = numpy.array([
+        0.5, 0.25, 1.25, -0.5, -1.25, -1.25, 0.5, -0.5, 0.5, -0.75])
+
+    # using a degenrate (h=0) array will set cell size to 1 for NNPS
+    h = numpy.zeros_like(x)
+
+    pa = get_particle_array(x=x, y=y, z=z, h=h)
+
+    nps = nnps.OctreeNNPS(dim=3, particles=[pa], cache=True, threshold=0)
+
+    for i in range(nps.narrays):
+        nps.tree[i].method == 1
+    # assert nps.method == 1
 
 class OctreeGPUNNPS2DTestCase(DictBoxSortNNPS2DTestCase):
     """Test for Z-Order SFC based OpenCL algorithm"""
