@@ -195,6 +195,21 @@ class SimpleOctreeTestCase(unittest.TestCase):
         self.tree.delete_tree()
 
 @mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
+def test_parallel_method_is_tested():
+    N = 50
+    x, y, z = np.mgrid[0:1:N*1j, 0:1:N*1j, 0:1:N*1j]
+    x = x.ravel()
+    y = y.ravel()
+    z = z.ravel()
+    h = np.ones_like(x)
+
+    pa = get_particle_array(x=x, y=y, z=z, h=h)
+    
+    tree = Octree(10)
+    depth_tree = tree.build_tree(pa, 0)
+    assert tree.method == 1
+
+@mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
 def test_single_level_parallel_octree():
     N = 50
     x, y, z = np.mgrid[0:1:N*1j, 0:1:N*1j, 0:1:N*1j]
