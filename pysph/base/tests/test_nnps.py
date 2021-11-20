@@ -242,6 +242,7 @@ class DictBoxSortNNPS2DTestCase(NNPS2DTestCase):
 
 @mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
 def test_parallel_method_is_tested():
+    """Test for ensuring that Parallel Octree Method is used for testing"""
     x = numpy.array([
         -1.5, 0.33, 1.25, 0.05, -0.5, -0.75, -1.25, 0.5, 0.5, 0.5])
 
@@ -259,8 +260,7 @@ def test_parallel_method_is_tested():
     nps = nnps.OctreeNNPS(dim=3, particles=[pa], cache=True, threshold=0)
 
     for i in range(nps.narrays):
-        nps.tree[i].method == 1
-    # assert nps.method == 1
+        assert nps.tree[i].method == 1
 
 class OctreeGPUNNPS2DTestCase(DictBoxSortNNPS2DTestCase):
     """Test for Z-Order SFC based OpenCL algorithm"""
