@@ -74,7 +74,7 @@ cdef class Octree:
     cdef public double hmax
     cdef public double length
     cdef public int depth
-    cdef public int threshold
+    cdef public bint test_parallel
     cdef public int method
     cdef double machine_eps
 
@@ -108,7 +108,7 @@ cdef class Octree:
 
     cdef void _plot_tree(self, OctreeNode node, ax)
 
-    cdef int c_build_tree(self, NNPSParticleArrayWrapper pa_wrapper, int threshold = *)
+    cdef int c_build_tree(self, NNPSParticleArrayWrapper pa_wrapper, bint test_parallel = *)
 
     cdef void _c_get_leaf_cells(self, cOctreeNode* node)
 
@@ -116,7 +116,7 @@ cdef class Octree:
 
     cdef cOctreeNode* c_find_point(self, double x, double y, double z)
 
-    cpdef int build_tree(self, ParticleArray pa, int threshold = *)
+    cpdef int build_tree(self, ParticleArray pa, bint test_parallel = *)
 
     cpdef delete_tree(self)
 
@@ -142,6 +142,6 @@ cdef class CompressedOctree(Octree):
             vector[u_int]* indices, double* xmin, double length,
             cOctreeNode* node, int level) nogil
     
-    cdef int c_build_tree(self, NNPSParticleArrayWrapper pa_wrapper, int threshold = *)
+    cdef int c_build_tree(self, NNPSParticleArrayWrapper pa_wrapper, bint test_parallel = *)
     
     

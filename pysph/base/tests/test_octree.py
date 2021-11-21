@@ -204,9 +204,9 @@ def test_parallel_method_is_tested():
     h = np.ones_like(x)
 
     pa = get_particle_array(x=x, y=y, z=z, h=h)
-    
+
     tree = Octree(10)
-    depth_tree = tree.build_tree(pa, 0)
+    depth_tree = tree.build_tree(pa, True)
     assert tree.method == 1
 
 @mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
@@ -223,7 +223,7 @@ def test_single_level_parallel_octree():
     # For maximum leaf particles greater that total number
     # of particles
     tree = Octree(pa.get_number_of_particles() + 1)
-    tree.build_tree(pa, 0)
+    tree.build_tree(pa, True)
     # Test that depth of the tree is 1
     assert tree.depth == 1
 
@@ -248,7 +248,7 @@ def test_compressed_octree_has_lesser_depth_than_parallel_octree():
     tree = Octree(10)
     comp_tree = CompressedOctree(10)
 
-    depth_tree = tree.build_tree(pa, 0)
+    depth_tree = tree.build_tree(pa, True)
     depth_comp_tree = comp_tree.build_tree(pa)
 
     # Test that the depth of compressed octree for the same
@@ -271,7 +271,7 @@ class SimpleParallelOctreeTestCase(unittest.TestCase):
 
     def test_levels_in_tree(self):
         pa = get_particle_array(x=self.x, y=self.y, z=self.z, h=self.h)
-        self.tree.build_tree(pa, 0)
+        self.tree.build_tree(pa, True)
         root = self.tree.get_root()
 
         def _check_levels(node, level):

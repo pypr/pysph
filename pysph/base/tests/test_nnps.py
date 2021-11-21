@@ -257,7 +257,7 @@ def test_parallel_method_is_tested():
 
     pa = get_particle_array(x=x, y=y, z=z, h=h)
 
-    nps = nnps.OctreeNNPS(dim=3, particles=[pa], cache=True, threshold=0)
+    nps = nnps.OctreeNNPS(dim=3, particles=[pa], cache=True, test_parallel=True)
 
     for i in range(nps.narrays):
         assert nps.tree[i].method == 1
@@ -583,7 +583,7 @@ class OctreeParallelNNPSTestCase(DictBoxSortNNPSTestCase):
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.OctreeNNPS(
-            dim=3, particles=self.particles, radius_scale=2.0, threshold=0
+            dim=3, particles=self.particles, radius_scale=2.0, test_parallel=True
         )
 
 
@@ -1073,7 +1073,7 @@ class TestNNPSOnLargeDomain(unittest.TestCase):
         # Given
         pa = self._make_particles(20)
         # We turn on cache so it computes all the neighbors quickly for us.
-        nps = nnps.OctreeNNPS(dim=3, particles=[pa], cache=True, threshold=0)
+        nps = nnps.OctreeNNPS(dim=3, particles=[pa], cache=True, test_parallel=True)
         nbrs = UIntArray()
         direct = UIntArray()
         nps.set_context(0, 0)
@@ -1253,7 +1253,7 @@ def test_corner_case_parallel_octree_1d_few_cells():
     pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=1.0)
     nbrs = UIntArray()
     bf_nbrs = UIntArray()
-    nps = nnps.OctreeNNPS(dim=3, particles=[pa], radius_scale=0.7, threshold=0)
+    nps = nnps.OctreeNNPS(dim=3, particles=[pa], radius_scale=0.7, test_parallel=True)
     for i in range(2):
         nps.get_nearest_particles(0, 0, i, nbrs)
         nps.brute_force_neighbors(0, 0, i, bf_nbrs)
@@ -1317,7 +1317,7 @@ def test_large_number_of_neighbors_parallel_octree():
     h = numpy.ones_like(x)
     pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=h)
 
-    nps = nnps.OctreeNNPS(dim=3, particles=[pa], cache=False, threshold=0)
+    nps = nnps.OctreeNNPS(dim=3, particles=[pa], cache=False, test_parallel=True)
     nbrs = UIntArray()
     nps.get_nearest_particles(0, 0, 0, nbrs)
     # print(nbrs.length)
