@@ -596,7 +596,7 @@ cdef class Octree:
 
     #### Public protocol ################################################
 
-    cdef int c_build_tree(self, NNPSParticleArrayWrapper pa_wrapper, int threshold = 40000):
+    cdef int c_build_tree(self, NNPSParticleArrayWrapper pa_wrapper, bint test_parallel = False):
 
         self._calculate_domain(pa_wrapper)
 
@@ -621,22 +621,23 @@ cdef class Octree:
 
         cdef int num_threads = get_number_of_threads()
 
+        #Use the parallel method
+        if ( (num_threads > 4 and num_particles > 40000) or test_parallel ):
+            self.method = 1
+            self.root.start_index = 0
+            self.root.num_particles = num_particles
+            self.depth = self._c_build_tree_level1(pa_wrapper, self.root.xmin,
+                    self.root.length, self.root, num_threads)
+
         #Use the serial method
-        if (num_threads < 4 or num_particles < threshold):
+        else: 
             self.method = 0
             self._next_pid = 0
             for i from 0<=i<num_particles:
                 indices_ptr.push_back(i)
             self.depth = self._c_build_tree(pa_wrapper, indices_ptr, self.root.xmin,
                 self.root.length, self.root, 0)
-
-        #Use the parallel method
-        else: 
-            self.method = 1
-            self.root.start_index = 0
-            self.root.num_particles = num_particles
-            self.depth = self._c_build_tree_level1(pa_wrapper, self.root.xmin,
-                    self.root.length, self.root, num_threads)
+            
         return self.depth
 
     cdef void c_get_leaf_cells(self):
@@ -669,7 +670,7 @@ cdef class Octree:
 
     ######################################################################
 
-    cpdef int build_tree(self, ParticleArray pa, int threshold = 40000):
+    cpdef int build_tree(self, ParticleArray pa, bint test_parallel = False):
         """ Build tree.
 
         Parameters
@@ -685,7 +686,7 @@ cdef class Octree:
 
         """
         cdef NNPSParticleArrayWrapper pa_wrapper = NNPSParticleArrayWrapper(pa)
-        return self.c_build_tree(pa_wrapper, threshold)
+        return self.c_build_tree(pa_wrapper, test_parallel)
 
     cpdef delete_tree(self):
         """ Delete tree"""
@@ -875,7 +876,7 @@ cdef class CompressedOctree(Octree):
 
         return 1 + depth_max
     
-    cdef int c_build_tree(self, NNPSParticleArrayWrapper pa_wrapper, int threshold = 40000):
+    cdef int c_build_tree(self, NNPSParticleArrayWrapper pa_wrapper, bint test_parallel = False):
 
         self._calculate_domain(pa_wrapper)
 
