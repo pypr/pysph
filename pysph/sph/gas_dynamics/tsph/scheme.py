@@ -2,20 +2,15 @@ from pysph.sph.scheme import Scheme, add_bool_argument
 
 
 class TSPHScheme(Scheme):
-    def __init__(self, fluids, solids, dim, gamma, hfact, alpha1=1.0,
-                 alpha2=0.0, beta=2.0, update_alpha2=False, fkern=1.0,
-                 max_density_iterations=250, alphaav=1.0,
-                 density_iteration_tolerance=1e-3, has_ghosts=False,
-                 av_switch='balsara'):
+    def __init__(self, fluids, solids, dim, gamma, hfact,
+                 beta=2.0, fkern=1.0, max_density_iterations=250, alphaav=1.0,
+                 density_iteration_tolerance=1e-3, has_ghosts=False):
 
         self.fluids = fluids
         self.solids = solids
         self.dim = dim
         self.solver = None
         self.gamma = gamma
-        self.alpha1 = alpha1
-        self.alpha2 = alpha2
-        self.update_alpha2 = update_alpha2
         self.beta = beta
         self.hfact = hfact
         self.density_iteration_tolerance = density_iteration_tolerance
@@ -23,21 +18,12 @@ class TSPHScheme(Scheme):
         self.has_ghosts = has_ghosts
         self.fkern = fkern
         self.alphaav = alphaav
-        self.av_switch = av_switch
 
     def add_user_options(self, group):
-
-        av_switch_choices = ['morris-monaghan', 'balsara']
         group.add_argument(
-            "--av-switch", action="store", dest="av_switch",
-            default=None, choices=av_switch_choices,
-            help="Specify switch to "
-                 "adapt artificial viscocity %s" % av_switch_choices
-        )
-        group.add_argument(
-            "--alpha1", action="store", type=float, dest="alpha1",
+            "--alphaav", action="store", type=float, dest="alphaav",
             default=None,
-            help="Alpha1 for the artificial viscosity."
+            help="alpha_av for the artificial viscosity switch."
         )
         group.add_argument(
             "--beta", action="store", type=float, dest="beta",
@@ -45,24 +31,13 @@ class TSPHScheme(Scheme):
             help="Beta for the artificial viscosity."
         )
         group.add_argument(
-            "--alpha2", action="store", type=float, dest="alpha2",
-            default=None,
-            help="Alpha2 for artificial viscosity"
-        )
-        group.add_argument(
             "--gamma", action="store", type=float, dest="gamma",
             default=None,
             help="Gamma for the state equation."
         )
-        add_bool_argument(
-            group, "update-alpha2", dest="update_alpha2",
-            help="Update the alpha2 parameter.",
-            default=None
-        )
 
     def consume_user_options(self, options):
-        vars = ['gamma', 'alpha2', 'alpha1', 'beta', 'av_switch',
-                'update_alpha2']
+        vars = ['gamma', 'alphaav', 'beta']
         data = dict((var, self._smart_getattr(options, var)) for var in vars)
         self.configure(**data)
 
@@ -104,67 +79,59 @@ class TSPHScheme(Scheme):
             SummationDensity, MomentumAndEnergy, VelocityGradDivC1,
             BalsaraSwitch, UpdateGhostProps, WallBoundary)
 
+        all_pa = self.fluids + self.solids
         equations = []
         # Find the optimal 'h'
 
         g1 = []
         for fluid in self.fluids:
-            g1.append(
-                SummationDensity(
-                    dest=fluid, sources=self.fluids, hfact=self.hfact,
-                    density_iterations=True, dim=self.dim,
-                    htol=self.density_iteration_tolerance
-                )
-            )
+            g1.append(SummationDensity(dest=fluid, sources=all_pa,
+                                       hfact=self.hfact,
+                                       density_iterations=True, dim=self.dim,
+                                       htol=self.density_iteration_tolerance))
 
-            equations.append(Group(
-                equations=g1, update_nnps=True, iterate=True,
-                max_iterations=self.max_density_iterations
-            ))
+            equations.append(
+                Group(equations=g1, update_nnps=True, iterate=True,
+                      max_iterations=self.max_density_iterations))
 
         g2 = []
         for fluid in self.fluids:
             g2.append(IdealGasEOS(dest=fluid, sources=None, gamma=self.gamma))
 
         equations.append(Group(equations=g2))
-        g5 = []
-        for fluid in self.fluids:
-            g5.append(VelocityGradDivC1(dest=fluid,
-                                        sources=self.fluids + self.solids,
-                                        dim=self.dim))
-
-            g5.append(BalsaraSwitch(
-                dest=fluid,
-                sources=None,
-                alphaav=self.alphaav,
-                fkern=self.fkern
-            ))
-
-        equations.append(Group(equations=g5))
 
         g3 = []
-        for solid in self.solids:
-            g3.append(WallBoundary(solid, sources=self.fluids))
+
+        for fluid in self.fluids:
+            g3.append(VelocityGradDivC1(dest=fluid,
+                                        sources=all_pa,
+                                        dim=self.dim))
+
+            g3.append(
+                BalsaraSwitch(dest=fluid, sources=None, alphaav=self.alphaav,
+                              fkern=self.fkern))
+
         equations.append(Group(equations=g3))
+
+        g4 = []
+        for solid in self.solids:
+            g4.append(WallBoundary(solid, sources=self.fluids))
+        equations.append(Group(equations=g4))
 
         if self.has_ghosts:
             gh = []
             for fluid in self.fluids:
-                gh.append(
-                    UpdateGhostProps(dest=fluid, sources=None)
-                )
+                gh.append(UpdateGhostProps(dest=fluid, sources=None))
             equations.append(Group(equations=gh, real=False))
 
-        g4 = []
+        g5 = []
         for fluid in self.fluids:
-            g4.append(MomentumAndEnergy(
-                dest=fluid, sources=self.fluids + self.solids,
-                dim=self.dim,
-                beta=self.beta,
-                fkern=self.fkern
-            ))
+            g5.append(MomentumAndEnergy(dest=fluid,
+                                        sources=all_pa,
+                                        dim=self.dim,
+                                        beta=self.beta, fkern=self.fkern))
 
-        equations.append(Group(equations=g4))
+        equations.append(Group(equations=g5))
 
         return equations
 
