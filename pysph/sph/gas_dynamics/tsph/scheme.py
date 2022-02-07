@@ -99,12 +99,10 @@ class TSPHScheme(Scheme):
 
     def get_equations(self):
         from pysph.sph.equation import Group
-        from pysph.sph.gas_dynamics.basic import (IdealGasEOS,
-                                                  MPMUpdateGhostProps)
+        from pysph.sph.gas_dynamics.basic import IdealGasEOS
         from pysph.sph.gas_dynamics.tsph.equations import (
             SummationDensity, MomentumAndEnergy, VelocityGradDivC1,
-            BalsaraSwitch)
-        from pysph.sph.gas_dynamics.boundary_equations import WallBoundary
+            BalsaraSwitch, UpdateGhostProps, WallBoundary)
 
         equations = []
         # Find the optimal 'h'
@@ -153,7 +151,7 @@ class TSPHScheme(Scheme):
             gh = []
             for fluid in self.fluids:
                 gh.append(
-                    MPMUpdateGhostProps(dest=fluid, sources=None)
+                    UpdateGhostProps(dest=fluid, sources=None)
                 )
             equations.append(Group(equations=gh, real=False))
 
