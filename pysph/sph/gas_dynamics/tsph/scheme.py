@@ -2,7 +2,7 @@ from pysph.sph.scheme import Scheme, add_bool_argument
 
 
 class TSPHScheme(Scheme):
-    def __init__(self, fluids, solids, dim, gamma, kernel_factor, alpha1=1.0,
+    def __init__(self, fluids, solids, dim, gamma, hfact, alpha1=1.0,
                  alpha2=0.0, beta=2.0, update_alpha2=False, fkern=1.0,
                  max_density_iterations=250, alphaav=1.0,
                  density_iteration_tolerance=1e-3, has_ghosts=False,
@@ -17,7 +17,7 @@ class TSPHScheme(Scheme):
         self.alpha2 = alpha2
         self.update_alpha2 = update_alpha2
         self.beta = beta
-        self.kernel_factor = kernel_factor
+        self.hfact = hfact
         self.density_iteration_tolerance = density_iteration_tolerance
         self.max_density_iterations = max_density_iterations
         self.has_ghosts = has_ghosts
@@ -113,7 +113,7 @@ class TSPHScheme(Scheme):
         for fluid in self.fluids:
             g1.append(
                 SummationDensity(
-                    dest=fluid, sources=self.fluids, k=self.kernel_factor,
+                    dest=fluid, sources=self.fluids, hfact=self.hfact,
                     density_iterations=True, dim=self.dim,
                     htol=self.density_iteration_tolerance
                 )
@@ -185,7 +185,7 @@ class TSPHScheme(Scheme):
                  'aalpha1', 'alpha10', 'h0', 'converged', 'ah', 'arho',
                  'dt_cfl', 'e0', 'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0']
         more_props = ['drhosumdh', 'n', 'dndh', 'prevn', 'prevdndh',
-                      'prevdrhosumdh', 'divv']
+                      'prevdrhosumdh', 'divv', 'an']
         props.extend(more_props)
         output_props = []
         for fluid in self.fluids:

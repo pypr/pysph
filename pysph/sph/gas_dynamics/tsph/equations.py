@@ -9,24 +9,36 @@ GHOST_TAG = get_ghost_tag()
 
 class SummationDensity(Equation):
     def __init__(self, dest, sources, dim, density_iterations=False,
-                 iterate_only_once=False, k=1.2, htol=1e-6):
+                 iterate_only_once=False, hfact=1.2, htol=1e-6):
+        """
+        :class:`SummationDensity
+        <pysph.sph.gas_dynamics.basic.SummationDensity>` modified to use
+        number density for calculation of grad-h terms.
 
-        r"""Summation density with iterative solution of the smoothing lengths
-        from pysph.sph.gas_dynamics.basic modified to use number density
-        for calculation of grad-h terms.
+        Ref. Appendix F1 [Hopkins2015]_
+        Parameters
+        ----------
+        density_iterations : bint, optional
+            Flag to indicate density iterations are required, by default False
+        iterate_only_once : bint, optional
+            Flag to indicate if only one iteration is required, by default False
+        hfact : float, optional
+            :math:`h_{fact}`, by default 1.2
+        htol : double, optional
+            Iteration tolerance, by default 1e-6
         """
 
         self.density_iterations = density_iterations
         self.iterate_only_once = iterate_only_once
         self.dim = dim
-        self.k = k
+        self.hfact = hfact
         self.htol = htol
         self.equation_has_converged = 1
 
         super().__init__(dest, sources)
 
     def initialize(self, d_idx, d_rho, d_arho, d_drhosumdh, d_n, d_dndh,
-                   d_prevn, d_prevdndh, d_prevdrhosumdh):
+                   d_prevn, d_prevdndh, d_prevdrhosumdh, d_an):
 
         d_rho[d_idx] = 0.0
         d_arho[d_idx] = 0.0
@@ -37,6 +49,7 @@ class SummationDensity(Equation):
 
         d_drhosumdh[d_idx] = 0.0
         d_n[d_idx] = 0.0
+        d_an[d_idx] = 0.0
         d_dndh[d_idx] = 0.0
 
         # set the converged attribute for the Equation to True. Within
@@ -45,7 +58,8 @@ class SummationDensity(Equation):
         self.equation_has_converged = 1
 
     def loop(self, d_idx, s_idx, d_rho, d_arho, d_drhosumdh, s_m, VIJ, WI, DWI,
-             GHI, d_n, d_dndh, d_h, d_prevn, d_prevdndh, d_prevdrhosumdh):
+             GHI, d_n, d_dndh, d_h, d_prevn, d_prevdndh, d_prevdrhosumdh,
+             d_an):
 
         mj = s_m[s_idx]
         vijdotdwij = VIJ[0] * DWI[0] + VIJ[1] * DWI[1] + VIJ[2] * DWI[2]
@@ -55,68 +69,58 @@ class SummationDensity(Equation):
 
         # density accelerations
         hibynidim = d_h[d_idx] / (d_prevn[d_idx] * self.dim)
-        inbrkti = 1 + d_prevdndh[d_idx] * d_h[d_idx] * hibynidim
+        inbrkti = 1 + d_prevdndh[d_idx] * hibynidim
         inprthsi = d_prevdrhosumdh[d_idx] * hibynidim
         fij = 1 - inprthsi / (s_m[s_idx] * inbrkti)
-        d_arho[d_idx] += mj * vijdotdwij * fij
+        vijdotdwij_fij = vijdotdwij * fij
+        d_arho[d_idx] += mj * vijdotdwij_fij
+        d_an[d_idx] += vijdotdwij_fij
 
         # gradient of kernel w.r.t h
         d_drhosumdh[d_idx] += mj * GHI
         d_n[d_idx] += WI
         d_dndh[d_idx] += GHI
 
-    def post_loop(self, d_idx, d_arho, d_rho, d_drhosumdh, d_h0, d_h, d_m,
-                  d_ah, d_converged):
-
+    def post_loop(self, d_idx, d_h0, d_h,
+                  d_ah, d_converged, d_n, d_dndh,
+                  d_an):
         # iteratively find smoothing length consistent with the
         if self.density_iterations:
             if not (d_converged[d_idx] == 1):
-                # current mass and smoothing length. The initial
-                # smoothing length h0 for this particle must be set
-                # outside the Group (that is, in the integrator)
-                mi = d_m[d_idx]
                 hi = d_h[d_idx]
                 hi0 = d_h0[d_idx]
 
-                # density from the mass, smoothing length and kernel
-                # scale factor
-                rhoi = mi / (hi / self.k) ** self.dim
-
-                # using fi from density entropy formulation for convergence
-                # related checks.
-                dhdrhoi = -hi / (self.dim * d_rho[d_idx])
-                obyfi = 1.0 - dhdrhoi * d_drhosumdh[d_idx]
+                # estimated, without summations
+                ni = (self.hfact / hi) ** self.dim
+                dndhi = - self.dim * d_n[d_idx] / hi
 
                 # correct fi TODO: Remove if not required
-                if obyfi < 0:
-                    obyfi = 1.0
-
-                # kernel multiplier. These are the multiplicative
-                # pre-factors, or the "grah-h" terms in the
-                # equations. Remember that the equations use 1/omega
-                fi = 1.0 / obyfi
+                # if fi < 0:
+                #     fi = 1.0
 
                 # the non-linear function and it's derivative
-                func = d_rho[d_idx] - rhoi
-                dfdh = d_drhosumdh[d_idx] - 1 / dhdrhoi
+                func = d_n[d_idx] - ni
+                dfdh = d_dndh[d_idx] - dndhi
 
                 # Newton Raphson estimate for the new h
                 hnew = hi - func / dfdh
 
                 # Nanny control for h TODO: Remove if not required
-                if (hnew > 1.2 * hi):
+                if hnew > 1.2 * hi:
                     hnew = 1.2 * hi
-                elif (hnew < 0.8 * hi):
+                elif hnew < 0.8 * hi:
                     hnew = 0.8 * hi
 
                 # overwrite if gone awry TODO: Remove if not required
-                if ((hnew <= 1e-6) or (fi < 1e-6)):
-                    hnew = self.k * (mi / d_rho[d_idx]) ** (1. / self.dim)
+                # if (hnew <= 1e-6) or (fi < 1e-6):
+                #     hnew = self.k * (mi / d_rho[d_idx]) ** (1. / self.dim)
 
                 # check for convergence
                 diff = abs(hnew - hi) / hi0
 
-                if not ((diff < self.htol) and (obyfi > 0) or
+                # if not ((diff < self.htol) and (fi > 0) or
+                #         self.iterate_only_once):
+                if not ((diff < self.htol) or
                         self.iterate_only_once):
                     # this particle hasn't converged. This means the
                     # entire group must be repeated until this fellow
@@ -130,7 +134,7 @@ class SummationDensity(Equation):
                     d_h[d_idx] = hnew
                     d_converged[d_idx] = 0
                 else:
-                    d_ah[d_idx] = d_arho[d_idx] * dhdrhoi
+                    d_ah[d_idx] = d_an[d_idx] / dndhi
                     d_converged[d_idx] = 1
 
     def converged(self):
@@ -153,7 +157,7 @@ class TSPHMomentumAndEnergy(Equation):
 
     def loop(self, d_idx, s_idx, d_m, s_m, d_p, s_p, d_cs, s_cs, d_rho, s_rho,
              d_au, d_av, d_aw, d_ae, XIJ, VIJ, DWI, DWJ, HIJ, d_alpha1,
-             s_alpha1, RIJ, R2IJ, RHOIJ, d_dt_cfl, d_h, d_dndh, d_n,
+             s_alpha1, RIJ, R2IJ, RHOIJ, d_h, d_dndh, d_n,
              d_drhosumdh, s_h, s_dndh, s_n, s_drhosumdh):
 
         dim = self.dim

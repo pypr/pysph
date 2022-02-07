@@ -72,8 +72,10 @@ class SodShockTube(ShockTubeSetup):
 
     def configure_scheme(self):
         scheme = self.scheme
-        if self.options.scheme in ['gsph', 'mpm', 'tsph']:
+        if self.options.scheme in ['gsph', 'mpm']:
             scheme.configure(kernel_factor=self.hdx)
+        elif self.options.scheme in ['tsph']:
+            scheme.configure(hfact=self.hdx)
         scheme.configure_solver(tf=self.tf, dt=self.dt)
 
     def create_scheme(self):
@@ -99,7 +101,7 @@ class SodShockTube(ShockTubeSetup):
         )
         tsph = TSPHScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            kernel_factor=None, alpha1=1.0, av_switch='balsara',
+            hfact=None, alpha1=1.0, av_switch='balsara',
             beta=2.0, update_alpha2=False, alphaav=1.0
         )
         s = SchemeChooser(
