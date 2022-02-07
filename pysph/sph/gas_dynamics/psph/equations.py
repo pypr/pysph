@@ -10,10 +10,24 @@ GHOST_TAG = get_ghost_tag()
 class PSPHSummationDensityAndPressure(Equation):
     def __init__(self, dest, sources, dim, gamma, density_iterations=False,
                  iterate_only_once=False, k=1.2, htol=1e-6):
+        """
+        :class:`SummationDensity 
+        <pysph.sph.gas_dynamics.basic.SummationDensity>` modified to use
+        number density for calculation of grad-h terms and to calculate 
+        pressure and speed of sound as well.
 
-        r"""Summation density with iterative solution of the smoothing lengths
-        from pysph.sph.gas_dynamics.basic modified to use number density
-        for calculation of grad-h terms.
+        Ref. Appendix F2 [Hopkins2015]_
+
+        Parameters
+        ----------
+        density_iterations : bint, optional
+            Flag to indicate density iterations are required, by default False
+        iterate_only_once : bint, optional
+            Flag to indicate if only one iteration is required, by default False
+        k : float, optional
+            :math:`h_{fact}`, by default 1.2
+        htol : double, optional
+            Iteration tolerance, by default 1e-6
         """
 
         self.density_iterations = density_iterations
@@ -62,7 +76,7 @@ class PSPHSummationDensityAndPressure(Equation):
         hibynidim = d_h[d_idx] / (d_prevn[d_idx] * self.dim)
         inbrkti = 1 + d_prevdndh[d_idx] * hibynidim
         inprthsi = d_dpsumdh[d_idx] * hibynidim / (
-                self.gammam1 * s_m[s_idx] * d_e[d_idx])
+            self.gammam1 * s_m[s_idx] * d_e[d_idx])
         fij = 1 - inprthsi / inbrkti
         vijdotdwij_fij = vijdotdwij * fij
         d_an[d_idx] += vijdotdwij_fij
@@ -140,6 +154,18 @@ class PSPHSummationDensityAndPressure(Equation):
 
 class GradientKinsfolkC1(Equation):
     def __init__(self, dest, sources, dim):
+        """
+        First order consistent,
+
+            - Velocity gradient, grad(v)
+            - Acceleration gradient, grad(a)
+            - Velocity divergence, div(v)
+            - Velocity divergence rate, d (div(v)) / dt
+            - Traceless symmetric strain rate, S
+            - trace(dot(S,transpose(S)))
+
+        Ref. Appendix B [CullenDehnen2010]_
+        """
         self.dim = dim
         super().__init__(dest, sources)
 
@@ -242,7 +268,7 @@ class GradientKinsfolkC1(Equation):
                 dltrowcol = ltstart_indx + (row * (row + 1)) / 2 + col
                 d_ss[dltrowcol] = 0.5 * (gradvls[rowcol] + gradvls[colrow])
 
-        # Trace ( S dot S )
+        # Trace ( S dot transpose(S) )
         for row in range(dim):
             for col in range(dim):
                 dltrowcol = ltstart_indx + (row * (row + 1)) / 2 + col
@@ -250,6 +276,10 @@ class GradientKinsfolkC1(Equation):
 
 
 class SignalVelocity(Equation):
+    """
+    Ref. Equation 25 [Hopkins2015]_
+    """
+
     def initialize(self, d_idx, d_vsig):
         d_vsig[d_idx] = 0.0
 
@@ -281,6 +311,11 @@ class SignalVelocity(Equation):
 class LimiterAndAlphas(Equation):
     def __init__(self, dest, sources, alphamin=0.02, alphamax=2.0, betac=0.7,
                  betad=0.05, betaxi=1.0, fkern=1.0):
+        """
+        Cullen Dehnen's limiter for artificial viscosity modified by Hopkins.
+
+        Ref. Appendix F2 [Hopkins2015]_
+        """
         self.alphamin = alphamin
         self.alphamax = alphamax
         self.betac = betac
@@ -312,7 +347,7 @@ class LimiterAndAlphas(Equation):
             absadivv = abs(d_adivv[d_idx])
             csbyfhi = d_cs[d_idx] / fhi
             alphatmp = self.alphamax * absadivv / (
-                    absadivv + self.betac * csbyfhi * csbyfhi)
+                absadivv + self.betac * csbyfhi * csbyfhi)
 
         if alphatmp >= d_alpha0[d_idx]:
             d_alpha0[d_idx] = alphatmp
@@ -335,6 +370,68 @@ class LimiterAndAlphas(Equation):
 class MomentumAndEnergy(Equation):
     def __init__(self, dest, sources, dim, fkern, gamma, betab=2.0,
                  alphac=0.25):
+        r"""
+        PSPH Momentum and Energy Equations with artificial viscosity and
+        artificial conductivity.
+
+        Possible typos in that have been taken care of,
+
+            1. Instead of Equation F15 [Hopkins2015]_ for evolution of total
+               energy sans artificial viscosity and artificial conductivity,
+
+                .. math::
+                    \frac{\mathrm{d} E_{i}}{\mathrm{~d} t}= \boldsymbol{v}_{i} 
+                    \cdot \frac{\mathrm{d} \boldsymbol{P}_{i}}{\mathrm{~d} t}-
+                    \sum_{j=1}^{N}(\gamma-1)^{2} m_{i} m_{j} u_{i} u_{j} 
+                    \frac{f_{i j}}{\bar{P}_{i}}\left(\boldsymbol{v}_{i}-
+                    \boldsymbol{v}_{j}\right) \cdot \nabla_{i} W_{i j}
+                    \left(h_{i}\right)
+
+               it should have been,
+
+                .. math::
+                    \frac{\mathrm{d} E_{i}}{\mathrm{~d} t}= \boldsymbol{v}_{i} 
+                    \cdot \frac{\mathrm{d} \boldsymbol{P}_{i}}{\mathrm{~d} t}+
+                    \sum_{j=1}^{N}(\gamma-1)^{2} m_{i} m_{j} u_{i} u_{j} 
+                    \frac{f_{i j}}{\bar{P}_{i}}\left(\boldsymbol{v}_{i}-
+                    \boldsymbol{v}_{j}\right) \cdot \nabla_{i} W_{i j}
+                    \left(h_{i}\right).
+
+               Specific thermal energy, :math:`u`, would therefore be evolved
+               using,
+
+                .. math::
+                    \frac{\mathrm{d} u_{i}}{\mathrm{~d} t}= 
+                    \sum_{j=1}^{N}(\gamma-1)^{2} m_{j} u_{i} u_{j} 
+                    \frac{f_{i j}}{\bar{P}_{i}}\left(\boldsymbol{v}_{i}-
+                    \boldsymbol{v}_{j}\right) \cdot \nabla_{i} W_{i j}
+                    \left(h_{i}\right).
+
+            #. Instead of Equation F18 [Hopkins2015]_ for contribution of 
+               artificial viscosity to the evolution of total
+               energy,
+
+                .. math::
+                    \frac{\mathrm{d} E_{i}}{\mathrm{~d} t}= \alpha_{\mathrm{C}} 
+                    \sum_{j} m_{i} m_{j} \alpha_{i j} \tilde{v}_{s}\left(u_{i}-
+                    u_{j}\right) \times \frac{\left|P_{i}-P_{j}\right|}{P_{i}+
+                    P_{j}} \frac{\nabla_{i} W_{i j}\left(h_{i}\right)+
+                    \nabla_{i} W_{i j}\left(h_{j}\right)}{\bar{\rho}_{i}+
+                    \bar{\rho}_{j}} ,
+
+               carefully comparing with [ReadHayfield2012]_ and [KP14]_, 
+               it should have been,
+
+                .. math::
+                    \frac{\mathrm{d} u_{i}}{\mathrm{~d} t}= \alpha_{\mathrm{C}} 
+                    \sum_{j} m_{i} m_{j} \alpha_{i j} \tilde{v}_{s}\left(u_{i}-
+                    u_{j}\right) \frac{\left|P_{i}-P_{j}\right|}{P_{i}+
+                    P_{j}} \frac{\nabla_{i} W_{i j}\left(h_{i}\right)+
+                    \nabla_{i} W_{i j}\left(h_{j}\right)}{\bar{\rho}_{i}+
+                    \bar{\rho}_{j}} \cdot \frac{\left(\boldsymbol{x}_{i}-
+                    \boldsymbol{x}_{j}\right)}{\left|\boldsymbol{x}_{i}-
+                    \boldsymbol{x}_{j}\right|}
+        """
         self.betab = betab
         self.dim = dim
         self.fkern = fkern
@@ -405,20 +502,20 @@ class MomentumAndEnergy(Equation):
             # artificial conductivity
             eij = d_e[d_idx] - s_e[s_idx]
             Lij = abs(d_p[d_idx] - s_p[s_idx]) / (d_p[d_idx] + s_p[s_idx])
-            d_ae[d_idx] += (self.alphac * mj * alphaij * vs * eij * Lij * Fij
-                            / twrhoij)
+            d_ae[d_idx] += (self.alphac * mj * alphaij * vs * eij * Lij * Fij /
+                            twrhoij)
 
         # grad-h correction terms.
         hibynidim = d_h[d_idx] / (d_n[d_idx] * dim)
         inbrkti = 1 + d_dndh[d_idx] * hibynidim
         inprthsi = d_dpsumdh[d_idx] * hibynidim / (
-                gammam1 * s_m[s_idx] * d_e[d_idx])
+            gammam1 * s_m[s_idx] * d_e[d_idx])
         fij = 1 - inprthsi / inbrkti
 
         hjbynjdim = s_h[s_idx] / (s_n[s_idx] * dim)
         inbrktj = 1 + s_dndh[s_idx] * hjbynjdim
         inprthsj = s_dpsumdh[s_idx] * hjbynjdim / (
-                gammam1 * d_m[d_idx] * s_e[s_idx])
+            gammam1 * d_m[d_idx] * s_e[s_idx])
         fji = 1 - inprthsj / inbrktj
 
         # accelerations for velocity
@@ -437,9 +534,16 @@ class MomentumAndEnergy(Equation):
 
 
 class WallBoundary(Equation):
+    """
+        :class:`WallBoundary
+        <pysph.sph.gas_dynamics.boundary_equations.WallBoundary>` modified
+        for PSPH
+    """
+
     def initialize(self, d_idx, d_p, d_rho, d_e, d_m, d_cs, d_h,
                    d_htmp, d_h0, d_u, d_v, d_w, d_wij, d_n, d_dndh,
                    d_psumdh):
+
         d_p[d_idx] = 0.0
         d_u[d_idx] = 0.0
         d_v[d_idx] = 0.0
@@ -492,12 +596,17 @@ class WallBoundary(Equation):
 
 class UpdateGhostProps(Equation):
     def __init__(self, dest, sources=None, dim=2):
+        """
+        :class:`MPMUpdateGhostProps
+        <pysph.sph.gas_dynamics.basic.MPMUpdateGhostProps>` modified
+        for PSPH
+        """
         super().__init__(dest, sources)
         self.dim = dim
         assert GHOST_TAG == 2
 
     def initialize(self, d_idx, d_orig_idx, d_p, d_tag, d_h,
-                  d_rho, d_dndh, d_psumdh, d_n):
+                   d_rho, d_dndh, d_psumdh, d_n):
         idx = declare('int')
         if d_tag[d_idx] == 2:
             idx = d_orig_idx[d_idx]
@@ -507,4 +616,3 @@ class UpdateGhostProps(Equation):
             d_dndh[d_idx] = d_dndh[idx]
             d_psumdh[d_idx] = d_psumdh[idx]
             d_n[d_idx] = d_n[idx]
-

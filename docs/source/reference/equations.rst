@@ -59,6 +59,10 @@ Gas Dynamics
    :members:
    :undoc-members:
 
+.. automodule:: pysph.sph.gas_dynamics.boundary_equations
+   :members:
+   :undoc-members:
+   
 Surface tension
 ----------------
 
@@ -73,6 +77,16 @@ Implicit Incompressible SPH
    :members:
    :undoc-members:
 
+Hopkins' ‘Modern’ SPH (PSPH)
+--------------
+
+.. automodule:: pysph.sph.gas_dynamics.psph.scheme
+   :members:
+   :undoc-members:
+
+.. automodule:: pysph.sph.gas_dynamics.psph.equations
+   :members:
+   :undoc-members:
 
 Rigid body motion
 -----------------
@@ -91,7 +105,6 @@ Miscellaneous
 .. automodule:: pysph.base.reduce_array
    :members:
    :undoc-members:
-
 
 Group of equations
 -------------------

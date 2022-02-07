@@ -2,8 +2,8 @@
 """
 from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
 from pysph.sph.scheme import ADKEScheme, GasDScheme, GSPHScheme, SchemeChooser
+from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
 from pysph.sph.wc.crksph import CRKSPHScheme
-from pysph.sph.gas_dynamics.psph.psph_scheme import PSPHScheme
 from pysph.base.nnps import DomainManager
 
 # Numerical constants
@@ -101,7 +101,7 @@ class SodShockTube(ShockTubeSetup):
         )
         psph = PSPHScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            kernel_factor=None, betab=2.0
+            kernel_factor=None
         )
         s = SchemeChooser(
             default='adke', adke=adke, mpm=mpm, gsph=gsph, crk=crk, psph=psph

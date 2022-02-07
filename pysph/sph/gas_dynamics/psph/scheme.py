@@ -1,3 +1,20 @@
+"""
+References
+-----------
+
+    .. [CullenDehnen2010] Cullen, Lee, and Walter Dehnen. “Inviscid Smoothed 
+        Particle Hydrodynamics: Inviscid Smoothed Particle Hydrodynamics.” 
+        Monthly Notices of the Royal Astronomical Society 408, no. 2 
+        (October 21, 2010): 669–83. 
+        https://doi.org/10.1111/j.1365-2966.2010.17158.x.
+        
+    .. [ReadHayfield2012] Read, J. I., and T. Hayfield. “SPHS: Smoothed 
+        Particle Hydrodynamics with a Higher Order Dissipation Switch: 
+        SPH with a Higher Order Dissipation Switch.” Monthly Notices of the 
+        Royal Astronomical Society 422, no. 4 (June 1, 2012): 3037–55. 
+        https://doi.org/10.1111/j.1365-2966.2012.20819.x.
+    """
+
 from pysph.sph.scheme import Scheme
 
 
@@ -7,6 +24,56 @@ class PSPHScheme(Scheme):
                  density_iteration_tolerance=1e-3, has_ghosts=False,
                  alphamin=0.02, alphamax=2.0, betac=0.7, betad=0.05,
                  betaxi=1.0):
+        """
+        Pressure-energy formulation [Hopkins2013]_ including Cullen-Dehnen 
+        artificial viscocity switch [CullenDehnen2010]_ with modifications, 
+        as presented in Appendix F2 of [Hopkins2015]_ .
+
+        Parameters
+        ----------
+        fluids: list
+            List of names of fluid particle arrays.
+        solids: list
+            List of names of solid particle arrays (or boundaries), currently
+            not supported
+        dim: int
+            Dimensionality of the problem.
+        gamma: float
+            :math:`\\gamma` for Equation of state.
+        kernel_factor: float
+            :math:`h_{fact}` for smoothing length adaptivity, also referred to 
+            as kernel_factor in other gas dynamics schemes.
+        betab : float, optional
+            :math:`\\beta_b` for artificial viscosity, by default 2.0
+        fkern : float, optional
+            :math:`f_{kern}`, Factor to scale smoothing length for equivalence
+            with classic kernel when using kernel with altered 
+            `radius_scale` is being used, by default 1.
+        max_density_iterations : int, optional
+            Maximum number of iterations to run for one density step,
+            by default 250.
+        alphac : float, optional
+            :math:`\\alpha_c` for artificial conductivity, by default 0.25
+        density_iteration_tolerance : float, optional
+            Maximum difference allowed in two successive density iterations,
+            by default 1e-3
+        has_ghosts : bool, optional
+            if ghost particles (either mirror or periodic) is used, by default
+            False
+        alphamin : float, optional
+            :math:`\\alpha_{min}` for artificial viscosity switch, by default
+            0.02
+        alphamax : float, optional
+            :math:`\\alpha_{max}` for artificial viscosity switch, by default
+            2.0
+        betac : float, optional
+            :math:`\\beta_c` for artificial viscosity switch, by default 0.7
+        betad : float, optional
+            :math:`\\beta_d` for artificial viscosity switch, by default 0.05
+        betaxi : float, optional
+            :math:`\\beta_{\\xi}` for artificial viscosity switch,
+            by default 1.0
+        """
 
         self.fluids = fluids
         self.solids = solids
@@ -125,7 +192,6 @@ class PSPHScheme(Scheme):
             g2.append(GradientKinsfolkC1(dest=fluid,
                                          sources=self.fluids + self.solids,
                                          dim=self.dim, ))
-
             g2.append(SignalVelocity(dest=fluid,
                                      sources=self.fluids + self.solids, ))
         equations.append(Group(equations=g2))

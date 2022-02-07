@@ -2,7 +2,7 @@ from pysph.sph.integrator import IntegratorStep
 
 
 class PECStep(IntegratorStep):
-    """Predictor Corrector integrator for Gas-dynamics"""
+    """Predictor Corrector integrator for Gas-dynamics modified for PSPH"""
 
     def initialize(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z, d_h,
                    d_u0, d_v0, d_w0, d_u, d_v, d_w, d_e, d_e0, d_h0,
