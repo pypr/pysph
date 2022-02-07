@@ -9,7 +9,7 @@ GHOST_TAG = get_ghost_tag()
 
 class PSPHSummationDensityAndPressure(Equation):
     def __init__(self, dest, sources, dim, gamma, density_iterations=False,
-                 iterate_only_once=False, k=1.2, htol=1e-6):
+                 iterate_only_once=False, hfact=1.2, htol=1e-6):
         """
         :class:`SummationDensity 
         <pysph.sph.gas_dynamics.basic.SummationDensity>` modified to use
@@ -24,7 +24,7 @@ class PSPHSummationDensityAndPressure(Equation):
             Flag to indicate density iterations are required, by default False
         iterate_only_once : bint, optional
             Flag to indicate if only one iteration is required, by default False
-        k : float, optional
+        hfact : float, optional
             :math:`h_{fact}`, by default 1.2
         htol : double, optional
             Iteration tolerance, by default 1e-6
@@ -33,7 +33,7 @@ class PSPHSummationDensityAndPressure(Equation):
         self.density_iterations = density_iterations
         self.iterate_only_once = iterate_only_once
         self.dim = dim
-        self.k = k
+        self.hfact = hfact
         self.htol = htol
         self.equation_has_converged = 1
         self.gamma = gamma
@@ -102,7 +102,7 @@ class PSPHSummationDensityAndPressure(Equation):
                 hi0 = d_h0[d_idx]
 
                 # estimated, without summations
-                ni = (self.k / hi) ** self.dim
+                ni = (self.hfact / hi) ** self.dim
                 dndhi = - self.dim * d_n[d_idx] / hi
 
                 # correct fi TODO: Remove if not required

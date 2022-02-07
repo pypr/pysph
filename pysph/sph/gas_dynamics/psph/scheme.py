@@ -19,8 +19,8 @@ from pysph.sph.scheme import Scheme
 
 
 class PSPHScheme(Scheme):
-    def __init__(self, fluids, solids, dim, gamma, kernel_factor, betab=2.0,
-                 fkern=1.0, max_density_iterations=250, alphac=0.25,
+    def __init__(self, fluids, solids, dim, gamma, hfact, betab=2.0, fkern=1.0,
+                 max_density_iterations=250, alphac=0.25,
                  density_iteration_tolerance=1e-3, has_ghosts=False,
                  alphamin=0.02, alphamax=2.0, betac=0.7, betad=0.05,
                  betaxi=1.0):
@@ -40,7 +40,7 @@ class PSPHScheme(Scheme):
             Dimensionality of the problem.
         gamma: float
             :math:`\\gamma` for Equation of state.
-        kernel_factor: float
+        hfact: float
             :math:`h_{fact}` for smoothing length adaptivity, also referred to 
             as kernel_factor in other gas dynamics schemes.
         betab : float, optional
@@ -81,7 +81,7 @@ class PSPHScheme(Scheme):
         self.solver = None
         self.gamma = gamma
         self.betab = betab
-        self.kernel_factor = kernel_factor
+        self.hfact = hfact
         self.density_iteration_tolerance = density_iteration_tolerance
         self.max_density_iterations = max_density_iterations
         self.has_ghosts = has_ghosts
@@ -177,7 +177,7 @@ class PSPHScheme(Scheme):
             g1.append(PSPHSummationDensityAndPressure(
                 dest=fluid,
                 sources=self.fluids,
-                k=self.kernel_factor,
+                hfact=self.hfact,
                 density_iterations=True,
                 dim=self.dim,
                 htol=self.density_iteration_tolerance,
@@ -202,8 +202,7 @@ class PSPHScheme(Scheme):
                                        alphamin=self.alphamin,
                                        alphamax=self.alphamax,
                                        betac=self.betac, betad=self.betad,
-                                       betaxi=self.betaxi,
-                                       fkern=self.fkern))
+                                       betaxi=self.betaxi, fkern=self.fkern))
         equations.append(Group(equations=g3))
 
         g4 = []
@@ -221,9 +220,8 @@ class PSPHScheme(Scheme):
         for fluid in self.fluids:
             g5.append(MomentumAndEnergy(dest=fluid,
                                         sources=self.fluids + self.solids,
-                                        dim=self.dim,
-                                        betab=self.betab, fkern=self.fkern,
-                                        alphac=self.alphac,
+                                        dim=self.dim, betab=self.betab,
+                                        fkern=self.fkern, alphac=self.alphac,
                                         gamma=self.gamma))
 
         equations.append(Group(equations=g5))
