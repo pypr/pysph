@@ -140,6 +140,74 @@ class SummationDensity(Equation):
     def converged(self):
         return self.equation_has_converged
 
+
+class VelocityGradDivC1(Equation):
+    def __init__(self, dest, sources, dim):
+        """
+        First Order consistent velocity gradient and divergence
+        """
+        self.dim = dim
+        super().__init__(dest, sources)
+
+    def _get_helpers_(self):
+        return [augmented_matrix, gj_solve, identity, mat_mult]
+
+    def initialize(self, d_gradv, d_idx, d_invtt, d_divv):
+        start_indx, i, dim = declare('int', 3)
+        start_indx = 9 * d_idx
+
+        for i in range(9):
+            d_gradv[start_indx + i] = 0.0
+            d_invtt[start_indx + i] = 0.0
+
+        d_divv[d_idx] = 0.0
+
+    def loop(self, d_idx, d_invtt, s_m, s_idx, VIJ, DWI, XIJ, d_gradv):
+        start_indx, row, col, drowcol, dim = declare('int', 5)
+        dim = self.dim
+        start_indx = d_idx * 9
+        for row in range(dim):
+            for col in range(dim):
+                drowcol = start_indx + row * 3 + col
+                d_invtt[drowcol] -= s_m[s_idx] * XIJ[row] * DWI[col]
+                d_gradv[drowcol] -= s_m[s_idx] * VIJ[row] * DWI[col]
+
+    def post_loop(self, d_idx, d_gradv, d_invtt, d_divv):
+        tt, invtt, idmat, gradv = declare('matrix(9)', 4)
+        augtt = declare('matrix(18)')
+
+        start_indx, row, col, rowcol, drowcol, dim = declare('int', 6)
+
+        dim = self.dim
+        start_indx = 9 * d_idx
+        identity(idmat, 3)
+        identity(tt, 3)
+
+        for row in range(3):
+            for col in range(3):
+                rowcol = row * 3 + col
+                drowcol = start_indx + rowcol
+                gradv[rowcol] = d_gradv[drowcol]
+
+        for row in range(dim):
+            for col in range(dim):
+                rowcol = row * 3 + col
+                drowcol = start_indx + rowcol
+                tt[rowcol] = d_invtt[drowcol]
+
+        augmented_matrix(tt, idmat, 3, 3, 3, augtt)
+        gj_solve(augtt, 3, 3, invtt)
+        gradvls = declare('matrix(9)')
+        mat_mult(gradv, invtt, 3, gradvls)
+
+        for row in range(dim):
+            d_divv[d_idx] += gradvls[row * 3 + row]
+            for col in range(dim):
+                rowcol = row * 3 + col
+                drowcol = start_indx + rowcol
+                d_gradv[drowcol] = gradvls[rowcol]
+
+
 class TSPHMomentumAndEnergy(Equation):
     def __init__(self, dest, sources, dim, fkern, beta=2.0):
         self.beta = beta
@@ -290,66 +358,3 @@ class BalsaraSwitch(Equation):
         # integrator's initialise is before compute_accelerations.
         # So, d_alpha1[d_idx] is always rewritten to zero. To avoid this,
         d_alpha10[d_idx] = d_alpha1[d_idx]
-
-
-class VelocityGradDivC1(Equation):
-    def __init__(self, dest, sources, dim):
-        self.dim = dim
-        super().__init__(dest, sources)
-
-    def _get_helpers_(self):
-        return [augmented_matrix, gj_solve, identity, mat_mult]
-
-    def initialize(self, d_gradv, d_idx, d_invtt, d_divv):
-        start_indx, i, dim = declare('int', 3)
-        start_indx = 9 * d_idx
-        for i in range(9):
-            d_gradv[start_indx + i] = 0.0
-            d_invtt[start_indx + i] = 0.0
-        d_divv[d_idx] = 0.0
-
-    def loop(self, d_idx, d_invtt, s_m, s_idx, VIJ, DWI, XIJ, d_gradv):
-        start_indx, row, col, drowcol, dim = declare('int', 5)
-        dim = self.dim
-        start_indx = d_idx * 9
-        for row in range(dim):
-            for col in range(dim):
-                drowcol = start_indx + row * 3 + col
-                d_invtt[drowcol] -= s_m[s_idx] * XIJ[row] * DWI[col]
-                d_gradv[drowcol] -= s_m[s_idx] * VIJ[row] * DWI[col]
-
-    def post_loop(self, d_idx, d_gradv, d_invtt, d_divv):
-        tt = declare('matrix(9)')
-        invtt = declare('matrix(9)')
-        augtt = declare('matrix(18)')
-        idmat = declare('matrix(9)')
-        gradv = declare('matrix(9)')
-        start_indx, row, col, rowcol, drowcol, dim = declare('int', 6)
-        dim = self.dim
-        start_indx = 9 * d_idx
-        identity(idmat, 3)
-        identity(tt, 3)
-
-        for row in range(3):
-            for col in range(3):
-                rowcol = row * 3 + col
-                drowcol = start_indx + rowcol
-                gradv[rowcol] = d_gradv[drowcol]
-
-        for row in range(dim):
-            for col in range(dim):
-                rowcol = row * 3 + col
-                drowcol = start_indx + rowcol
-                tt[rowcol] = d_invtt[drowcol]
-
-        augmented_matrix(tt, idmat, 3, 3, 3, augtt)
-        gj_solve(augtt, 3, 3, invtt)
-        gradvls = declare('matrix(9)')
-        mat_mult(gradv, invtt, 3, gradvls)
-
-        for row in range(dim):
-            d_divv[d_idx] += gradvls[row * 3 + row]
-            for col in range(dim):
-                rowcol = row * 3 + col
-                drowcol = start_indx + rowcol
-                d_gradv[drowcol] = gradvls[rowcol]

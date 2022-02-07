@@ -101,9 +101,9 @@ class TSPHScheme(Scheme):
         from pysph.sph.equation import Group
         from pysph.sph.gas_dynamics.basic import (IdealGasEOS,
                                                   MPMUpdateGhostProps)
-        from .equations import (SummationDensity, TSPHMomentumAndEnergy,
-                                VelocityGradDivC1, MorrisMonaghanSwitch,
-                                BalsaraSwitch)
+        from pysph.sph.gas_dynamics.tsph.equations import (
+            SummationDensity, TSPHMomentumAndEnergy, VelocityGradDivC1,
+            MorrisMonaghanSwitch, BalsaraSwitch)
         from pysph.sph.gas_dynamics.boundary_equations import WallBoundary
 
         equations = []
