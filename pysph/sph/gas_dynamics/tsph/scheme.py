@@ -102,7 +102,7 @@ class TSPHScheme(Scheme):
         from pysph.sph.gas_dynamics.basic import (IdealGasEOS,
                                                   MPMUpdateGhostProps)
         from pysph.sph.gas_dynamics.tsph.equations import (
-            SummationDensity, TSPHMomentumAndEnergy, VelocityGradDivC1,
+            SummationDensity, MomentumAndEnergy, VelocityGradDivC1,
             BalsaraSwitch)
         from pysph.sph.gas_dynamics.boundary_equations import WallBoundary
 
@@ -159,7 +159,7 @@ class TSPHScheme(Scheme):
 
         g4 = []
         for fluid in self.fluids:
-            g4.append(TSPHMomentumAndEnergy(
+            g4.append(MomentumAndEnergy(
                 dest=fluid, sources=self.fluids + self.solids,
                 dim=self.dim,
                 beta=self.beta,

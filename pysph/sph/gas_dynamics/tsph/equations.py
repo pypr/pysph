@@ -235,20 +235,56 @@ class BalsaraSwitch(Equation):
                 absdivv + abscurlv + 0.0001 * d_cs[d_idx] / fhi)
 
 
-class TSPHMomentumAndEnergy(Equation):
+class MomentumAndEnergy(Equation):
     def __init__(self, dest, sources, dim, fkern, beta=2.0):
+        r"""
+        TSPH Momentum and Energy Equations with artificial viscosity.
+
+        Possible typo in that has been taken care of:
+
+        Instead of Equation F3 [Hopkins2015]_ for evolution of total
+        energy sans artificial viscosity and artificial conductivity,
+
+            .. math::
+                \frac{\mathrm{d} E}{\mathrm{~d} t}=\boldsymbol{v}_{i}
+                \cdot \frac{\mathrm{d} \boldsymbol{P}_{i}}{\mathrm{~d} t}-
+                \sum_{j} m_{i} m_{j}\left(\boldsymbol{v}_{i}-
+                \boldsymbol{v}_{j}\right) \cdot\left[\frac{P_{i}}
+                {\bar{\rho}_{i}^{2}} f_{i, j} \nabla_{i}
+                W_{i j}\left(h_{i}\right)\right]
+
+           it should have been,
+
+            .. math::
+                \frac{\mathrm{d} E}{\mathrm{~d} t}=\boldsymbol{v}_{i}
+                \cdot \frac{\mathrm{d} \boldsymbol{P}_{i}}{\mathrm{~d} t}+
+                \sum_{j} m_{i} m_{j}\left(\boldsymbol{v}_{i}-
+                \boldsymbol{v}_{j}\right) \cdot\left[\frac{P_{i}}
+                {\bar{\rho}_{i}^{2}} f_{i, j} \nabla_{i}
+                W_{i j}\left(h_{i}\right)\right]
+
+           Specific thermal energy, :math:`u`, would therefore be evolved
+           using,
+
+            .. math::
+                \frac{\mathrm{d} E}{\mathrm{~d} t}=
+                \sum_{j} m_{i} m_{j}\left(\boldsymbol{v}_{i}-
+                \boldsymbol{v}_{j}\right) \cdot\left[\frac{P_{i}}
+                {\bar{\rho}_{i}^{2}} f_{i, j} \nabla_{i}
+                W_{i j}\left(h_{i}\right)\right]
+        """
         self.beta = beta
         self.dim = dim
         self.fkern = fkern
         super().__init__(dest, sources)
 
-    def initialize(self, d_idx, d_au, d_av, d_aw, d_ae, d_dt_cfl):
+    def initialize(self, d_idx, d_au, d_av, d_aw, d_ae):
         d_au[d_idx] = 0.0
         d_av[d_idx] = 0.0
         d_aw[d_idx] = 0.0
         d_ae[d_idx] = 0.0
 
-        d_dt_cfl[d_idx] = 0.0
+        # d_dt_cfl[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_m, s_m, d_p, s_p, d_cs, s_cs, d_rho, s_rho,
              d_au, d_av, d_aw, d_ae, XIJ, VIJ, DWI, DWJ, HIJ, d_alpha,
@@ -276,16 +312,16 @@ class TSPHMomentumAndEnergy(Equation):
         hij = self.fkern * HIJ
         vijdotxij = VIJ[0] * XIJ[0] + VIJ[1] * XIJ[1] + VIJ[2] * XIJ[2]
 
-        # normalized interaction vector
-        if RIJ < 1e-8:
-            XIJ[0] = 0.0
-            XIJ[1] = 0.0
-            XIJ[2] = 0.0
-        else:
-            XIJ[0] /= RIJ
-            XIJ[1] /= RIJ
-            XIJ[2] /= RIJ
-
+        # # normalized interaction vector
+        # if RIJ < 1e-8:
+        #     XIJ[0] = 0.0
+        #     XIJ[1] = 0.0
+        #     XIJ[2] = 0.0
+        # else:
+        #     XIJ[0] /= RIJ
+        #     XIJ[1] /= RIJ
+        #     XIJ[2] /= RIJ
+        #
         # Is this really reqd?
         # # v_{ij} \cdot r_{ij} or vijdotxij
         # dot = VIJ[0] * XIJ[0] + VIJ[1] * XIJ[1] + VIJ[2] * XIJ[2]
@@ -308,17 +344,18 @@ class TSPHMomentumAndEnergy(Equation):
             d_aw[d_idx] += aawi
 
             # viscous contribution to the thermal energy
-            d_ae[d_idx] -= 0.5 * (
-                    VIJ[0] * aaui + VIJ[1] * aavi + VIJ[2] * aawi)
+            d_ae[d_idx] -= 0.5 * (VIJ[0] * aaui +
+                                  VIJ[1] * aavi +
+                                  VIJ[2] * aawi)
 
         # grad-h correction terms.
         hibynidim = d_h[d_idx] / (d_n[d_idx] * dim)
-        inbrkti = 1 + d_dndh[d_idx] * d_h[d_idx] * hibynidim
+        inbrkti = 1 + d_dndh[d_idx] * hibynidim
         inprthsi = d_drhosumdh[d_idx] * hibynidim
         fij = 1 - inprthsi / (s_m[s_idx] * inbrkti)
 
         hjbynjdim = s_h[s_idx] / (s_n[s_idx] * dim)
-        inbrktj = 1 + s_dndh[s_idx] * s_h[s_idx] * hjbynjdim
+        inbrktj = 1 + s_dndh[s_idx] * hjbynjdim
         inprthsj = s_drhosumdh[s_idx] * hibynidim
         fji = 1 - inprthsj / (d_m[d_idx] * inbrktj)
 
