@@ -1,10 +1,65 @@
-from pysph.sph.scheme import Scheme, add_bool_argument
+"""
+References
+-----------
+
+    .. [Hopkins2013] Hopkins, Philip F. “A General Class of Lagrangian
+        Smoothed Particle Hydrodynamics Methods and Implications for Fluid
+        Mixing Problems.” Monthly Notices of the Royal Astronomical Society
+        428, no. 4 (February 1, 2013): 2840–56.
+        https://doi.org/10.1093/mnras/sts210.
+
+    .. [Hopkins2015] Hopkins, Philip F. “A New Class of Accurate,
+        Mesh-Free Hydrodynamic Simulation Methods.” Monthly Notices of the
+        Royal Astronomical Society 450, no. 1 (June 11, 2015): 53–110.
+        https://doi.org/10.1093/mnras/stv195.
+"""
+
+from pysph.sph.scheme import Scheme
 
 
 class TSPHScheme(Scheme):
     def __init__(self, fluids, solids, dim, gamma, hfact,
                  beta=2.0, fkern=1.0, max_density_iterations=250, alphaav=1.0,
                  density_iteration_tolerance=1e-3, has_ghosts=False):
+        """
+        Density-energy formulation [Hopkins2013]_ including Balsara's
+        artificial viscocity switch with modifications,
+        as presented in Appendix F2 of [Hopkins2015]_ .
+
+        Parameters
+        ----------
+        fluids: list
+            List of names of fluid particle arrays.
+        solids: list
+            List of names of solid particle arrays (or boundaries), currently
+            not supported
+        dim: int
+            Dimensionality of the problem.
+        gamma: float
+            :math:`\\gamma` for Equation of state.
+        hfact: float
+            :math:`h_{fact}` for smoothing length adaptivity, also referred to
+            as kernel_factor in other gas dynamics schemes.
+        beta : float, optional
+            :math:`\\beta` for artificial viscosity, by default 2.0
+        fkern : float, optional
+            :math:`f_{kern}`, Factor to scale smoothing length for equivalence
+            with classic kernel when using kernel with altered
+            `radius_scale` is being used, by default 1.
+        max_density_iterations : int, optional
+            Maximum number of iterations to run for one density step,
+            by default 250.
+        density_iteration_tolerance : float, optional
+            Maximum difference allowed in two successive density iterations,
+            by default 1e-3
+        has_ghosts : bool, optional
+            if ghost particles (either mirror or periodic) is used, by default
+            False
+        alphaav : float, optional
+            :math:`\\alpha_{av}` for artificial viscosity switch, by default
+            1.0
+        """
+
 
         self.fluids = fluids
         self.solids = solids

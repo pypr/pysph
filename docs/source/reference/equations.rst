@@ -73,6 +73,16 @@ Implicit Incompressible SPH
    :members:
    :undoc-members:
 
+Hopkins' ‘Traditional’ SPH (TSPH)
+--------------
+
+.. automodule:: pysph.sph.gas_dynamics.tsph.scheme
+   :members:
+   :undoc-members:
+
+.. automodule:: pysph.sph.gas_dynamics.tsph.equations
+   :members:
+   :undoc-members:
 
 Rigid body motion
 -----------------

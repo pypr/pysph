@@ -16,16 +16,6 @@ class SummationDensity(Equation):
         number density for calculation of grad-h terms.
 
         Ref. Appendix F1 [Hopkins2015]_
-        Parameters
-        ----------
-        density_iterations : bint, optional
-            Flag to indicate density iterations are required, by default False
-        iterate_only_once : bint, optional
-            Flag to indicate if only one iteration is required, by default False
-        hfact : float, optional
-            :math:`h_{fact}`, by default 1.2
-        htol : double, optional
-            Iteration tolerance, by default 1e-6
         """
 
         self.density_iterations = density_iterations
