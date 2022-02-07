@@ -103,7 +103,7 @@ class TSPHScheme(Scheme):
                                                   MPMUpdateGhostProps)
         from pysph.sph.gas_dynamics.tsph.equations import (
             SummationDensity, TSPHMomentumAndEnergy, VelocityGradDivC1,
-            MorrisMonaghanSwitch, BalsaraSwitch)
+            BalsaraSwitch)
         from pysph.sph.gas_dynamics.boundary_equations import WallBoundary
 
         equations = []
@@ -134,20 +134,14 @@ class TSPHScheme(Scheme):
             g5.append(VelocityGradDivC1(dest=fluid,
                                         sources=self.fluids + self.solids,
                                         dim=self.dim))
-            if self.av_switch == 'balsara':
-                g5.append(BalsaraSwitch(
-                    dest=fluid,
-                    sources=None,
-                    alphaav=self.alphaav,
-                    fkern=self.fkern
-                ))
-            elif self.av_switch == 'morris-monaghan':
-                g5.append(MorrisMonaghanSwitch(
-                    dest=fluid,
-                    sources=None,
-                    alpha1_min=self.alpha1,
-                    sigma=0.1
-                ))
+
+            g5.append(BalsaraSwitch(
+                dest=fluid,
+                sources=None,
+                alphaav=self.alphaav,
+                fkern=self.fkern
+            ))
+
         equations.append(Group(equations=g5))
 
         g3 = []
@@ -183,7 +177,8 @@ class TSPHScheme(Scheme):
         props = ['rho', 'm', 'x', 'y', 'z', 'u', 'v', 'w', 'h', 'cs', 'p', 'e',
                  'au', 'av', 'aw', 'ae', 'pid', 'gid', 'tag', 'dwdh', 'alpha1',
                  'aalpha1', 'alpha10', 'h0', 'converged', 'ah', 'arho',
-                 'dt_cfl', 'e0', 'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0']
+                 'dt_cfl', 'e0', 'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0',
+                 'alpha']
         more_props = ['drhosumdh', 'n', 'dndh', 'prevn', 'prevdndh',
                       'prevdrhosumdh', 'divv', 'an']
         props.extend(more_props)

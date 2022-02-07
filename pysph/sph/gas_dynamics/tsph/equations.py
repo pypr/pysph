@@ -207,6 +207,33 @@ class VelocityGradDivC1(Equation):
                 drowcol = start_indx + rowcol
                 d_gradv[drowcol] = gradvls[rowcol]
 
+class BalsaraSwitch(Equation):
+    def __init__(self, dest, sources, alphaav, fkern):
+        self.alphaav = alphaav
+        self.fkern = fkern
+        super().__init__(dest, sources)
+
+    def post_loop(self, d_h, d_idx, d_cs, d_divv, d_gradv, d_alpha):
+        curlv = declare('matrix(3)')
+
+        curlv[0] = (d_gradv[9 * d_idx + 3 * 2 + 1] -
+                    d_gradv[9 * d_idx + 3 * 1 + 2])
+        curlv[1] = (d_gradv[9 * d_idx + 3 * 0 + 2] -
+                    d_gradv[9 * d_idx + 3 * 2 + 0])
+        curlv[2] = (d_gradv[9 * d_idx + 3 * 1 + 0] -
+                    d_gradv[9 * d_idx + 3 * 0 + 1])
+
+        abscurlv = sqrt(curlv[0] * curlv[0] +
+                        curlv[1] * curlv[1] +
+                        curlv[2] * curlv[2])
+
+        absdivv = abs(d_divv[d_idx])
+
+        fhi = d_h[d_idx] * self.fkern
+
+        d_alpha[d_idx] = self.alphaav * absdivv / (
+                absdivv + abscurlv + 0.0001 * d_cs[d_idx] / fhi)
+
 
 class TSPHMomentumAndEnergy(Equation):
     def __init__(self, dest, sources, dim, fkern, beta=2.0):
@@ -224,8 +251,8 @@ class TSPHMomentumAndEnergy(Equation):
         d_dt_cfl[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_m, s_m, d_p, s_p, d_cs, s_cs, d_rho, s_rho,
-             d_au, d_av, d_aw, d_ae, XIJ, VIJ, DWI, DWJ, HIJ, d_alpha1,
-             s_alpha1, RIJ, R2IJ, RHOIJ, d_h, d_dndh, d_n,
+             d_au, d_av, d_aw, d_ae, XIJ, VIJ, DWI, DWJ, HIJ, d_alpha,
+             s_alpha, RIJ, R2IJ, RHOIJ, d_h, d_dndh, d_n,
              d_drhosumdh, s_h, s_dndh, s_n, s_drhosumdh):
 
         dim = self.dim
@@ -269,9 +296,9 @@ class TSPHMomentumAndEnergy(Equation):
         # Artificial viscosity
         if vijdotxij <= 0.0:
             # viscosity
-            alpha1 = 0.5 * (d_alpha1[d_idx] + s_alpha1[s_idx])
+            alpha = 0.5 * (d_alpha[d_idx] + s_alpha[s_idx])
             muij = hij * vijdotxij / (R2IJ + 0.0001 * hij ** 2)
-            common = alpha1 * muij * (cij - 2 * muij) * mj / (2 * RHOIJ)
+            common = alpha * muij * (cij - 2 * muij) * mj / (2 * RHOIJ)
 
             aaui = common * (DWI[0] + DWJ[0])
             aavi = common * (DWI[1] + DWJ[1])
@@ -306,55 +333,3 @@ class TSPHMomentumAndEnergy(Equation):
         # accelerations for the thermal energy
         vijdotdwi = VIJ[0] * DWI[0] + VIJ[1] * DWI[1] + VIJ[2] * DWI[2]
         d_ae[d_idx] += mj * pibrhoi2 * fij * vijdotdwi
-
-
-class MorrisMonaghanSwitch(Equation):
-    def __init__(self, dest, sources, alpha1_min=0.1, sigma=0.1):
-        self.sigma = sigma
-        self.alpha1_min = alpha1_min
-        super().__init__(dest, sources)
-
-    def post_loop(self, d_h, d_idx, d_cs, d_divv, d_aalpha1, d_alpha1):
-        hi = d_h[d_idx]
-        tau = hi / (self.sigma * d_cs[d_idx])
-
-        S1 = max(-d_divv[d_idx], 0.0)
-        d_aalpha1[d_idx] = (self.alpha1_min - d_alpha1[d_idx]) / tau + S1
-
-
-class BalsaraSwitch(Equation):
-    def __init__(self, dest, sources, alphaav, fkern):
-        self.alphaav = alphaav
-        self.fkern = fkern
-        super().__init__(dest, sources)
-
-    def post_loop(self, d_h, d_idx, d_cs, d_divv, d_gradv, d_alpha1, dt,
-                  d_aalpha1, d_alpha10, d_arho, d_rho):
-        curlv = declare('matrix(3)')
-
-        curlv[0] = (d_gradv[9 * d_idx + 3 * 2 + 1] -
-                    d_gradv[9 * d_idx + 3 * 1 + 2])
-        curlv[1] = (d_gradv[9 * d_idx + 3 * 0 + 2] -
-                    d_gradv[9 * d_idx + 3 * 2 + 0])
-        curlv[2] = (d_gradv[9 * d_idx + 3 * 1 + 0] -
-                    d_gradv[9 * d_idx + 3 * 0 + 1])
-
-        abscurlv = sqrt(curlv[0] * curlv[0] +
-                        curlv[1] * curlv[1] +
-                        curlv[2] * curlv[2])
-
-        absdivv = abs(d_divv[d_idx])
-
-        fhi = d_h[d_idx] * self.fkern
-
-        d_alpha1[d_idx] = self.alphaav * absdivv / (
-                absdivv + abscurlv + 0.0001 * d_cs[d_idx] / 1e-3)
-
-        # Just to keep stage 2 of PEC happy
-        # ---------------------------------
-        # stage 2 of GasDFluidStep does,
-        # d_alpha1[d_idx] = d_alpha10[d_idx] + dt*d_aalpha1[d_idx]
-        # d_aalpha1 is already 0. d_alpha10[d_idx] is also 0 as the
-        # integrator's initialise is before compute_accelerations.
-        # So, d_alpha1[d_idx] is always rewritten to zero. To avoid this,
-        d_alpha10[d_idx] = d_alpha1[d_idx]
