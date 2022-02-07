@@ -175,12 +175,11 @@ class TSPHScheme(Scheme):
         particle_arrays = dict([(p.name, p) for p in particles])
 
         props = ['rho', 'm', 'x', 'y', 'z', 'u', 'v', 'w', 'h', 'cs', 'p', 'e',
-                 'au', 'av', 'aw', 'ae', 'pid', 'gid', 'tag', 'dwdh', 'alpha1',
-                 'aalpha1', 'alpha10', 'h0', 'converged', 'ah', 'arho',
-                 'dt_cfl', 'e0', 'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0',
-                 'alpha']
+                 'au', 'av', 'aw', 'ae', 'pid', 'gid', 'tag', 'dwdh', 'h0',
+                 'converged', 'ah', 'arho', 'dt_cfl', 'e0', 'rho0', 'u0', 'v0',
+                 'w0', 'x0', 'y0', 'z0', 'alpha']
         more_props = ['drhosumdh', 'n', 'dndh', 'prevn', 'prevdndh',
-                      'prevdrhosumdh', 'divv', 'an']
+                      'prevdrhosumdh', 'divv', 'an', 'n0']
         props.extend(more_props)
         output_props = []
         for fluid in self.fluids:
