@@ -2,28 +2,23 @@ from pysph.sph.scheme import Scheme
 
 
 class PSPHScheme(Scheme):
-    def __init__(self, fluids, solids, dim, gamma, kernel_factor, alpha1=1.0,
-                 alpha2=0.0, betab=2.0, update_alpha2=False, fkern=1.0,
-                 max_density_iterations=250, alphaav=1.0, alphac=0.25,
+    def __init__(self, fluids, solids, dim, gamma, kernel_factor, betab=2.0,
+                 fkern=1.0, max_density_iterations=250, alphac=0.25,
                  density_iteration_tolerance=1e-3, has_ghosts=False,
-                 alphamin=0.02, alphamax=2.0, betac=0.7,
-                 betad=0.05, betaxi=1.0):
+                 alphamin=0.02, alphamax=2.0, betac=0.7, betad=0.05,
+                 betaxi=1.0):
 
         self.fluids = fluids
         self.solids = solids
         self.dim = dim
         self.solver = None
         self.gamma = gamma
-        self.alpha1 = alpha1
-        self.alpha2 = alpha2
-        self.update_alpha2 = update_alpha2
         self.betab = betab
         self.kernel_factor = kernel_factor
         self.density_iteration_tolerance = density_iteration_tolerance
         self.max_density_iterations = max_density_iterations
         self.has_ghosts = has_ghosts
         self.fkern = fkern
-        self.alphaav = alphaav
         self.alphac = alphac
         self.alphamin = alphamin
         self.alphamax = alphamax
@@ -31,32 +26,41 @@ class PSPHScheme(Scheme):
         self.betad = betad
         self.betaxi = betaxi
 
-
     def add_user_options(self, group):
+        group.add_argument("--alphamax", action="store", type=float,
+                           dest="alphamax", default=None,
+                           help="alpha_max for artificial viscosity switch. ")
 
-        group.add_argument(
-            "--alpha1", action="store", type=float, dest="alpha1",
-            default=None,
-            help="Alpha1 for the artificial viscosity."
-        )
-        group.add_argument(
-            "--betab", action="store", type=float, dest="betab",
-            default=None,
-            help="Beta for the artificial viscosity."
-        )
-        group.add_argument(
-            "--alpha2", action="store", type=float, dest="alpha2",
-            default=None,
-            help="Alpha2 for artificial viscosity"
-        )
-        group.add_argument(
-            "--gamma", action="store", type=float, dest="gamma",
-            default=None,
-            help="Gamma for the state equation."
-        )
+        group.add_argument("--alphamin", action="store", type=float,
+                           dest="alphamin", default=None,
+                           help="alpha_min for artificial viscosity switch. ")
+
+        group.add_argument("--betab", action="store", type=float, dest="betab",
+                           default=None,
+                           help="beta for the artificial viscosity.")
+
+        group.add_argument("--betaxi", action="store", type=float,
+                           dest="betaxi", default=None,
+                           help="beta_xi for artificial viscosity switch.")
+
+        group.add_argument("--betad", action="store", type=float, dest="betad",
+                           default=None,
+                           help="beta_d for artificial viscosity switch.")
+
+        group.add_argument("--betac", action="store", type=float, dest="betac",
+                           default=None,
+                           help="beta_c for artificial viscosity switch.")
+
+        group.add_argument("--alphac", action="store", type=float,
+                           dest="alphac", default=None,
+                           help="alpha_c for artificial conductivity. ")
+
+        group.add_argument("--gamma", action="store", type=float, dest="gamma",
+                           default=None, help="Gamma for the state equation.")
 
     def consume_user_options(self, options):
-        vars = ['gamma', 'alpha2', 'alpha1', 'betab']
+        vars = 'gamma alphamax alphamin alphac betab betaxi betad ' \
+               'betac'.split(' ')
         data = dict((var, self._smart_getattr(options, var)) for var in vars)
         self.configure(**data)
 
@@ -96,53 +100,44 @@ class PSPHScheme(Scheme):
         from pysph.sph.gas_dynamics.psph.equations import (
             PSPHSummationDensityAndPressure, GradientKinsfolkC1,
             SignalVelocity, LimiterAndAlphas, MomentumAndEnergy, WallBoundary,
-            UpdateGhostProps
-        )
+            UpdateGhostProps)
 
         equations = []
         # Find the optimal 'h'
 
         g1 = []
         for fluid in self.fluids:
-            g1.append(
-                PSPHSummationDensityAndPressure(
-                    dest=fluid, sources=self.fluids, k=self.kernel_factor,
-                    density_iterations=True, dim=self.dim,
-                    htol=self.density_iteration_tolerance, gamma=self.gamma
-                )
-            )
+            g1.append(PSPHSummationDensityAndPressure(
+                dest=fluid,
+                sources=self.fluids,
+                k=self.kernel_factor,
+                density_iterations=True,
+                dim=self.dim,
+                htol=self.density_iteration_tolerance,
+                gamma=self.gamma))
 
-            equations.append(Group(
-                equations=g1, update_nnps=True, iterate=True,
-                max_iterations=self.max_density_iterations
-            ))
+            equations.append(
+                Group(equations=g1, update_nnps=True, iterate=True,
+                      max_iterations=self.max_density_iterations))
 
         g2 = []
         for fluid in self.fluids:
-            g2.append(GradientKinsfolkC1(
-                dest=fluid,
-                sources=self.fluids + self.solids,
-                dim=self.dim,
-            ))
+            g2.append(GradientKinsfolkC1(dest=fluid,
+                                         sources=self.fluids + self.solids,
+                                         dim=self.dim, ))
 
-            g2.append(SignalVelocity(
-                dest=fluid,
-                sources=self.fluids + self.solids,
-            ))
+            g2.append(SignalVelocity(dest=fluid,
+                                     sources=self.fluids + self.solids, ))
         equations.append(Group(equations=g2))
 
         g3 = []
         for fluid in self.fluids:
-            g3.append(LimiterAndAlphas(
-                dest=fluid,
-                sources=self.fluids,
-                alphamin=self.alphamin,
-                alphamax=self.alphamax,
-                betac=self.betac,
-                betad=self.betad,
-                betaxi=self.betaxi,
-                fkern=self.fkern
-            ))
+            g3.append(LimiterAndAlphas(dest=fluid, sources=self.fluids,
+                                       alphamin=self.alphamin,
+                                       alphamax=self.alphamax,
+                                       betac=self.betac, betad=self.betad,
+                                       betaxi=self.betaxi,
+                                       fkern=self.fkern))
         equations.append(Group(equations=g3))
 
         g4 = []
@@ -153,21 +148,17 @@ class PSPHScheme(Scheme):
         if self.has_ghosts:
             gh = []
             for fluid in self.fluids:
-                gh.append(
-                    UpdateGhostProps(dest=fluid, sources=None)
-                )
+                gh.append(UpdateGhostProps(dest=fluid, sources=None))
             equations.append(Group(equations=gh, real=False))
 
         g5 = []
         for fluid in self.fluids:
-            g5.append(MomentumAndEnergy(
-                dest=fluid, sources=self.fluids + self.solids,
-                dim=self.dim,
-                betab=self.betab,
-                fkern=self.fkern,
-                alphac=self.alphac,
-                gamma=self.gamma
-            ))
+            g5.append(MomentumAndEnergy(dest=fluid,
+                                        sources=self.fluids + self.solids,
+                                        dim=self.dim,
+                                        betab=self.betab, fkern=self.fkern,
+                                        alphac=self.alphac,
+                                        gamma=self.gamma))
 
         equations.append(Group(equations=g5))
 
