@@ -25,6 +25,8 @@ from pysph.solver.application import Application
 from pysph.sph.scheme import \
     GSPHScheme, ADKEScheme, GasDScheme, SchemeChooser
 from pysph.sph.wc.crksph import CRKSPHScheme
+from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
+from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
 
 
 class AcousticWave(Application):
@@ -113,8 +115,18 @@ class AcousticWave(Application):
             alpha=0, beta=0.0, k=1.5, eps=0.0, g1=0.0, g2=0.0,
             has_ghosts=True)
 
+        psph = PSPHScheme(
+            fluids=['fluid'], solids=[], dim=self.dim, gamma=self.gamma,
+            hfact=1.2
+        )
+
+        tsph = TSPHScheme(
+            fluids=['fluid'], solids=[], dim=self.dim, gamma=self.gamma,
+            hfact=1.2)
+
         s = SchemeChooser(
-            default='gsph', gsph=gsph, mpm=mpm, crksph=crksph, adke=adke
+            default='gsph', gsph=gsph, mpm=mpm, crksph=crksph, adke=adke,
+            psph=psph, tsph=tsph
         )
 
         return s
@@ -127,20 +139,26 @@ class AcousticWave(Application):
                 adaptive_timestep=True, pfreq=50
             )
 
-        if self.options.scheme == 'mpm':
+        elif self.options.scheme == 'mpm':
             s.configure(kernel_factor=1.2)
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=50)
 
-        if self.options.scheme == 'crksph':
+        elif self.options.scheme == 'crksph':
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=50)
 
-        if self.options.scheme == 'adke':
+        elif self.options.scheme == 'adke':
+            s.configure_solver(dt=self.dt, tf=self.tf,
+                               adaptive_timestep=False, pfreq=50)
+
+        elif self.options.scheme in ['tsph', 'psph']:
+            s.configure(hfact=1.2)
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=50)
 
     def post_process(self):
+        import os
         from pysph.solver.utils import load
         if len(self.output_files) < 1:
             return
@@ -169,6 +187,8 @@ class AcousticWave(Application):
         )
         l1 = l1 / self.n_particles
         print("l_1 norm of density for the problem: %s" % (l1))
+        fname = os.path.join(self.output_dir, 'norms.npz')
+        numpy.savez(fname, linf_vel=l_inf, l1_vel=l_1, l1_rho=l1)
 
 
 if __name__ == "__main__":
