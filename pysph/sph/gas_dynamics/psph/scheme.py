@@ -240,7 +240,7 @@ class PSPHScheme(Scheme):
                       'prevdrhosumdh', 'divv', 'dpsumdh', 'dprevpsumdh', 'an',
                       'adivv', 'trssdsst', 'vsig', 'alpha', 'alpha0', 'xi']
         props.extend(more_props)
-        output_props = []
+        output_props = 'rho p u v w x y z e n divv h alpha'.split(' ')
         for fluid in self.fluids:
             pa = particle_arrays[fluid]
             self._ensure_properties(pa, props, clean)

@@ -201,7 +201,7 @@ class TSPHScheme(Scheme):
         more_props = ['drhosumdh', 'n', 'dndh', 'prevn', 'prevdndh',
                       'prevdrhosumdh', 'divv', 'an', 'n0']
         props.extend(more_props)
-        output_props = []
+        output_props = 'rho p u v w x y z e n divv h alpha'.split(' ')
         for fluid in self.fluids:
             pa = particle_arrays[fluid]
             self._ensure_properties(pa, props, clean)
