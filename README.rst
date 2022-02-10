@@ -219,6 +219,25 @@ There are many more examples, they can be listed by simply running::
     $ pysph run
 
 
+Works using PySPH
+-----------------
+
+The following are some of the works that use PySPH,
+
+- Adaptive SPH method: https://gitlab.com/pypr/adaptive_sph
+- Adaptive SPH method applied to moving bodies: https://gitlab.com/pypr/asph_motion
+- Convergence of the SPH method: https://gitlab.com/pypr/convergence_sph
+- Corrected transport velocity formulation: https://gitlab.com/pypr/ctvf
+- Dual-Time SPH method: https://gitlab.com/pypr/dtsph
+- Entropically damped artificial compressibility SPH formulation: https://gitlab.com/pypr/edac_sph
+- Generalized inlet and outlet boundary conditions for SPH: https://gitlab.com/pypr/inlet_outlet
+- Method of manufactured solutions for SPH: https://gitlab.com/pypr/mms_sph
+- A demonstration of the binder support provided by PySPH: https://gitlab.com/pypr/pysph_demo
+- Manuscript and code for a paper on PySPH: https://gitlab.com/pypr/pysph_paper
+- Simple Iterative Incompressible SPH scheme: https://gitlab.com/pypr/sisph
+- Geometry generation and preprocessing for SPH simulations: https://gitlab.com/pypr/sph_geom
+
+
 Credits
 --------
 
@@ -236,6 +255,46 @@ Some earlier developers not listed on the above are:
 
 - Pankaj Pandey (stress solver and improved load balancing, 2011)
 - Chandrashekhar Kaushik (original parallel and serial implementation in 2009)
+
+
+Citing PySPH
+-------------
+
+You may use the following article to formally refer to PySPH,
+a freely-available arXiv copy of the below paper is at
+https://arxiv.org/abs/1909.04504,
+
+ - Prabhu Ramachandran, Aditya Bhosale, Kunal Puri, Pawan Negi, Abhinav
+   Muta, A. Dinesh, Dileep Menon, Rahul Govind, Suraj Sanka, Amal
+   S Sebastian, Ananyo Sen, Rohan Kaushik, Anshuman Kumar,  Vikas
+   Kurapati, Mrinalgouda Patil, Deep Tavker, Pankaj Pandey,
+   Chandrashekhar Kaushik, Arkopal Dutt, Arpit Agarwal. "PySPH:
+   A Python-Based Framework for Smoothed Particle Hydrodynamics". ACM
+   Transactions on Mathematical Software 47, no. 4 (31 December 2021):
+   1--38. DOI: https://doi.org/10.1145/3460773.
+
+The bibtex entry is:::
+
+    @article{ramachandran2021a,
+        title = {{{PySPH}}: {{A Python-based Framework}} for {{Smoothed Particle Hydrodynamics}}},
+        shorttitle = {{{PySPH}}},
+        author = {Ramachandran, Prabhu and Bhosale, Aditya and Puri,
+        Kunal and Negi, Pawan and Muta, Abhinav and Dinesh,
+        A. and Menon, Dileep and Govind, Rahul and Sanka, Suraj and Sebastian,
+        Amal S. and Sen, Ananyo and Kaushik, Rohan and Kumar,
+        Anshuman and Kurapati, Vikas and Patil, Mrinalgouda and Tavker,
+        Deep and Pandey, Pankaj and Kaushik, Chandrashekhar and Dutt,
+        Arkopal and Agarwal, Arpit},
+        year = {2021},
+        month = dec,
+        journal = {ACM Transactions on Mathematical Software},
+        volume = {47},
+        number = {4},
+        pages = {1--38},
+        issn = {0098-3500, 1557-7295},
+        doi = {10.1145/3460773},
+        langid = {english}
+    }
 
 
 Support
