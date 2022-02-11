@@ -197,6 +197,7 @@ class VelocityGradDivC1(Equation):
                 drowcol = start_indx + rowcol
                 d_gradv[drowcol] = gradvls[rowcol]
 
+
 class BalsaraSwitch(Equation):
     def __init__(self, dest, sources, alphaav, fkern):
         self.alphaav = alphaav
@@ -278,9 +279,10 @@ class MomentumAndEnergy(Equation):
 
     def loop(self, d_idx, s_idx, d_m, s_m, d_p, s_p, d_cs, s_cs, d_rho, s_rho,
              d_au, d_av, d_aw, d_ae, XIJ, VIJ, DWI, DWJ, HIJ, d_alpha,
-             s_alpha, RIJ, R2IJ, RHOIJ, d_h, d_dndh, d_n,
+             s_alpha, RIJ, R2IJ, RHOIJ1, d_h, d_dndh, d_n,
              d_drhosumdh, s_h, s_dndh, s_n, s_drhosumdh):
 
+        avi = declare("matrix(3)")
         dim = self.dim
 
         # particle pressure
@@ -300,7 +302,9 @@ class MomentumAndEnergy(Equation):
 
         mj = s_m[s_idx]
         hij = self.fkern * HIJ
-        vijdotxij = VIJ[0] * XIJ[0] + VIJ[1] * XIJ[1] + VIJ[2] * XIJ[2]
+        vijdotxij = (VIJ[0] * XIJ[0] +
+                     VIJ[1] * XIJ[1] +
+                     VIJ[2] * XIJ[2])
 
         # # normalized interaction vector
         # if RIJ < 1e-8:
@@ -323,20 +327,22 @@ class MomentumAndEnergy(Equation):
         if vijdotxij <= 0.0:
             # viscosity
             alpha = 0.5 * (d_alpha[d_idx] + s_alpha[s_idx])
-            muij = hij * vijdotxij / (R2IJ + 0.0001 * hij ** 2)
-            common = alpha * muij * (cij - 2 * muij) * mj / (2 * RHOIJ)
+            muij = hij * vijdotxij / (R2IJ + 0.0001 * hij * hij)
+            common = alpha * muij * (cij - self.beta * muij) * mj * RHOIJ1 / 2
 
-            aaui = common * (DWI[0] + DWJ[0])
-            aavi = common * (DWI[1] + DWJ[1])
-            aawi = common * (DWI[2] + DWJ[2])
-            d_au[d_idx] += aaui
-            d_av[d_idx] += aavi
-            d_aw[d_idx] += aawi
+            avi[0] = common * (DWI[0] + DWJ[0])
+            avi[1] = common * (DWI[1] + DWJ[1])
+            avi[2] = common * (DWI[2] + DWJ[2])
+
+            # viscous contribution to velocity
+            d_au[d_idx] += avi[0]
+            d_av[d_idx] += avi[1]
+            d_aw[d_idx] += avi[2]
 
             # viscous contribution to the thermal energy
-            d_ae[d_idx] -= 0.5 * (VIJ[0] * aaui +
-                                  VIJ[1] * aavi +
-                                  VIJ[2] * aawi)
+            d_ae[d_idx] -= 0.5 * (VIJ[0] * avi[0] +
+                                  VIJ[1] * avi[1] +
+                                  VIJ[2] * avi[2])
 
         # grad-h correction terms.
         hibynidim = d_h[d_idx] / (d_n[d_idx] * dim)
@@ -346,52 +352,56 @@ class MomentumAndEnergy(Equation):
 
         hjbynjdim = s_h[s_idx] / (s_n[s_idx] * dim)
         inbrktj = 1 + s_dndh[s_idx] * hjbynjdim
-        inprthsj = s_drhosumdh[s_idx] * hibynidim
+        inprthsj = s_drhosumdh[s_idx] * hjbynjdim
         fji = 1 - inprthsj / (d_m[d_idx] * inbrktj)
 
         # accelerations for velocity
-        mj_pibrhoi_fij = mj * pibrhoi2 * fij
-        mj_pjbrhoj_fji = mj * pjbrhoj2 * fji
+        comi = mj * pibrhoi2 * fij
+        comj = mj * pjbrhoj2 * fji
 
-        d_au[d_idx] -= mj_pibrhoi_fij * DWI[0] + mj_pjbrhoj_fji * DWJ[0]
-        d_av[d_idx] -= mj_pibrhoi_fij * DWI[1] + mj_pjbrhoj_fji * DWJ[1]
-        d_aw[d_idx] -= mj_pibrhoi_fij * DWI[2] + mj_pjbrhoj_fji * DWJ[2]
+        d_au[d_idx] -= comi * DWI[0] + comj * DWJ[0]
+        d_av[d_idx] -= comi * DWI[1] + comj * DWJ[1]
+        d_aw[d_idx] -= comi * DWI[2] + comj * DWJ[2]
 
         # accelerations for the thermal energy
         vijdotdwi = VIJ[0] * DWI[0] + VIJ[1] * DWI[1] + VIJ[2] * DWI[2]
-        d_ae[d_idx] += mj * pibrhoi2 * fij * vijdotdwi
+        d_ae[d_idx] += comi * vijdotdwi
 
 
 class WallBoundary(Equation):
     """
         :class:`WallBoundary
         <pysph.sph.gas_dynamics.boundary_equations.WallBoundary>` modified
-        for TSPH
+        for TSPH.
+
+        Most importantly, mass of the boundary particle should never be zero
+        since it appears in denominator of fij. This has been addressed.
     """
 
     def initialize(self, d_idx, d_p, d_rho, d_e, d_m, d_cs, d_h,
                    d_htmp, d_h0, d_u, d_v, d_w, d_wij, d_n, d_dndh,
-                   d_psumdh):
-
+                   d_drhosumdh, d_divv, d_m0):
         d_p[d_idx] = 0.0
         d_u[d_idx] = 0.0
         d_v[d_idx] = 0.0
         d_w[d_idx] = 0.0
+        d_m0[d_idx] = d_m[d_idx]
         d_m[d_idx] = 0.0
         d_rho[d_idx] = 0.0
         d_e[d_idx] = 0.0
         d_cs[d_idx] = 0.0
+        d_divv[d_idx] = 0.0
         d_wij[d_idx] = 0.0
         d_h[d_idx] = d_h0[d_idx]
         d_htmp[d_idx] = 0.0
         d_n[d_idx] = 0.0
         d_dndh[d_idx] = 0.0
-        d_psumdh[d_idx] = 0.0
+        d_drhosumdh[d_idx] = 0.0
 
-    def loop(self, d_idx, s_idx, d_p, d_rho, d_e, d_m, d_cs, d_u, d_v, d_w,
-             d_wij, d_htmp, s_p, s_rho, s_e, s_m, s_cs, s_h,
-             s_u, s_v, s_w, WI, s_n, d_n, d_dndh, s_dndh, d_psumdh,
-             s_psumdh):
+    def loop(self, d_idx, s_idx, d_p, d_rho, d_e, d_m, d_cs, d_divv, d_h, d_u,
+             d_v, d_w, d_wij, d_htmp, s_p, s_rho, s_e, s_m, s_cs, s_h, s_divv,
+             s_u, s_v, s_w, WI, s_n, d_n, s_dndh, d_dndh, d_drhosumdh,
+             s_drhosumdh):
         d_wij[d_idx] += WI
         d_p[d_idx] += s_p[s_idx] * WI
         d_u[d_idx] -= s_u[s_idx] * WI
@@ -401,13 +411,14 @@ class WallBoundary(Equation):
         d_rho[d_idx] += s_rho[s_idx] * WI
         d_e[d_idx] += s_e[s_idx] * WI
         d_cs[d_idx] += s_cs[s_idx] * WI
+        d_divv[d_idx] += s_divv[s_idx] * WI
         d_htmp[d_idx] += s_h[s_idx] * WI
         d_n[d_idx] += s_n[s_idx] * WI
         d_dndh[d_idx] += s_dndh[s_idx] * WI
-        d_psumdh[d_idx] += s_psumdh[s_idx] * WI
+        d_drhosumdh[d_idx] += s_drhosumdh[s_idx] * WI
 
-    def post_loop(self, d_idx, d_p, d_rho, d_e, d_m, d_cs, d_h, d_u,
-                  d_v, d_w, d_wij, d_htmp, d_dndh, d_psumdh, d_n):
+    def post_loop(self, d_idx, d_p, d_rho, d_e, d_m, d_cs, d_divv, d_h, d_u,
+                  d_v, d_w, d_wij, d_htmp, d_n, d_dndh, d_drhosumdh, d_m0):
         if d_wij[d_idx] > 1e-30:
             d_p[d_idx] = d_p[d_idx] / d_wij[d_idx]
             d_u[d_idx] = d_u[d_idx] / d_wij[d_idx]
@@ -417,10 +428,15 @@ class WallBoundary(Equation):
             d_rho[d_idx] = d_rho[d_idx] / d_wij[d_idx]
             d_e[d_idx] = d_e[d_idx] / d_wij[d_idx]
             d_cs[d_idx] = d_cs[d_idx] / d_wij[d_idx]
+            d_divv[d_idx] = d_divv[d_idx] / d_wij[d_idx]
             d_h[d_idx] = d_htmp[d_idx] / d_wij[d_idx]
-            d_dndh[d_idx] /= d_wij[d_idx]
-            d_psumdh[d_idx] /= d_wij[d_idx]
-            d_n[d_idx] /= d_wij[d_idx]
+            d_n[d_idx] = d_n[d_idx] / d_wij[d_idx]
+            d_dndh[d_idx] = d_dndh[d_idx] / d_wij[d_idx]
+            d_drhosumdh[d_idx] = d_drhosumdh[d_idx] / d_wij[d_idx]
+
+        # Secret Sauce
+        if d_m[d_idx] < 1e-10:
+            d_m[d_idx] = d_m0[d_idx]
 
 
 class UpdateGhostProps(Equation):

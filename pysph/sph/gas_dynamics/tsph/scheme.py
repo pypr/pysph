@@ -184,7 +184,8 @@ class TSPHScheme(Scheme):
             g5.append(MomentumAndEnergy(dest=fluid,
                                         sources=all_pa,
                                         dim=self.dim,
-                                        beta=self.beta, fkern=self.fkern))
+                                        beta=self.beta,
+                                        fkern=self.fkern))
 
         equations.append(Group(equations=g5))
 
@@ -214,7 +215,7 @@ class TSPHScheme(Scheme):
             pa.orig_idx[:] = numpy.arange(nfp)
             pa.set_output_arrays(output_props)
 
-        solid_props = set(props) | set('div cs wij htmp'.split(' '))
+        solid_props = set(props) | set('m0 wij htmp'.split(' '))
         for solid in self.solids:
             pa = particle_arrays[solid]
             self._ensure_properties(pa, solid_props, clean)
