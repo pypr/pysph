@@ -175,7 +175,8 @@ cdef class CompressedOctreeNNPS(OctreeNNPS):
     """
     def __init__(self, int dim, list particles, double radius_scale = 2.0,
             int ghost_layers = 1, domain=None, bint fixed_h = False,
-            bint cache = False, bint sort_gids = False, int leaf_max_particles = 10):
+            bint cache = False, bint sort_gids = False, int leaf_max_particles = 10,
+            bint test_parallel = False):
         NNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
             cache, sort_gids
@@ -191,6 +192,9 @@ cdef class CompressedOctreeNNPS(OctreeNNPS):
         self.leaf_max_particles = leaf_max_particles
         self.current_tree = NULL
         self.current_pids = NULL
+
+        for i in range(self.narrays):
+            self.tree[i].test_parallel = test_parallel
 
         self.sort_gids = sort_gids
         self.domain.update()
@@ -225,7 +229,7 @@ cdef class CompressedOctreeNNPS(OctreeNNPS):
     cpdef _refresh(self):
         cdef int i
         for i from 0<=i<self.narrays:
-            (<CompressedOctree>self.tree[i]).c_build_tree(self.pa_wrappers[i])
+            (<CompressedOctree>self.tree[i]).c_build_tree(self.pa_wrappers[i], self.tree[i].test_parallel)
         self.current_tree = (<CompressedOctree>self.tree[self.src_index]).root
         self.current_pids = (<CompressedOctree>self.tree[self.src_index]).pids
 

@@ -240,8 +240,10 @@ class DictBoxSortNNPS2DTestCase(NNPS2DTestCase):
         self.test_neighbors_ba()
         self.test_neighbors_bb()
 
-@mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
-def test_parallel_method_is_tested():
+
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
+def test_parallel_Octree_method_is_tested():
     """Test for ensuring that Parallel Octree Method is used for testing"""
     x = numpy.array([
         -1.5, 0.33, 1.25, 0.05, -0.5, -0.75, -1.25, 0.5, 0.5, 0.5])
@@ -257,10 +259,37 @@ def test_parallel_method_is_tested():
 
     pa = get_particle_array(x=x, y=y, z=z, h=h)
 
-    nps = nnps.OctreeNNPS(dim=3, particles=[pa], cache=True, test_parallel=True)
+    nps = nnps.OctreeNNPS(dim=3, particles=[pa], cache=True,
+                          test_parallel=True)
 
     for i in range(nps.narrays):
         assert nps.tree[i].method == 1
+
+
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
+def test_parallel_CompressedOctree_method_is_tested():
+    """Test for ensuring that Parallel CompressedOctree Method is tested"""
+    x = numpy.array([
+        -1.5, 0.33, 1.25, 0.05, -0.5, -0.75, -1.25, 0.5, 0.5, 0.5])
+
+    y = numpy.array([
+        0.25, -0.25, -1.25, 1.25, 0.5, 0.75, 0.5, 1.5, -0.5, 1.75])
+
+    z = numpy.array([
+        0.5, 0.25, 1.25, -0.5, -1.25, -1.25, 0.5, -0.5, 0.5, -0.75])
+
+    # using a degenrate (h=0) array will set cell size to 1 for NNPS
+    h = numpy.zeros_like(x)
+
+    pa = get_particle_array(x=x, y=y, z=z, h=h)
+
+    nps = nnps.CompressedOctreeNNPS(dim=3, particles=[pa], cache=True,
+                                    test_parallel=True)
+
+    for i in range(nps.narrays):
+        assert nps.tree[i].method == 1
+
 
 class OctreeGPUNNPS2DTestCase(DictBoxSortNNPS2DTestCase):
     """Test for Z-Order SFC based OpenCL algorithm"""
@@ -576,14 +605,17 @@ class OctreeNNPSTestCase(DictBoxSortNNPSTestCase):
             dim=3, particles=self.particles, radius_scale=2.0
         )
 
-@mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
+
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
 class OctreeParallelNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Octree based algorithm"""
 
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.OctreeNNPS(
-            dim=3, particles=self.particles, radius_scale=2.0, test_parallel=True
+            dim=3, particles=self.particles, radius_scale=2.0,
+            test_parallel=True
         )
 
 
@@ -948,6 +980,19 @@ class CompressedOctreeNNPSTestCase(DictBoxSortNNPSTestCase):
         )
 
 
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
+class CompressedOctreeParallelNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for Parallel Compressed Octree based algorithm"""
+
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.CompressedOctreeNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0,
+            test_parallel=True
+        )
+
+
 class LinkedListNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for the original box-sort algorithm"""
 
@@ -1068,12 +1113,14 @@ class TestNNPSOnLargeDomain(unittest.TestCase):
             y.sort()
             assert numpy.all(x == y)
 
-    @mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
+    @mark.skipif(get_number_of_threads() == 1,
+                 reason="N_threads=1; OpenMP does not seem available.")
     def test_octree_parallel_works_for_large_domain(self):
         # Given
         pa = self._make_particles(20)
         # We turn on cache so it computes all the neighbors quickly for us.
-        nps = nnps.OctreeNNPS(dim=3, particles=[pa], cache=True, test_parallel=True)
+        nps = nnps.OctreeNNPS(dim=3, particles=[pa], cache=True,
+                              test_parallel=True)
         nbrs = UIntArray()
         direct = UIntArray()
         nps.set_context(0, 0)
@@ -1086,12 +1133,31 @@ class TestNNPSOnLargeDomain(unittest.TestCase):
             y.sort()
             assert numpy.all(x == y)
 
-
     def test_compressed_octree_works_for_large_domain(self):
         # Given
         pa = self._make_particles(20)
         # We turn on cache so it computes all the neighbors quickly for us.
         nps = nnps.CompressedOctreeNNPS(dim=3, particles=[pa], cache=True)
+        nbrs = UIntArray()
+        direct = UIntArray()
+        nps.set_context(0, 0)
+        for i in range(pa.get_number_of_particles()):
+            nps.get_nearest_particles(0, 0, i, nbrs)
+            nps.brute_force_neighbors(0, 0, i, direct)
+            x = nbrs.get_npy_array()
+            y = direct.get_npy_array()
+            x.sort()
+            y.sort()
+            assert numpy.all(x == y)
+
+    @mark.skipif(get_number_of_threads() == 1,
+                 reason="N_threads=1; OpenMP does not seem available.")
+    def test_compressed_octree_parallel_works_for_large_domain(self):
+        # Given
+        pa = self._make_particles(20)
+        # We turn on cache so it computes all the neighbors quickly for us.
+        nps = nnps.CompressedOctreeNNPS(dim=3, particles=[pa], cache=True,
+                                        test_parallel=True)
         nbrs = UIntArray()
         direct = UIntArray()
         nps.set_context(0, 0)
@@ -1247,13 +1313,31 @@ def test_corner_case_1d_few_cells(cls):
         nps.brute_force_neighbors(0, 0, i, bf_nbrs)
         assert sorted(nbrs) == sorted(bf_nbrs), 'Failed for particle: %d' % i
 
-@mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
+
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
 def test_corner_case_parallel_octree_1d_few_cells():
     x, y, z = [0.131, 0.359], [1.544, 1.809], [-3.6489999, -2.8559999]
     pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=1.0)
     nbrs = UIntArray()
     bf_nbrs = UIntArray()
-    nps = nnps.OctreeNNPS(dim=3, particles=[pa], radius_scale=0.7, test_parallel=True)
+    nps = nnps.OctreeNNPS(dim=3, particles=[pa], radius_scale=0.7,
+                          test_parallel=True)
+    for i in range(2):
+        nps.get_nearest_particles(0, 0, i, nbrs)
+        nps.brute_force_neighbors(0, 0, i, bf_nbrs)
+        assert sorted(nbrs) == sorted(bf_nbrs), 'Failed for particle: %d' % i
+
+
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
+def test_corner_case_parallel_compressed_octree_1d_few_cells():
+    x, y, z = [0.131, 0.359], [1.544, 1.809], [-3.6489999, -2.8559999]
+    pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=1.0)
+    nbrs = UIntArray()
+    bf_nbrs = UIntArray()
+    nps = nnps.CompressedOctreeNNPS(dim=3, particles=[pa], radius_scale=0.7,
+                                    test_parallel=True)
     for i in range(2):
         nps.get_nearest_particles(0, 0, i, nbrs)
         nps.brute_force_neighbors(0, 0, i, bf_nbrs)
@@ -1309,7 +1393,9 @@ def test_large_number_of_neighbors_octree():
     # print(nbrs.length)
     assert nbrs.length == len(x)
 
-@mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
+
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
 def test_large_number_of_neighbors_parallel_octree():
     x = numpy.random.random(1 << 14) * 0.1
     y = x.copy()
@@ -1317,7 +1403,8 @@ def test_large_number_of_neighbors_parallel_octree():
     h = numpy.ones_like(x)
     pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=h)
 
-    nps = nnps.OctreeNNPS(dim=3, particles=[pa], cache=False, test_parallel=True)
+    nps = nnps.OctreeNNPS(dim=3, particles=[pa], cache=False,
+                          test_parallel=True)
     nbrs = UIntArray()
     nps.get_nearest_particles(0, 0, 0, nbrs)
     # print(nbrs.length)

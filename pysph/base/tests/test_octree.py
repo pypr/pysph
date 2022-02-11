@@ -16,6 +16,7 @@ from pytest import importorskip, mark
 
 from pysph.base.nnps import get_number_of_threads
 
+
 def test_single_level_octree():
     N = 50
     x, y, z = np.mgrid[0:1:N*1j, 0:1:N*1j, 0:1:N*1j]
@@ -32,6 +33,7 @@ def test_single_level_octree():
     tree.build_tree(pa)
     # Test that depth of the tree is 1
     assert tree.depth == 1
+
 
 def test_compressed_octree_has_lesser_depth_than_octree():
     N = 50
@@ -59,6 +61,7 @@ def test_compressed_octree_has_lesser_depth_than_octree():
     # Test that the depth of compressed octree for the same
     # leaf_max_particles is lesser than that of octree
     assert depth_comp_tree < depth_tree
+
 
 def test_single_level_compressed_octree():
     N = 50
@@ -102,7 +105,7 @@ class SimpleOctreeTestCase(unittest.TestCase):
             self.assertTrue(node.level == level)
             children = node.get_children()
             for child in children:
-                if child == None:
+                if child is None:
                     continue
                 _check_levels(child, level + 1)
 
@@ -114,12 +117,12 @@ class SimpleOctreeTestCase(unittest.TestCase):
         self.tree.build_tree(pa)
         root = self.tree.get_root()
         # Test that parent of root is 'None'
-        self.assertTrue(root.get_parent() == None)
+        self.assertTrue(root.get_parent() is None)
 
         def _check_parent(node):
             children = node.get_children()
             for child in children:
-                if child == None:
+                if child is None:
                     continue
                 # Test that the parent is set correctly for all nodes
                 self.assertTrue(child.get_parent() == node)
@@ -139,7 +142,7 @@ class SimpleOctreeTestCase(unittest.TestCase):
             sum_indices[0] += indices.length
             children = node.get_children()
             for child in children:
-                if child == None:
+                if child is None:
                     continue
                 _calculate_sum(child, sum_indices)
 
@@ -189,13 +192,15 @@ class SimpleOctreeTestCase(unittest.TestCase):
             line_length = (xs[0] - xs[1])**2 + (ys[0] - ys[1])**2
             # Test that the lengths of sides 2D projection of the node
             # is equal to the length of the side of the node
-            self.assertTrue(line_length == root.length**2 or \
-                    line_length == 0)
+            self.assertTrue(line_length == root.length**2 or
+                            line_length == 0)
 
         self.tree.delete_tree()
 
-@mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
-def test_parallel_method_is_tested():
+
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
+def test_parallel_octree_method_is_tested():
     N = 50
     x, y, z = np.mgrid[0:1:N*1j, 0:1:N*1j, 0:1:N*1j]
     x = x.ravel()
@@ -209,7 +214,26 @@ def test_parallel_method_is_tested():
     depth_tree = tree.build_tree(pa, True)
     assert tree.method == 1
 
-@mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
+
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
+def test_parallel_compressed_octree_method_is_tested():
+    N = 50
+    x, y, z = np.mgrid[0:1:N*1j, 0:1:N*1j, 0:1:N*1j]
+    x = x.ravel()
+    y = y.ravel()
+    z = z.ravel()
+    h = np.ones_like(x)
+
+    pa = get_particle_array(x=x, y=y, z=z, h=h)
+
+    tree = CompressedOctree(10)
+    depth_tree = tree.build_tree(pa, True)
+    assert tree.method == 1
+
+
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
 def test_single_level_parallel_octree():
     N = 50
     x, y, z = np.mgrid[0:1:N*1j, 0:1:N*1j, 0:1:N*1j]
@@ -227,8 +251,30 @@ def test_single_level_parallel_octree():
     # Test that depth of the tree is 1
     assert tree.depth == 1
 
-@mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
-def test_compressed_octree_has_lesser_depth_than_parallel_octree():
+
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
+def test_single_level_parallel_compressed_octree():
+    N = 50
+    x, y, z = np.mgrid[0:1:N*1j, 0:1:N*1j, 0:1:N*1j]
+    x = x.ravel()
+    y = y.ravel()
+    z = z.ravel()
+    h = np.ones_like(x)
+
+    pa = get_particle_array(x=x, y=y, z=z, h=h)
+
+    # For maximum leaf particles greater that total number
+    # of particles
+    tree = CompressedOctree(pa.get_number_of_particles() + 1)
+    tree.build_tree(pa, True)
+    # Test that depth of the tree is 1
+    assert tree.depth == 1
+
+
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
+def test_parallel_compressed_octree_has_lesser_depth_than_parallel_octree():
     N = 50
     x, y, z = np.mgrid[0:1:N*1j, 0:1:N*1j, 0:1:N*1j]
     x = x.ravel()
@@ -249,13 +295,15 @@ def test_compressed_octree_has_lesser_depth_than_parallel_octree():
     comp_tree = CompressedOctree(10)
 
     depth_tree = tree.build_tree(pa, True)
-    depth_comp_tree = comp_tree.build_tree(pa)
+    depth_comp_tree = comp_tree.build_tree(pa, True)
 
     # Test that the depth of compressed octree for the same
     # leaf_max_particles is lesser than that of octree
     assert depth_comp_tree < depth_tree
 
-@mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
+
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
 class SimpleParallelOctreeTestCase(unittest.TestCase):
     """Simple test case for Parallel Octree
     """
@@ -280,7 +328,7 @@ class SimpleParallelOctreeTestCase(unittest.TestCase):
             self.assertTrue(node.level == level)
             children = node.get_children()
             for child in children:
-                if child == None:
+                if child is None:
                     continue
                 _check_levels(child, level + 1)
 
@@ -289,15 +337,15 @@ class SimpleParallelOctreeTestCase(unittest.TestCase):
 
     def test_parent_for_node(self):
         pa = get_particle_array(x=self.x, y=self.y, z=self.z, h=self.h)
-        self.tree.build_tree(pa, 0)
+        self.tree.build_tree(pa, True)
         root = self.tree.get_root()
         # Test that parent of root is 'None'
-        self.assertTrue(root.get_parent() == None)
+        self.assertTrue(root.get_parent() is None)
 
         def _check_parent(node):
             children = node.get_children()
             for child in children:
-                if child == None:
+                if child is None:
                     continue
                 # Test that the parent is set correctly for all nodes
                 self.assertTrue(child.get_parent() == node)
@@ -308,7 +356,7 @@ class SimpleParallelOctreeTestCase(unittest.TestCase):
 
     def test_sum_of_indices_lengths_equals_total_number_of_particles(self):
         pa = get_particle_array(x=self.x, y=self.y, z=self.z, h=self.h)
-        self.tree.build_tree(pa, 0)
+        self.tree.build_tree(pa, True)
         root = self.tree.get_root()
         sum_indices = [0]
 
@@ -317,7 +365,7 @@ class SimpleParallelOctreeTestCase(unittest.TestCase):
             sum_indices[0] += indices.length
             children = node.get_children()
             for child in children:
-                if child == None:
+                if child is None:
                     continue
                 _calculate_sum(child, sum_indices)
 
@@ -329,7 +377,7 @@ class SimpleParallelOctreeTestCase(unittest.TestCase):
 
     def test_all_indices_are_unique(self):
         pa = get_particle_array(x=self.x, y=self.y, z=self.z, h=self.h)
-        self.tree.build_tree(pa, 0)
+        self.tree.build_tree(pa, True)
         root = self.tree.get_root()
         all_indices = []
 
@@ -350,7 +398,7 @@ class SimpleParallelOctreeTestCase(unittest.TestCase):
 
     def test_plot_root(self):
         pa = get_particle_array(x=self.x, y=self.y, z=self.z, h=self.h)
-        self.tree.build_tree(pa, 0)
+        self.tree.build_tree(pa, True)
         root = self.tree.get_root()
         mpl = importorskip("matplotlib")
         mpl.use('Agg')
@@ -367,10 +415,11 @@ class SimpleParallelOctreeTestCase(unittest.TestCase):
             line_length = (xs[0] - xs[1])**2 + (ys[0] - ys[1])**2
             # Test that the lengths of sides 2D projection of the node
             # is equal to the length of the side of the node
-            self.assertTrue(line_length == root.length**2 or \
-                    line_length == 0)
+            self.assertTrue(line_length == root.length**2 or
+                            line_length == 0)
 
         self.tree.delete_tree()
+
 
 class TestOctreeFor2DDataset(SimpleOctreeTestCase):
     """Test Octree for 2D dataset
@@ -385,6 +434,7 @@ class TestOctreeFor2DDataset(SimpleOctreeTestCase):
 
         self.tree = Octree(10)
 
+
 class TestOctreeFor1DDataset(SimpleOctreeTestCase):
     """Test Octree for 1D dataset
     """
@@ -396,6 +446,7 @@ class TestOctreeFor1DDataset(SimpleOctreeTestCase):
         self.h = np.ones_like(self.x)
 
         self.tree = Octree(100)
+
 
 class TestOctreeForFloatingPointError(SimpleOctreeTestCase):
     """Test Octree for floating point error
@@ -418,8 +469,10 @@ class TestOctreeForFloatingPointError(SimpleOctreeTestCase):
         self.h = np.ones_like(self.x)
         self.tree = Octree(10)
 
-@mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
-class TestOctreeFor2DDataset(SimpleParallelOctreeTestCase):
+
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
+class TestParallelOctreeFor2DDataset(SimpleParallelOctreeTestCase):
     """Test Octree for 2D dataset
     """
     def setUp(self):
@@ -432,8 +485,10 @@ class TestOctreeFor2DDataset(SimpleParallelOctreeTestCase):
 
         self.tree = Octree(10)
 
-@mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
-class TestOctreeFor1DDataset(SimpleParallelOctreeTestCase):
+
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
+class TestParallelOctreeFor1DDataset(SimpleParallelOctreeTestCase):
     """Test Octree for 1D dataset
     """
     def setUp(self):
@@ -445,8 +500,10 @@ class TestOctreeFor1DDataset(SimpleParallelOctreeTestCase):
 
         self.tree = Octree(100)
 
-@mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
-class TestOctreeForFloatingPointError(SimpleParallelOctreeTestCase):
+
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
+class TestParallelOctreeForFloatingPointError(SimpleParallelOctreeTestCase):
     """Test Octree for floating point error
     """
     def setUp(self):
@@ -467,6 +524,7 @@ class TestOctreeForFloatingPointError(SimpleParallelOctreeTestCase):
         self.h = np.ones_like(self.x)
         self.tree = Octree(10)
 
+
 class SimpleCompressedOctreeTestCase(SimpleOctreeTestCase):
     """Simple test case for Compressed Octree
     """
@@ -480,6 +538,7 @@ class SimpleCompressedOctreeTestCase(SimpleOctreeTestCase):
 
         self.tree = CompressedOctree(10)
 
+
 class TestCompressedOctreeFor1DDataset(SimpleOctreeTestCase):
     """Test Octree for 1D dataset
     """
@@ -491,6 +550,7 @@ class TestCompressedOctreeFor1DDataset(SimpleOctreeTestCase):
         self.h = np.ones_like(self.x)
 
         self.tree = CompressedOctree(100)
+
 
 class TestCompressedOctreeFor2DDataset(SimpleOctreeTestCase):
     """Test Octree for 2D dataset
@@ -504,6 +564,7 @@ class TestCompressedOctreeFor2DDataset(SimpleOctreeTestCase):
         self.h = np.ones_like(self.x)
 
         self.tree = CompressedOctree(10)
+
 
 class TestCompressedOctreeForFloatingPointError(SimpleOctreeTestCase):
     """Test Octree for floating point error
@@ -526,6 +587,80 @@ class TestCompressedOctreeForFloatingPointError(SimpleOctreeTestCase):
         self.h = np.ones_like(self.x)
 
         self.tree = CompressedOctree(10)
+
+
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
+class SimpleParallelCompressedOctreeTestCase(SimpleParallelOctreeTestCase):
+    """Simple test case for Compressed Octree
+    """
+    def setUp(self):
+        N = 50
+        x, y, z = np.mgrid[0:1:N*1j, 0:1:N*1j, 0:1:N*1j]
+        self.x = x.ravel()
+        self.y = y.ravel()
+        self.z = z.ravel()
+        self.h = np.ones_like(self.x)
+
+        self.tree = CompressedOctree(10)
+
+
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
+class TestParallelCompressedOctreeFor1DDataset(SimpleParallelOctreeTestCase):
+    """Test Octree for 1D dataset
+    """
+    def setUp(self):
+        N = int(1e5)
+        self.x = np.linspace(0, 1, num=N)
+        self.y = np.zeros_like(self.x)
+        self.z = np.zeros_like(self.x)
+        self.h = np.ones_like(self.x)
+
+        self.tree = CompressedOctree(100)
+
+
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
+class TestParallelCompressedOctreeFor2DDataset(SimpleParallelOctreeTestCase):
+    """Test Octree for 2D dataset
+    """
+    def setUp(self):
+        N = 500
+        x, y = np.mgrid[0:1:N*1j, 0:1:N*1j]
+        self.x = x.ravel()
+        self.y = y.ravel()
+        self.z = np.zeros_like(self.x)
+        self.h = np.ones_like(self.x)
+
+        self.tree = CompressedOctree(10)
+
+
+@mark.skipif(get_number_of_threads() == 1,
+             reason="N_threads=1; OpenMP does not seem available.")
+class TestParallelCompressedOctreeForFloatingPointError(
+        SimpleParallelOctreeTestCase):
+    """Test Octree for floating point error
+    """
+    def setUp(self):
+        N = 50
+        x, y, z = np.mgrid[-1:1:N*1j, -1:1:N*1j, -1:1:N*1j]
+        self.x = x.ravel()
+        self.y = y.ravel()
+        self.z = z.ravel()
+
+        x1 = np.array([-1e-20])
+        y1 = np.array([1e-20])
+        z1 = np.array([1e-20])
+
+        self.x = np.concatenate([self.x, x1])
+        self.y = np.concatenate([self.y, y1])
+        self.z = np.concatenate([self.z, z1])
+
+        self.h = np.ones_like(self.x)
+
+        self.tree = CompressedOctree(10)
+
 
 if __name__ == '__main__':
     unittest.main()
