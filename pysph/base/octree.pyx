@@ -384,7 +384,7 @@ cdef class Octree:
             node.is_leaf = True
             return 1
 
-        cdef u_int* p_indices = <u_int*> malloc(n*sizeof(u_int))
+        cdef u_int* p_indices = self.pids
         cdef vector[u_int]* child_indices = new vector[u_int](n)
         cdef vector[vector[int]] cumulative_map = vector[vector[int]](num_threads)
         cdef vector[vector[double]] threads_hmax = vector[vector[double]](num_threads)
@@ -459,6 +459,8 @@ cdef class Octree:
                 oct_cid = count[oct_id] + cumulative_map[tid][oct_id]
                 p_indices[oct_cid] = p
                 cumulative_map[tid][oct_id] += 1             
+
+        del child_indices
 
         if(next_level_nodes.empty()):
             self.pids = p_indices
