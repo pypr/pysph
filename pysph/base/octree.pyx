@@ -637,9 +637,6 @@ cdef class Octree:
 
                 new_nodes[tid].clear()
 
-            free(xmin)
-            free(xmin_new)
-
         return count[num_threads + 1]
 
 
@@ -1284,11 +1281,6 @@ cdef class CompressedOctree(Octree):
                 END_OMP_PRAGMA()
 
                 new_nodes[tid].clear()
-
-            free(xmin)
-            for i from 0<=i<8:
-                free(xmin_new[i])
-                free(xmax_new[i])
 
         return count[num_threads + 1]
 
