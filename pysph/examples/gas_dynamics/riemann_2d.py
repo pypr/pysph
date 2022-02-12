@@ -12,6 +12,8 @@ from pysph.base.nnps import DomainManager
 from pysph.solver.application import Application
 from pysph.sph.scheme import GSPHScheme, SchemeChooser, ADKEScheme, GasDScheme
 from pysph.sph.wc.crksph import CRKSPHScheme
+from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
+from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
 from pysph.examples.gas_dynamics.riemann_2d_config import R2DConfig
 
 # current case from the al possible unique cases
@@ -257,8 +259,19 @@ class Riemann2D(Application):
             has_ghosts=True
         )
 
+        psph = PSPHScheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            hfact=1.2
+        )
+
+        tsph = TSPHScheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            hfact=1.2
+        )
+
         s = SchemeChooser(
-            default='gsph', gsph=gsph, adke=adke, crksph=crksph, mpm=mpm
+            default='gsph', gsph=gsph, adke=adke, crksph=crksph, mpm=mpm,
+            psph=psph, tsph=tsph
         )
         return s
 
@@ -275,6 +288,10 @@ class Riemann2D(Application):
                                adaptive_timestep=False, pfreq=50)
         elif self.options.scheme == 'mpm':
             s.configure(kernel_factor=kernel_factor)
+            s.configure_solver(dt=self.dt, tf=self.tf,
+                               adaptive_timestep=False, pfreq=50)
+        elif self.options.scheme in ['tsph', 'psph']:
+            s.configure(hfact=kernel_factor)
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=50)
 
