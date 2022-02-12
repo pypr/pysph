@@ -22,6 +22,8 @@ from pysph.base.utils import get_particle_array as gpa
 from pysph.base.nnps import DomainManager
 from pysph.solver.application import Application
 from pysph.sph.scheme import GSPHScheme, SchemeChooser
+from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
+from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
 
 
 class ChengShu(Application):
@@ -80,8 +82,17 @@ class ChengShu(Application):
             niter=200, tol=1e-6
         )
 
+        psph = PSPHScheme(
+            fluids=['fluid'], solids=[], dim=self.dim, gamma=self.gamma,
+            hfact=1.2
+        )
+
+        tsph = TSPHScheme(
+            fluids=['fluid'], solids=[], dim=self.dim, gamma=self.gamma,
+            hfact=1.2)
+
         s = SchemeChooser(
-            default='gsph', gsph=gsph
+            default='gsph', gsph=gsph, psph=psph, tsph=tsph
         )
 
         return s
@@ -93,6 +104,10 @@ class ChengShu(Application):
                 dt=self.dt, tf=self.tf,
                 adaptive_timestep=False, pfreq=1000
             )
+        elif self.options.scheme in ['tsph', 'psph']:
+            s.configure(hfact=1.2)
+            s.configure_solver(dt=self.dt, tf=self.tf,
+                               adaptive_timestep=False, pfreq=1000)
 
 
 if __name__ == "__main__":
