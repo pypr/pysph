@@ -240,7 +240,7 @@ class DictBoxSortNNPS2DTestCase(NNPS2DTestCase):
         self.test_neighbors_ba()
         self.test_neighbors_bb()
 
-@mark.skip('Temporarily skipping')
+@mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
 def test_parallel_method_is_tested():
     """Test for ensuring that Parallel Octree Method is used for testing"""
     x = numpy.array([
