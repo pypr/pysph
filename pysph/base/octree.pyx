@@ -459,9 +459,6 @@ cdef class Octree:
                 oct_cid = count[oct_id] + cumulative_map[tid][oct_id]
                 p_indices[oct_cid] = p
                 cumulative_map[tid][oct_id] += 1             
-
-        del child_indices
-
         if(next_level_nodes.empty()):
             self.pids = p_indices
             return 2
