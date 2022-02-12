@@ -41,7 +41,7 @@ class SedovPointExplosion(Application):
         y = data['y']
         rho = data['rho']
         p = data['p']
-        e = data['e']
+        e = data['e'] + 1e-9
         h = data['h']
         m = data['m']
 
