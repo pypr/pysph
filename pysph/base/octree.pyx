@@ -384,7 +384,7 @@ cdef class Octree:
             node.is_leaf = True
             return 1
 
-        cdef u_int* p_indices = <u_int*> malloc(num_particles*sizeof(u_int))
+        cdef u_int* p_indices = <u_int*> malloc(n*sizeof(u_int))
         cdef vector[u_int]* child_indices = new vector[u_int](n)
         cdef vector[vector[int]] cumulative_map = vector[vector[int]](num_threads)
         cdef vector[vector[double]] threads_hmax = vector[vector[double]](num_threads)
