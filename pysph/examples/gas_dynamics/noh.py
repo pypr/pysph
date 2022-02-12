@@ -213,6 +213,12 @@ class NohImplosion(Application):
         pyplot.savefig(fname, dpi=300)
         pyplot.close('all')
 
+        fname = os.path.join(self.output_dir, '1dresults.npz')
+        numpy.savez(fname, r=r, rho=rho, p=p)
+
+        fname = os.path.join(self.output_dir, '1dexact.npz')
+        numpy.savez(fname, r=re, rho=rho_e, p=p_e)
+
 
 if __name__ == '__main__':
     app = NohImplosion()
