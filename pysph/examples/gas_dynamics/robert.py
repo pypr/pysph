@@ -3,7 +3,8 @@
 
 from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
 from pysph.sph.scheme import ADKEScheme, GasDScheme, GSPHScheme, SchemeChooser
-import numpy
+from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
+from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
 
 # Numerical constants
 dim = 1
@@ -83,7 +84,24 @@ class Robert(ShockTubeSetup):
             niter=40, tol=1e-6
         )
 
-        s = SchemeChooser(default='adke', adke=adke, mpm=mpm, gsph=gsph)
+        # PSPH doesn't work with default number of particles due to particle
+        # penetration. Reduce the number of particles, say with --nl=1500
+        # for this example to work with PSPH scheme.
+        psph = PSPHScheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            hfact=1.2
+        )
+
+        # TSPH doesn't work with default number of particles due to particle
+        # penetration. Reduce the number of particles, say with --nl=1500
+        # for this example to work with TSPH scheme.
+        tsph = TSPHScheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            hfact=1.2
+        )
+
+        s = SchemeChooser(default='adke', adke=adke, mpm=mpm, gsph=gsph,
+                          psph=psph, tsph=tsph)
         return s
 
 
