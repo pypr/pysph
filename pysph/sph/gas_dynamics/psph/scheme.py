@@ -171,12 +171,12 @@ class PSPHScheme(Scheme):
 
         equations = []
         # Find the optimal 'h'
-
+        all_pa = self.fluids + self.solids
         g1 = []
         for fluid in self.fluids:
             g1.append(PSPHSummationDensityAndPressure(
                 dest=fluid,
-                sources=self.fluids,
+                sources=all_pa,
                 hfact=self.hfact,
                 density_iterations=True,
                 dim=self.dim,
@@ -188,17 +188,18 @@ class PSPHScheme(Scheme):
                       max_iterations=self.max_density_iterations))
 
         g2 = []
+
         for fluid in self.fluids:
             g2.append(GradientKinsfolkC1(dest=fluid,
-                                         sources=self.fluids + self.solids,
+                                         sources=all_pa,
                                          dim=self.dim, ))
             g2.append(SignalVelocity(dest=fluid,
-                                     sources=self.fluids + self.solids, ))
+                                     sources=all_pa, ))
         equations.append(Group(equations=g2))
 
         g3 = []
         for fluid in self.fluids:
-            g3.append(LimiterAndAlphas(dest=fluid, sources=self.fluids,
+            g3.append(LimiterAndAlphas(dest=fluid, sources=all_pa,
                                        alphamin=self.alphamin,
                                        alphamax=self.alphamax,
                                        betac=self.betac, betad=self.betad,
@@ -219,7 +220,7 @@ class PSPHScheme(Scheme):
         g5 = []
         for fluid in self.fluids:
             g5.append(MomentumAndEnergy(dest=fluid,
-                                        sources=self.fluids + self.solids,
+                                        sources=all_pa,
                                         dim=self.dim, betab=self.betab,
                                         fkern=self.fkern, alphac=self.alphac,
                                         gamma=self.gamma))
@@ -255,7 +256,7 @@ class PSPHScheme(Scheme):
             pa.orig_idx[:] = numpy.arange(nfp)
             pa.set_output_arrays(output_props)
 
-        solid_props = set(props) | set('div cs wij htmp'.split(' '))
+        solid_props = set(props) | set('m0 wij htmp'.split(' '))
         for solid in self.solids:
             pa = particle_arrays[solid]
             self._ensure_properties(pa, solid_props, clean)

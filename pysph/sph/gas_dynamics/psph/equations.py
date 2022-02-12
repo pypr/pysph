@@ -76,7 +76,7 @@ class PSPHSummationDensityAndPressure(Equation):
         hibynidim = d_h[d_idx] / (d_prevn[d_idx] * self.dim)
         inbrkti = 1 + d_prevdndh[d_idx] * hibynidim
         inprthsi = d_dpsumdh[d_idx] * hibynidim / (
-            self.gammam1 * s_m[s_idx] * d_e[d_idx])
+                self.gammam1 * s_m[s_idx] * d_e[d_idx])
         fij = 1 - inprthsi / inbrkti
         vijdotdwij_fij = vijdotdwij * fij
         d_an[d_idx] += vijdotdwij_fij
@@ -347,7 +347,7 @@ class LimiterAndAlphas(Equation):
             absadivv = abs(d_adivv[d_idx])
             csbyfhi = d_cs[d_idx] / fhi
             alphatmp = self.alphamax * absadivv / (
-                absadivv + self.betac * csbyfhi * csbyfhi)
+                    absadivv + self.betac * csbyfhi * csbyfhi)
 
         if alphatmp >= d_alpha0[d_idx]:
             d_alpha0[d_idx] = alphatmp
@@ -450,8 +450,8 @@ class MomentumAndEnergy(Equation):
 
     def loop(self, d_idx, s_idx, d_m, s_m, d_p, s_p, d_cs, s_cs,
              d_au, d_av, d_aw, d_ae, XIJ, VIJ, DWI, DWJ, HIJ, d_alpha,
-             s_alpha, RIJ, R2IJ, RHOIJ, d_h, d_dndh, d_n, s_h, s_dndh, s_n,
-             d_e, s_e, d_dpsumdh, s_dpsumdh):
+             s_alpha, RIJ, R2IJ, d_h, d_dndh, d_n, s_h, s_dndh, s_n,
+             d_e, s_e, d_dpsumdh, s_dpsumdh, RHOIJ1):
 
         dim = self.dim
         gammam1 = self.gammam1
@@ -461,7 +461,9 @@ class MomentumAndEnergy(Equation):
         cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
 
         mj = s_m[s_idx]
-        vijdotxij = VIJ[0] * XIJ[0] + VIJ[1] * XIJ[1] + VIJ[2] * XIJ[2]
+        vijdotxij = (VIJ[0] * XIJ[0] +
+                     VIJ[1] * XIJ[1] +
+                     VIJ[2] * XIJ[2])
 
         if RIJ < 1e-8:
             vs = 2 * cij
@@ -482,8 +484,9 @@ class MomentumAndEnergy(Equation):
         # Artificial viscosity
         if vijdotxij <= 0.0:
             alphaij = 0.5 * (d_alpha[d_idx] + s_alpha[s_idx])
-            twrhoij = (2 * RHOIJ)
-            common = alphaij * muij * (cij - self.betab * muij) * mj / twrhoij
+            oby2rhoij = RHOIJ1 / 2.0
+            common = (alphaij * muij * (cij - self.betab * muij) * mj *
+                      oby2rhoij)
 
             avi[0] = common * (DWI[0] + DWJ[0])
             avi[1] = common * (DWI[1] + DWJ[1])
@@ -502,20 +505,20 @@ class MomentumAndEnergy(Equation):
             # artificial conductivity
             eij = d_e[d_idx] - s_e[s_idx]
             Lij = abs(d_p[d_idx] - s_p[s_idx]) / (d_p[d_idx] + s_p[s_idx])
-            d_ae[d_idx] += (self.alphac * mj * alphaij * vs * eij * Lij * Fij /
-                            twrhoij)
+            d_ae[d_idx] += (self.alphac * mj * alphaij * vs * eij * Lij * Fij *
+                            oby2rhoij)
 
         # grad-h correction terms.
         hibynidim = d_h[d_idx] / (d_n[d_idx] * dim)
         inbrkti = 1 + d_dndh[d_idx] * hibynidim
         inprthsi = d_dpsumdh[d_idx] * hibynidim / (
-            gammam1 * s_m[s_idx] * d_e[d_idx])
+                gammam1 * s_m[s_idx] * d_e[d_idx])
         fij = 1 - inprthsi / inbrkti
 
         hjbynjdim = s_h[s_idx] / (s_n[s_idx] * dim)
         inbrktj = 1 + s_dndh[s_idx] * hjbynjdim
         inprthsj = s_dpsumdh[s_idx] * hjbynjdim / (
-            gammam1 * d_m[d_idx] * s_e[s_idx])
+                gammam1 * d_m[d_idx] * s_e[s_idx])
         fji = 1 - inprthsj / inbrktj
 
         # accelerations for velocity
@@ -542,12 +545,13 @@ class WallBoundary(Equation):
 
     def initialize(self, d_idx, d_p, d_rho, d_e, d_m, d_cs, d_h,
                    d_htmp, d_h0, d_u, d_v, d_w, d_wij, d_n, d_dndh,
-                   d_psumdh):
+                   d_dpsumdh, d_m0):
 
         d_p[d_idx] = 0.0
         d_u[d_idx] = 0.0
         d_v[d_idx] = 0.0
         d_w[d_idx] = 0.0
+        d_m0[d_idx] = d_m[d_idx]
         d_m[d_idx] = 0.0
         d_rho[d_idx] = 0.0
         d_e[d_idx] = 0.0
@@ -557,12 +561,12 @@ class WallBoundary(Equation):
         d_htmp[d_idx] = 0.0
         d_n[d_idx] = 0.0
         d_dndh[d_idx] = 0.0
-        d_psumdh[d_idx] = 0.0
+        d_dpsumdh[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_p, d_rho, d_e, d_m, d_cs, d_u, d_v, d_w,
              d_wij, d_htmp, s_p, s_rho, s_e, s_m, s_cs, s_h,
-             s_u, s_v, s_w, WI, s_n, d_n, d_dndh, s_dndh, d_psumdh,
-             s_psumdh):
+             s_u, s_v, s_w, WI, s_n, d_n, d_dndh, s_dndh, d_dpsumdh,
+             s_dpsumdh):
         d_wij[d_idx] += WI
         d_p[d_idx] += s_p[s_idx] * WI
         d_u[d_idx] -= s_u[s_idx] * WI
@@ -575,10 +579,10 @@ class WallBoundary(Equation):
         d_htmp[d_idx] += s_h[s_idx] * WI
         d_n[d_idx] += s_n[s_idx] * WI
         d_dndh[d_idx] += s_dndh[s_idx] * WI
-        d_psumdh[d_idx] += s_psumdh[s_idx] * WI
+        d_dpsumdh[d_idx] += s_dpsumdh[s_idx] * WI
 
     def post_loop(self, d_idx, d_p, d_rho, d_e, d_m, d_cs, d_h, d_u,
-                  d_v, d_w, d_wij, d_htmp, d_dndh, d_psumdh, d_n):
+                  d_v, d_w, d_wij, d_htmp, d_dndh, d_dpsumdh, d_n, d_m0):
         if d_wij[d_idx] > 1e-30:
             d_p[d_idx] = d_p[d_idx] / d_wij[d_idx]
             d_u[d_idx] = d_u[d_idx] / d_wij[d_idx]
@@ -590,8 +594,12 @@ class WallBoundary(Equation):
             d_cs[d_idx] = d_cs[d_idx] / d_wij[d_idx]
             d_h[d_idx] = d_htmp[d_idx] / d_wij[d_idx]
             d_dndh[d_idx] /= d_wij[d_idx]
-            d_psumdh[d_idx] /= d_wij[d_idx]
+            d_dpsumdh[d_idx] /= d_wij[d_idx]
             d_n[d_idx] /= d_wij[d_idx]
+
+        # Secret Sauce
+        if d_m[d_idx] < 1e-10:
+            d_m[d_idx] = d_m0[d_idx]
 
 
 class UpdateGhostProps(Equation):
