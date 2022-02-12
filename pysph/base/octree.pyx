@@ -359,7 +359,7 @@ cdef class Octree:
     @cython.boundscheck(False) 
     cdef int _c_build_tree_level1(self, NNPSParticleArrayWrapper pa, double* xmin, double length,
             cOctreeNode* node, int num_threads) nogil:
-
+        
         cdef double* src_x_ptr = pa.x.data
         cdef double* src_y_ptr = pa.y.data
         cdef double* src_z_ptr = pa.z.data
@@ -600,11 +600,13 @@ cdef class Octree:
         self._calculate_domain(pa_wrapper)
 
         cdef int num_particles = pa_wrapper.get_number_of_particles()
+        cdef vector[u_int]* indices_ptr = new vector[u_int]()
+
         self.num_particles = num_particles
 
         cdef int i
-
-        cdef vector[u_int]* indices_ptr = new vector[u_int]()
+        for i from 0<=i<num_particles:
+            indices_ptr.push_back(i)
 
         if self.root != NULL:
             self._delete_tree(self.root)
@@ -614,29 +616,14 @@ cdef class Octree:
             del self.leaf_cells
 
         self.pids = <u_int*> malloc(num_particles*sizeof(u_int))
+        self._next_pid = 0
 
         self.root = self._new_node(self.xmin, self.length,
                 hmax=self.hmax, level=0)
 
-        cdef int num_threads = get_number_of_threads()
-
-        #Use the parallel method
-        if ( (num_threads > 4 and num_particles > 40000) or test_parallel):
-            self.method = 1
-            # self.root.start_index = 0
-            # self.root.num_particles = num_particles
-            # self.depth = self._c_build_tree_level1(pa_wrapper, self.root.xmin,
-            #         self.root.length, self.root, num_threads)
-
-        #Use the serial method
-        else: 
-            self.method = 0
-        self._next_pid = 0
-        for i from 0<=i<num_particles:
-            indices_ptr.push_back(i)
         self.depth = self._c_build_tree(pa_wrapper, indices_ptr, self.root.xmin,
-            self.root.length, self.root, 0)
-            
+                self.root.length, self.root, 0)
+
         return self.depth
 
     cdef void c_get_leaf_cells(self):
