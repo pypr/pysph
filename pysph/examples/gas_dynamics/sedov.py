@@ -13,7 +13,9 @@ import numpy
 # PySPH base and carray imports
 from pysph.base.utils import get_particle_array as gpa
 from pysph.solver.application import Application
-from pysph.sph.scheme import GasDScheme
+from pysph.sph.scheme import GasDScheme, SchemeChooser
+from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
+from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
 
 # Numerical constants
 dim = 2
@@ -58,14 +60,31 @@ class SedovPointExplosion(Application):
         return [fluid,]
 
     def create_scheme(self):
-        s = GasDScheme(
+        mpm = GasDScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             kernel_factor=kernel_factor, alpha1=alpha1, alpha2=alpha2,
             beta=beta, adaptive_h_scheme="mpm",
             update_alpha1=True, update_alpha2=True
         )
-        s.configure_solver(dt=dt, tf=tf, adaptive_timestep=False, pfreq=25)
+        psph = PSPHScheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            hfact=kernel_factor
+        )
+
+        tsph = TSPHScheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            hfact=kernel_factor
+        )
+        s = SchemeChooser(
+            default='mpm', mpm=mpm, psph=psph, tsph=tsph
+        )
         return s
+
+    def configure_scheme(self):
+        s = self.scheme
+        s.configure_solver(
+            dt=dt, tf=tf, adaptive_timestep=False, pfreq=25
+        )
 
 
 if __name__ == '__main__':
