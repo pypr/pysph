@@ -6,6 +6,8 @@ results after they interact
 from pysph.sph.scheme import (
     GSPHScheme, SchemeChooser, ADKEScheme, GasDScheme
 )
+from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
+from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
 from pysph.sph.wc.crksph import CRKSPHScheme
 from pysph.base.utils import get_particle_array as gpa
 from pysph.base.nnps import DomainManager
@@ -36,8 +38,19 @@ class WCBlastwave(Application):
         self.hdx = 1.5
         self.n_particles = 1000
 
+    def add_user_options(self, group):
+        group.add_argument(
+            "--hdx", action="store", type=float,
+            dest="hdx", default=1.5,
+            help="Ratio h/dx."
+        )
+        group.add_argument(
+            "--np", action="store", type=float, dest="np", default=1000,
+            help="Number of particles"
+        )
+
     def consume_user_options(self):
-        pass
+        self.n_particles = self.options.np
 
     def create_particles(self):
         self.dx = self.domain_length / self.n_particles
@@ -101,8 +114,21 @@ class WCBlastwave(Application):
             gamma=gamma, cl=4, cq=1, eta_crit=0.2, has_ghosts=True
         )
 
+        # Use 400 particles
+        psph = PSPHScheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            hfact=1.2
+        )
+
+        # Use 400 particles
+        tsph = TSPHScheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            hfact=1.2
+        )
+
         s = SchemeChooser(
-            default='gsph', gsph=gsph, adke=adke, mpm=mpm, crksph=crk
+            default='gsph', gsph=gsph, adke=adke, mpm=mpm, crksph=crk,
+            psph=psph, tsph=tsph
             )
         return s
 
@@ -121,6 +147,10 @@ class WCBlastwave(Application):
         elif self.options.scheme == 'crksph':
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=20)
+        elif self.options.scheme in ['tsph', 'psph']:
+            s.configure(hfact=1.2)
+            s.configure_solver(dt=self.dt, tf=self.tf,
+                               adaptive_timestep=False, pfreq=50)
 
     def post_process(self):
         if len(self.output_files) < 1 or self.rank > 0:
@@ -179,6 +209,10 @@ class WCBlastwave(Application):
             fig = os.path.join(self.output_dir, props[_i] + ".png")
             pyplot.savefig(fig, dpi=300)
             pyplot.close('all')
+
+        fname = os.path.join(self.output_dir, 'results.npz')
+        numpy.savez(fname, x=pa.x, u=pa.u, e=pa.e, cs=pa.cs, rho=pa.rho,
+                    p=pa.p, h=pa.h)
 
 
 if __name__ == '__main__':
