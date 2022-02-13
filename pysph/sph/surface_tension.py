@@ -147,7 +147,8 @@ class MomentumEquationPressureGradientHuAdams(Equation):
         self.gx = gx
         self.gy = gy
         self.gz = gz
-        super(MomentumEquationPressureGradientHuAdams, self).__init__(dest, sources)
+        super(MomentumEquationPressureGradientHuAdams,
+              self).__init__(dest, sources)
 
 
     def initialize(self, d_au, d_av, d_aw, d_idx):
@@ -174,7 +175,8 @@ class MomentumEquationPressureGradientAdami(Equation):
         self.gx = gx
         self.gy = gy
         self.gz = gz
-        super(MomentumEquationPressureGradientAdami, self).__init__(dest, sources)
+        super(MomentumEquationPressureGradientAdami,
+              self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_au, d_av, d_aw):
         d_au[d_idx] = 0.0
@@ -811,9 +813,9 @@ class CSFSurfaceTensionForceAdami(Equation):
 
     def post_loop(self, d_idx, d_au, d_av, d_aw, d_kappa, d_cx, d_cy, d_cz,
                   d_m, d_alpha, d_rho):
-        d_au[d_idx] += -self.sigma * d_kappa[d_idx] * d_cx[d_idx] / d_rho[d_idx]
-        d_av[d_idx] += -self.sigma * d_kappa[d_idx] * d_cy[d_idx] / d_rho[d_idx]
-        d_aw[d_idx] += -self.sigma * d_kappa[d_idx] * d_cz[d_idx] / d_rho[d_idx]
+        d_au[d_idx] += -self.sigma * d_kappa[d_idx] * d_cx[d_idx]/d_rho[d_idx]
+        d_av[d_idx] += -self.sigma * d_kappa[d_idx] * d_cy[d_idx]/d_rho[d_idx]
+        d_aw[d_idx] += -self.sigma * d_kappa[d_idx] * d_cz[d_idx]/d_rho[d_idx]
 
 
 class ShadlooViscosity(Equation):
@@ -1031,7 +1033,8 @@ def get_surface_tension_equations(fluids, solids, scheme, rho0, p0, c0, b,
         result = []
         equations = []
         for i in fluids+solids:
-            equations.append(SummationDensitySourceMass(dest=i, sources=fluids+solids))
+            equations.append(SummationDensitySourceMass(dest=i,
+                                                        sources=fluids+solids))
         result.append(Group(equations, real=real))
         equations = []
         for i in fluids:
@@ -1065,7 +1068,8 @@ def get_surface_tension_equations(fluids, solids, scheme, rho0, p0, c0, b,
         result = []
         equations = []
         for i in fluids+solids:
-            equations.append(SummationDensitySourceMass(dest=i, sources=fluids+solids))
+            equations.append(SummationDensitySourceMass(dest=i,
+                                                        sources=fluids+solids))
         result.append(Group(equations, real=real))
         equations = []
         for i in fluids:
@@ -1091,7 +1095,9 @@ def get_surface_tension_equations(fluids, solids, scheme, rho0, p0, c0, b,
                 dest=i, sources=fluids+solids))
             equations.append(MomentumEquationViscosityAdami(dest=i,
                                                             sources=fluids))
-            equations.append(CSFSurfaceTensionForceAdami(dest=i, sources=None, sigma=sigma))
+            equations.append(CSFSurfaceTensionForceAdami(dest=i,
+                                                        sources=None,
+                                                        sigma=sigma))
             if len(solids) != 0:
                 equations.append(SolidWallNoSlipBC(dest=i, sources=solids,
                                  nu=nu))
@@ -1100,7 +1106,8 @@ def get_surface_tension_equations(fluids, solids, scheme, rho0, p0, c0, b,
         result = []
         equations = []
         for i in fluids+solids:
-            equations.append(SummationDensitySourceMass(dest=i, sources=fluids+solids))
+            equations.append(SummationDensitySourceMass(dest=i,
+                                                        sources=fluids+solids))
         result.append(Group(equations, real=real))
         equations = []
         for i in fluids:
