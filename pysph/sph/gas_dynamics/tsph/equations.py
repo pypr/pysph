@@ -71,8 +71,7 @@ class SummationDensity(Equation):
         d_n[d_idx] += WI
         d_dndh[d_idx] += GHI
 
-    def post_loop(self, d_idx, d_h0, d_h,
-                  d_ah, d_converged, d_n, d_dndh,
+    def post_loop(self, d_idx, d_h0, d_h, d_ah, d_converged, d_n, d_dndh,
                   d_an):
         # iteratively find smoothing length consistent with the
         if self.density_iterations:
@@ -84,10 +83,6 @@ class SummationDensity(Equation):
                 ni = (self.hfact / hi) ** self.dim
                 dndhi = - self.dim * d_n[d_idx] / hi
 
-                # correct fi TODO: Remove if not required
-                # if fi < 0:
-                #     fi = 1.0
-
                 # the non-linear function and it's derivative
                 func = d_n[d_idx] - ni
                 dfdh = d_dndh[d_idx] - dndhi
@@ -95,23 +90,18 @@ class SummationDensity(Equation):
                 # Newton Raphson estimate for the new h
                 hnew = hi - func / dfdh
 
-                # Nanny control for h TODO: Remove if not required
+                # Nanny control for h
                 if hnew > 1.2 * hi:
                     hnew = 1.2 * hi
                 elif hnew < 0.8 * hi:
                     hnew = 0.8 * hi
-
-                # overwrite if gone awry TODO: Remove if not required
-                # if (hnew <= 1e-6) or (fi < 1e-6):
-                #     hnew = self.k * (mi / d_rho[d_idx]) ** (1. / self.dim)
 
                 # check for convergence
                 diff = abs(hnew - hi) / hi0
 
                 # if not ((diff < self.htol) and (fi > 0) or
                 #         self.iterate_only_once):
-                if not ((diff < self.htol) or
-                        self.iterate_only_once):
+                if not ((diff < self.htol) or self.iterate_only_once):
                     # this particle hasn't converged. This means the
                     # entire group must be repeated until this fellow
                     # has converged, or till the maximum iteration has
@@ -129,6 +119,24 @@ class SummationDensity(Equation):
 
     def converged(self):
         return self.equation_has_converged
+
+
+class IdealGasEOS(Equation):
+    def __init__(self, dest, sources, gamma):
+        """
+        :class:`IdealGasEOS
+        <pysph.sph.gas_dynamics.basic.IdealGasEOS>` modified to avoid repeated
+        calculations using :meth:`loop() <pysph.sph.equation.Equation.loop()>`.
+        Doing the same using :meth:`post_loop()
+        <pysph.sph.equation.Equation.loop()>`.
+        """
+        self.gamma = gamma
+        self.gamma1 = gamma - 1.0
+        super(IdealGasEOS, self).__init__(dest, sources)
+
+    def post_loop(self, d_idx, d_p, d_rho, d_e, d_cs):
+        d_p[d_idx] = self.gamma1 * d_rho[d_idx] * d_e[d_idx]
+        d_cs[d_idx] = sqrt(self.gamma * d_p[d_idx] / d_rho[d_idx])
 
 
 class VelocityGradDivC1(Equation):
@@ -278,10 +286,9 @@ class MomentumAndEnergy(Equation):
         # d_dt_cfl[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_m, s_m, d_p, s_p, d_cs, s_cs, d_rho, s_rho,
-             d_au, d_av, d_aw, d_ae, XIJ, VIJ, DWI, DWJ, HIJ, d_alpha,
-             s_alpha, RIJ, R2IJ, RHOIJ1, d_h, d_dndh, d_n,
-             d_drhosumdh, s_h, s_dndh, s_n, s_drhosumdh):
-
+             d_au, d_av, d_aw, d_ae, XIJ, VIJ, DWI, DWJ, HIJ, d_alpha, s_alpha,
+             R2IJ, RHOIJ1, d_h, d_dndh, d_n, d_drhosumdh, s_h, s_dndh, s_n,
+             s_drhosumdh):
         avi = declare("matrix(3)")
         dim = self.dim
 
@@ -302,9 +309,7 @@ class MomentumAndEnergy(Equation):
 
         mj = s_m[s_idx]
         hij = self.fkern * HIJ
-        vijdotxij = (VIJ[0] * XIJ[0] +
-                     VIJ[1] * XIJ[1] +
-                     VIJ[2] * XIJ[2])
+        vijdotxij = (VIJ[0] * XIJ[0] + VIJ[1] * XIJ[1] + VIJ[2] * XIJ[2])
 
         # # normalized interaction vector
         # if RIJ < 1e-8:
@@ -378,9 +383,9 @@ class WallBoundary(Equation):
         since it appears in denominator of fij. This has been addressed.
     """
 
-    def initialize(self, d_idx, d_p, d_rho, d_e, d_m, d_cs, d_h,
-                   d_htmp, d_h0, d_u, d_v, d_w, d_wij, d_n, d_dndh,
-                   d_drhosumdh, d_divv, d_m0):
+    def initialize(self, d_idx, d_p, d_rho, d_e, d_m, d_cs, d_h, d_htmp, d_h0,
+                   d_u, d_v, d_w, d_wij, d_n, d_dndh, d_drhosumdh, d_divv,
+                   d_m0):
         d_p[d_idx] = 0.0
         d_u[d_idx] = 0.0
         d_v[d_idx] = 0.0
@@ -450,8 +455,8 @@ class UpdateGhostProps(Equation):
         self.dim = dim
         assert GHOST_TAG == 2
 
-    def initialize(self, d_idx, d_orig_idx, d_p, d_tag, d_h,
-                   d_rho, d_dndh, d_psumdh, d_n):
+    def initialize(self, d_idx, d_orig_idx, d_p, d_tag, d_h, d_rho, d_dndh,
+                   d_psumdh, d_n):
         idx = declare('int')
         if d_tag[d_idx] == 2:
             idx = d_orig_idx[d_idx]

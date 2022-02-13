@@ -172,29 +172,22 @@ class PSPHScheme(Scheme):
         equations = []
         # Find the optimal 'h'
         all_pa = self.fluids + self.solids
+
         g1 = []
         for fluid in self.fluids:
             g1.append(PSPHSummationDensityAndPressure(
-                dest=fluid,
-                sources=all_pa,
-                hfact=self.hfact,
-                density_iterations=True,
-                dim=self.dim,
-                htol=self.density_iteration_tolerance,
-                gamma=self.gamma))
-
+                dest=fluid, sources=all_pa, hfact=self.hfact,
+                density_iterations=True, dim=self.dim,
+                htol=self.density_iteration_tolerance, gamma=self.gamma))
             equations.append(
                 Group(equations=g1, update_nnps=True, iterate=True,
                       max_iterations=self.max_density_iterations))
 
         g2 = []
-
         for fluid in self.fluids:
-            g2.append(GradientKinsfolkC1(dest=fluid,
-                                         sources=all_pa,
-                                         dim=self.dim, ))
-            g2.append(SignalVelocity(dest=fluid,
-                                     sources=all_pa, ))
+            g2.append(GradientKinsfolkC1(
+                dest=fluid, sources=all_pa, dim=self.dim))
+            g2.append(SignalVelocity(dest=fluid, sources=all_pa))
         equations.append(Group(equations=g2))
 
         g3 = []
@@ -219,12 +212,9 @@ class PSPHScheme(Scheme):
 
         g5 = []
         for fluid in self.fluids:
-            g5.append(MomentumAndEnergy(dest=fluid,
-                                        sources=all_pa,
-                                        dim=self.dim, betab=self.betab,
-                                        fkern=self.fkern, alphac=self.alphac,
-                                        gamma=self.gamma))
-
+            g5.append(MomentumAndEnergy(
+                dest=fluid, sources=all_pa, dim=self.dim, betab=self.betab,
+                fkern=self.fkern, alphac=self.alphac, gamma=self.gamma))
         equations.append(Group(equations=g5))
 
         return equations

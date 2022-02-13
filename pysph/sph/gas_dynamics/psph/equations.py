@@ -41,9 +41,8 @@ class PSPHSummationDensityAndPressure(Equation):
 
         super().__init__(dest, sources)
 
-    def initialize(self, d_idx, d_rho, d_arho, d_n, d_dndh,
-                   d_prevn, d_prevdndh, d_p, d_dpsumdh,
-                   d_dprevpsumdh, d_an):
+    def initialize(self, d_idx, d_rho, d_arho, d_n, d_dndh, d_prevn,
+                   d_prevdndh, d_p, d_dpsumdh, d_dprevpsumdh, d_an):
 
         d_rho[d_idx] = 0.0
         d_arho[d_idx] = 0.0
@@ -60,9 +59,8 @@ class PSPHSummationDensityAndPressure(Equation):
 
         self.equation_has_converged = 1
 
-    def loop(self, d_idx, s_idx, d_rho, d_arho, s_m, VIJ, WI, DWI,
-             GHI, d_n, d_dndh, d_h, d_prevn, d_prevdndh,
-             s_e, d_p, d_dpsumdh, d_e, d_an):
+    def loop(self, d_idx, s_idx, d_rho, d_arho, s_m, VIJ, WI, DWI, GHI, d_n,
+             d_dndh, d_h, d_prevn, d_prevdndh, s_e, d_p, d_dpsumdh, d_e, d_an):
 
         mj = s_m[s_idx]
         vijdotdwij = VIJ[0] * DWI[0] + VIJ[1] * DWI[1] + VIJ[2] * DWI[2]
@@ -89,9 +87,8 @@ class PSPHSummationDensityAndPressure(Equation):
         d_n[d_idx] += WI
         d_dndh[d_idx] += GHI
 
-    def post_loop(self, d_idx, d_rho, d_h0, d_h,
-                  d_ah, d_converged, d_cs, d_p, d_n, d_dndh,
-                  d_an):
+    def post_loop(self, d_idx, d_rho, d_h0, d_h, d_ah, d_converged, d_cs, d_p,
+                  d_n, d_dndh, d_an):
 
         d_cs[d_idx] = sqrt(self.gamma * d_p[d_idx] / d_rho[d_idx])
 
@@ -105,10 +102,6 @@ class PSPHSummationDensityAndPressure(Equation):
                 ni = (self.hfact / hi) ** self.dim
                 dndhi = - self.dim * d_n[d_idx] / hi
 
-                # correct fi TODO: Remove if not required
-                # if fi < 0:
-                #     fi = 1.0
-
                 # the non-linear function and it's derivative
                 func = d_n[d_idx] - ni
                 dfdh = d_dndh[d_idx] - dndhi
@@ -116,23 +109,18 @@ class PSPHSummationDensityAndPressure(Equation):
                 # Newton Raphson estimate for the new h
                 hnew = hi - func / dfdh
 
-                # Nanny control for h TODO: Remove if not required
+                # Nanny control for h
                 if hnew > 1.2 * hi:
                     hnew = 1.2 * hi
                 elif hnew < 0.8 * hi:
                     hnew = 0.8 * hi
-
-                # overwrite if gone awry TODO: Remove if not required
-                # if (hnew <= 1e-6) or (fi < 1e-6):
-                #     hnew = self.k * (mi / d_rho[d_idx]) ** (1. / self.dim)
 
                 # check for convergence
                 diff = abs(hnew - hi) / hi0
 
                 # if not ((diff < self.htol) and (fi > 0) or
                 #         self.iterate_only_once):
-                if not ((diff < self.htol) or
-                        self.iterate_only_once):
+                if not ((diff < self.htol) or self.iterate_only_once):
                     # this particle hasn't converged. This means the
                     # entire group must be repeated until this fellow
                     # has converged, or till the maximum iteration has
@@ -172,8 +160,8 @@ class GradientKinsfolkC1(Equation):
     def _get_helpers_(self):
         return [augmented_matrix, gj_solve, identity, mat_mult]
 
-    def initialize(self, d_gradv, d_idx, d_invtt, d_divv, d_grada,
-                   d_adivv, d_trssdsst):
+    def initialize(self, d_gradv, d_idx, d_invtt, d_divv, d_grada, d_adivv,
+                   d_trssdsst):
         start_indx, i, dim = declare('int', 3)
         start_indx = 9 * d_idx
         for i in range(9):
@@ -185,8 +173,8 @@ class GradientKinsfolkC1(Equation):
         d_adivv[d_idx] = 0.0
         d_trssdsst[d_idx] = 0.0
 
-    def loop(self, d_idx, d_invtt, s_m, s_idx, VIJ, DWI, XIJ, d_gradv,
-             d_grada, d_au, s_au, d_av, s_av, d_aw, s_aw):
+    def loop(self, d_idx, d_invtt, s_m, s_idx, VIJ, DWI, XIJ, d_gradv, d_grada,
+             d_au, s_au, d_av, s_av, d_aw, s_aw):
         start_indx, row, col, drowcol, dim = declare('int', 5)
         dim = self.dim
         start_indx = d_idx * 9
@@ -445,13 +433,10 @@ class MomentumAndEnergy(Equation):
         d_aw[d_idx] = 0.0
         d_ae[d_idx] = 0.0
 
-        # Really required?
-        # d_dt_cfl[d_idx] = 0.0
-
-    def loop(self, d_idx, s_idx, d_m, s_m, d_p, s_p, d_cs, s_cs,
-             d_au, d_av, d_aw, d_ae, XIJ, VIJ, DWI, DWJ, HIJ, d_alpha,
-             s_alpha, RIJ, R2IJ, d_h, d_dndh, d_n, s_h, s_dndh, s_n,
-             d_e, s_e, d_dpsumdh, s_dpsumdh, RHOIJ1):
+    def loop(self, d_idx, s_idx, d_m, s_m, d_p, s_p, d_cs, s_cs, d_au, d_av,
+             d_aw, d_ae, XIJ, VIJ, DWI, DWJ, d_alpha, s_alpha, RIJ, d_h,
+             d_dndh, d_n, s_h, s_dndh, s_n, d_e, s_e, d_dpsumdh, s_dpsumdh,
+             RHOIJ1):
 
         dim = self.dim
         gammam1 = self.gammam1
@@ -461,9 +446,7 @@ class MomentumAndEnergy(Equation):
         cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
 
         mj = s_m[s_idx]
-        vijdotxij = (VIJ[0] * XIJ[0] +
-                     VIJ[1] * XIJ[1] +
-                     VIJ[2] * XIJ[2])
+        vijdotxij = (VIJ[0] * XIJ[0] + VIJ[1] * XIJ[1] + VIJ[2] * XIJ[2])
 
         if RIJ < 1e-8:
             vs = 2 * cij
@@ -485,8 +468,8 @@ class MomentumAndEnergy(Equation):
         if vijdotxij <= 0.0:
             alphaij = 0.5 * (d_alpha[d_idx] + s_alpha[s_idx])
             oby2rhoij = RHOIJ1 / 2.0
-            common = (alphaij * muij * (cij - self.betab * muij) * mj *
-                      oby2rhoij)
+            common = (alphaij * muij * (
+                    cij - self.betab * muij) * mj * oby2rhoij)
 
             avi[0] = common * (DWI[0] + DWJ[0])
             avi[1] = common * (DWI[1] + DWJ[1])
@@ -543,9 +526,8 @@ class WallBoundary(Equation):
         for PSPH
     """
 
-    def initialize(self, d_idx, d_p, d_rho, d_e, d_m, d_cs, d_h,
-                   d_htmp, d_h0, d_u, d_v, d_w, d_wij, d_n, d_dndh,
-                   d_dpsumdh, d_m0):
+    def initialize(self, d_idx, d_p, d_rho, d_e, d_m, d_cs, d_h, d_htmp, d_h0,
+                   d_u, d_v, d_w, d_wij, d_n, d_dndh, d_dpsumdh, d_m0):
 
         d_p[d_idx] = 0.0
         d_u[d_idx] = 0.0
@@ -564,9 +546,8 @@ class WallBoundary(Equation):
         d_dpsumdh[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_p, d_rho, d_e, d_m, d_cs, d_u, d_v, d_w,
-             d_wij, d_htmp, s_p, s_rho, s_e, s_m, s_cs, s_h,
-             s_u, s_v, s_w, WI, s_n, d_n, d_dndh, s_dndh, d_dpsumdh,
-             s_dpsumdh):
+             d_wij, d_htmp, s_p, s_rho, s_e, s_m, s_cs, s_h, s_u, s_v, s_w, WI,
+             s_n, d_n, d_dndh, s_dndh, d_dpsumdh, s_dpsumdh):
         d_wij[d_idx] += WI
         d_p[d_idx] += s_p[s_idx] * WI
         d_u[d_idx] -= s_u[s_idx] * WI
@@ -581,8 +562,8 @@ class WallBoundary(Equation):
         d_dndh[d_idx] += s_dndh[s_idx] * WI
         d_dpsumdh[d_idx] += s_dpsumdh[s_idx] * WI
 
-    def post_loop(self, d_idx, d_p, d_rho, d_e, d_m, d_cs, d_h, d_u,
-                  d_v, d_w, d_wij, d_htmp, d_dndh, d_dpsumdh, d_n, d_m0):
+    def post_loop(self, d_idx, d_p, d_rho, d_e, d_m, d_cs, d_h, d_u, d_v, d_w,
+                  d_wij, d_htmp, d_dndh, d_dpsumdh, d_n, d_m0):
         if d_wij[d_idx] > 1e-30:
             d_p[d_idx] = d_p[d_idx] / d_wij[d_idx]
             d_u[d_idx] = d_u[d_idx] / d_wij[d_idx]
@@ -613,8 +594,8 @@ class UpdateGhostProps(Equation):
         self.dim = dim
         assert GHOST_TAG == 2
 
-    def initialize(self, d_idx, d_orig_idx, d_p, d_tag, d_h,
-                   d_rho, d_dndh, d_psumdh, d_n):
+    def initialize(self, d_idx, d_orig_idx, d_p, d_tag, d_h, d_rho, d_dndh,
+                   d_psumdh, d_n):
         idx = declare('int')
         if d_tag[d_idx] == 2:
             idx = d_orig_idx[d_idx]

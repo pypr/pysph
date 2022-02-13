@@ -18,8 +18,8 @@ from pysph.sph.scheme import Scheme
 
 
 class TSPHScheme(Scheme):
-    def __init__(self, fluids, solids, dim, gamma, hfact,
-                 beta=2.0, fkern=1.0, max_density_iterations=250, alphaav=1.0,
+    def __init__(self, fluids, solids, dim, gamma, hfact, beta=2.0, fkern=1.0,
+                 max_density_iterations=250, alphaav=1.0,
                  density_iteration_tolerance=1e-3, has_ghosts=False):
         """
         Density-energy formulation [Hopkins2013]_ including Balsara's
@@ -60,7 +60,6 @@ class TSPHScheme(Scheme):
             1.0
         """
 
-
         self.fluids = fluids
         self.solids = solids
         self.dim = dim
@@ -75,21 +74,16 @@ class TSPHScheme(Scheme):
         self.alphaav = alphaav
 
     def add_user_options(self, group):
-        group.add_argument(
-            "--alphaav", action="store", type=float, dest="alphaav",
-            default=None,
-            help="alpha_av for the artificial viscosity switch."
-        )
-        group.add_argument(
-            "--beta", action="store", type=float, dest="beta",
-            default=None,
-            help="Beta for the artificial viscosity."
-        )
-        group.add_argument(
-            "--gamma", action="store", type=float, dest="gamma",
-            default=None,
-            help="Gamma for the state equation."
-        )
+        group.add_argument("--alphaav", action="store", type=float,
+                           dest="alphaav", default=None,
+                           help="alpha_av for the artificial viscosity switch.")
+
+        group.add_argument("--beta", action="store", type=float, dest="beta",
+                           default=None,
+                           help="Beta for the artificial viscosity.")
+
+        group.add_argument("--gamma", action="store", type=float, dest="gamma",
+                           default=None, help="Gamma for the state equation.")
 
     def consume_user_options(self, options):
         vars = ['gamma', 'alphaav', 'beta']
@@ -129,43 +123,35 @@ class TSPHScheme(Scheme):
 
     def get_equations(self):
         from pysph.sph.equation import Group
-        from pysph.sph.gas_dynamics.basic import IdealGasEOS
         from pysph.sph.gas_dynamics.tsph.equations import (
             SummationDensity, MomentumAndEnergy, VelocityGradDivC1,
-            BalsaraSwitch, UpdateGhostProps, WallBoundary)
+            BalsaraSwitch, UpdateGhostProps, WallBoundary, IdealGasEOS)
 
         all_pa = self.fluids + self.solids
         equations = []
-        # Find the optimal 'h'
 
+        # Find the optimal 'h'
         g1 = []
         for fluid in self.fluids:
-            g1.append(SummationDensity(dest=fluid, sources=all_pa,
-                                       hfact=self.hfact,
-                                       density_iterations=True, dim=self.dim,
-                                       htol=self.density_iteration_tolerance))
-
-            equations.append(
-                Group(equations=g1, update_nnps=True, iterate=True,
-                      max_iterations=self.max_density_iterations))
+            g1.append(SummationDensity(
+                dest=fluid, sources=all_pa, hfact=self.hfact,
+                density_iterations=True, dim=self.dim,
+                htol=self.density_iteration_tolerance))
+            equations.append(Group(
+                equations=g1, update_nnps=True, iterate=True,
+                max_iterations=self.max_density_iterations))
 
         g2 = []
         for fluid in self.fluids:
             g2.append(IdealGasEOS(dest=fluid, sources=None, gamma=self.gamma))
-
         equations.append(Group(equations=g2))
 
         g3 = []
-
         for fluid in self.fluids:
-            g3.append(VelocityGradDivC1(dest=fluid,
-                                        sources=all_pa,
+            g3.append(VelocityGradDivC1(dest=fluid, sources=all_pa,
                                         dim=self.dim))
-
-            g3.append(
-                BalsaraSwitch(dest=fluid, sources=None, alphaav=self.alphaav,
-                              fkern=self.fkern))
-
+            g3.append(BalsaraSwitch(dest=fluid, sources=None,
+                                    alphaav=self.alphaav, fkern=self.fkern))
         equations.append(Group(equations=g3))
 
         g4 = []
@@ -181,12 +167,9 @@ class TSPHScheme(Scheme):
 
         g5 = []
         for fluid in self.fluids:
-            g5.append(MomentumAndEnergy(dest=fluid,
-                                        sources=all_pa,
-                                        dim=self.dim,
-                                        beta=self.beta,
+            g5.append(MomentumAndEnergy(dest=fluid, sources=all_pa,
+                                        dim=self.dim, beta=self.beta,
                                         fkern=self.fkern))
-
         equations.append(Group(equations=g5))
 
         return equations
