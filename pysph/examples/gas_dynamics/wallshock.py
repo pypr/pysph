@@ -2,6 +2,8 @@
 """
 from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
 from pysph.sph.scheme import ADKEScheme, GasDScheme, GSPHScheme, SchemeChooser
+from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
+from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
 
 # Numerical constants
 dim = 1
@@ -82,7 +84,18 @@ class WallShock(ShockTubeSetup):
             niter=40, tol=1e-6
         )
 
-        s = SchemeChooser(default='adke', adke=adke, mpm=mpm, gsph=gsph)
+        psph = PSPHScheme(
+            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
+            hfact=1.2
+        )
+
+        tsph = TSPHScheme(
+            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
+            hfact=1.2
+        )
+
+        s = SchemeChooser(default='adke', adke=adke, mpm=mpm, gsph=gsph,
+                          psph=psph, tsph=tsph)
         return s
 
 
