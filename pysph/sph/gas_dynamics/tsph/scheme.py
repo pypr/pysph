@@ -24,7 +24,27 @@ class TSPHScheme(Scheme):
         """
         Density-energy formulation [Hopkins2013]_ including Balsara's
         artificial viscocity switch with modifications,
-        as presented in Appendix F2 of [Hopkins2015]_ .
+        as presented in Appendix F1 of [Hopkins2015]_ .
+
+        Notes
+        -----
+        Is this exactly in accordance with what is proposed in [Hopkins2015]_ ?
+            Not quite.
+
+        What is different then?
+            #. Adapting smoothing length using MPM [KP14]_ procedure from
+               :class:`SummationDensity
+               <pysph.sph.gas_dynamics.basic.SummationDensity>`. In this,
+               calculation of grad-h terms are changed to that specified for this
+               scheme.
+            #. Using the PEC integrator step. No individual
+               adaptive time-stepping.
+            #. Using :class:`Gaussian Kernel <pysph.base.kernels.Gaussian>`
+               by default instead of Cubic Spline with radius scale 1.
+
+        Tip: Reduce the number of points if particle penetration is encountered.
+        This has to be done while running ``gas_dynamics.wc_blastwave`` and
+        ``gas_dynamics.robert``
 
         Parameters
         ----------
