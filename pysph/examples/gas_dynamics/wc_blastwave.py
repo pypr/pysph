@@ -3,16 +3,16 @@
 Two discontinuities moving towards each other and the
 results after they interact
 """
-from pysph.sph.scheme import (
-    GSPHScheme, SchemeChooser, ADKEScheme, GasDScheme
-)
+import numpy
+
+from pysph.base.nnps import DomainManager
+from pysph.base.utils import get_particle_array as gpa
+from pysph.solver.application import Application
 from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
 from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
+from pysph.sph.scheme import (GSPHScheme, SchemeChooser, ADKEScheme,
+                              GasDScheme)
 from pysph.sph.wc.crksph import CRKSPHScheme
-from pysph.base.utils import get_particle_array as gpa
-from pysph.base.nnps import DomainManager
-from pysph.solver.application import Application
-import numpy
 
 # Numerical constants
 dim = 1
@@ -39,24 +39,19 @@ class WCBlastwave(Application):
         self.n_particles = 1000
 
     def add_user_options(self, group):
-        group.add_argument(
-            "--hdx", action="store", type=float,
-            dest="hdx", default=1.5,
-            help="Ratio h/dx."
-        )
-        group.add_argument(
-            "--np", action="store", type=float, dest="np", default=1000,
-            help="Number of particles"
-        )
+        group.add_argument("--hdx", action="store", type=float, dest="hdx",
+                           default=1.5, help="Ratio h/dx.")
+
+        group.add_argument("--nparticles", action="store", type=float,
+                           dest="nprt", default=1000,
+                           help="Number of particles")
 
     def consume_user_options(self):
-        self.n_particles = self.options.np
+        self.n_particles = self.options.nprt
 
     def create_particles(self):
         self.dx = self.domain_length / self.n_particles
-        x = numpy.arange(
-            self.xmin + self.dx*0.5, self.xmax, self.dx
-            )
+        x = numpy.arange(self.xmin + self.dx * 0.5, self.xmax, self.dx)
 
         p = numpy.ones_like(x) * self.p2
 
@@ -66,91 +61,79 @@ class WCBlastwave(Application):
         p[left_indices] = self.p1
         p[right_indices] = self.p3
 
-        h = self.hdx*self.dx
+        h = self.hdx * self.dx
         m = self.dx * self.rho
         e = p / ((self.gamma - 1) * self.rho)
 
         cs = numpy.sqrt(self.gamma * p / self.rho)
 
-        fluid = gpa(
-            name='fluid', x=x, rho=self.rho, p=p, h=h, m=m, e=e, cs=cs,
-            h0=h, u=0
-            )
+        fluid = gpa(name='fluid', x=x, rho=self.rho, p=p, h=h, m=m, e=e, cs=cs,
+                    h0=h, u=0)
 
         self.scheme.setup_properties([fluid])
         return [fluid]
 
     def create_domain(self):
-        return DomainManager(
-            xmin=self.xmin, xmax=self.xmax,
-            mirror_in_x=True
-        )
+        return DomainManager(xmin=self.xmin, xmax=self.xmax, mirror_in_x=True)
 
     def create_scheme(self):
         self.dt = dt
         self.tf = tf
-        adke = ADKEScheme(
-            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            alpha=1, beta=1.0, k=1.0, eps=0.8, g1=0.2, g2=0.4,
-            has_ghosts=True)
+        adke = ADKEScheme(fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+                          alpha=1, beta=1.0, k=1.0, eps=0.8, g1=0.2, g2=0.4,
+                          has_ghosts=True)
 
-        mpm = GasDScheme(
-            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            kernel_factor=1.2, alpha1=1.0, alpha2=0.1,
-            beta=2.0, update_alpha1=True, update_alpha2=True,
-            has_ghosts=True
-        )
+        mpm = GasDScheme(fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+                         kernel_factor=1.2, alpha1=1.0, alpha2=0.1, beta=2.0,
+                         update_alpha1=True, update_alpha2=True,
+                         has_ghosts=True)
 
-        gsph = GSPHScheme(
-            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            kernel_factor=1.0,
-            g1=0.2, g2=0.4, rsolver=2, interpolation=1, monotonicity=1,
-            interface_zero=True, hybrid=False, blend_alpha=2.0,
-            niter=20, tol=1e-6, has_ghosts=True
-        )
+        gsph = GSPHScheme(fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+                          kernel_factor=1.0, g1=0.2, g2=0.4, rsolver=2,
+                          interpolation=1, monotonicity=1, interface_zero=True,
+                          hybrid=False, blend_alpha=2.0, niter=20, tol=1e-6,
+                          has_ghosts=True)
 
-        crk = CRKSPHScheme(
-            fluids=['fluid'], dim=dim, rho0=0, c0=0, nu=0, h0=0, p0=0,
-            gamma=gamma, cl=4, cq=1, eta_crit=0.2, has_ghosts=True
-        )
+        crk = CRKSPHScheme(fluids=['fluid'], dim=dim, rho0=0, c0=0, nu=0, h0=0,
+                           p0=0, gamma=gamma, cl=4, cq=1, eta_crit=0.2,
+                           has_ghosts=True)
 
         # Use 400 particles
-        psph = PSPHScheme(
-            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            hfact=1.2
-        )
+        psph = PSPHScheme(fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+                          hfact=1.2)
 
         # Use 400 particles
-        tsph = TSPHScheme(
-            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            hfact=1.2
-        )
+        tsph = TSPHScheme(fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+                          hfact=1.2)
 
-        s = SchemeChooser(
-            default='gsph', gsph=gsph, adke=adke, mpm=mpm, crksph=crk,
-            psph=psph, tsph=tsph
-            )
+        s = SchemeChooser(default='gsph', gsph=gsph, adke=adke, mpm=mpm,
+                          crksph=crk, psph=psph, tsph=tsph)
         return s
 
     def configure_scheme(self):
         s = self.scheme
+
         if self.options.scheme == 'mpm':
             s.configure(kernel_factor=1.2)
-            s.configure_solver(dt=self.dt, tf=self.tf,
-                               adaptive_timestep=True, pfreq=50)
+            s.configure_solver(dt=self.dt, tf=self.tf, adaptive_timestep=True,
+                               pfreq=50)
+
         elif self.options.scheme == 'adke':
-            s.configure_solver(dt=self.dt, tf=self.tf,
-                               adaptive_timestep=False, pfreq=50)
+            s.configure_solver(dt=self.dt, tf=self.tf, adaptive_timestep=False,
+                               pfreq=50)
+
         elif self.options.scheme == 'gsph':
-            s.configure_solver(dt=self.dt, tf=self.tf,
-                               adaptive_timestep=False, pfreq=50)
+            s.configure_solver(dt=self.dt, tf=self.tf, adaptive_timestep=False,
+                               pfreq=50)
+
         elif self.options.scheme == 'crksph':
-            s.configure_solver(dt=self.dt, tf=self.tf,
-                               adaptive_timestep=False, pfreq=20)
+            s.configure_solver(dt=self.dt, tf=self.tf, adaptive_timestep=False,
+                               pfreq=20)
+
         elif self.options.scheme in ['tsph', 'psph']:
             s.configure(hfact=1.2)
-            s.configure_solver(dt=self.dt, tf=self.tf,
-                               adaptive_timestep=False, pfreq=50)
+            s.configure_solver(dt=self.dt, tf=self.tf, adaptive_timestep=False,
+                               pfreq=50)
 
     def post_process(self):
         if len(self.output_files) < 1 or self.rank > 0:
@@ -175,9 +158,7 @@ class WCBlastwave(Application):
         except ImportError:
             print("h5py not found, exact data will not be plotted")
 
-        fname = os.path.join(
-            os.path.dirname(__file__), 'wc_exact.hdf5'
-        )
+        fname = os.path.join(os.path.dirname(__file__), 'wc_exact.hdf5')
         props = ["rho", "u", "p", "e"]
         props_h5 = ["'" + pr + "'" for pr in props]
         if plot_exact:

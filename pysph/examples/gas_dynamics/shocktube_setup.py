@@ -3,17 +3,17 @@
 """
 
 import os
+
 import numpy
-from math import sqrt
 
 from pysph.base.utils import get_particle_array as gpa
-from pysph.solver.application import Application
 from pysph.examples.gas_dynamics import riemann_solver
+from pysph.solver.application import Application
 
 
 class ShockTubeSetup(Application):
 
-    def generate_particles(self, xmin, xmax, dxl, dxr, m, pl, pr, h0,  bx,
+    def generate_particles(self, xmin, xmax, dxl, dxr, m, pl, pr, h0, bx,
                            gamma1, ul=0, ur=0, constants={}):
         xt1 = numpy.arange(xmin - bx + 0.5 * dxl, 0, dxl)
         xt2 = numpy.arange(0.5 * dxr, xmax + bx, dxr)
@@ -52,15 +52,13 @@ class ShockTubeSetup(Application):
         bm = numpy.ones_like(b) * dxl
         bh = numpy.ones_like(b) * 4 * h0
         bhtmp = numpy.ones_like(b)
-        fluid = gpa(
-            constants=constants, name='fluid', x=x, rho=rho, p=p,
-            e=e, h=h, m=m, u=u, wij=wij, h0=h.copy()
-        )
 
-        boundary = gpa(
-            constants=constants, name='boundary', x=b, rho=brho, p=bp,
-            e=be, h=bh, m=bm, wij=bwij, h0=bh.copy(), htmp=bhtmp
-        )
+        fluid = gpa(constants=constants, name='fluid', x=x, rho=rho, p=p, e=e,
+                    h=h, m=m, u=u, wij=wij, h0=h.copy())
+
+        boundary = gpa(constants=constants, name='boundary', x=b, rho=brho,
+                       p=bp, e=be, h=bh, m=bm, wij=bwij, h0=bh.copy(),
+                       htmp=bhtmp)
 
         self.scheme.setup_properties([fluid, boundary])
         print("1D Shocktube with %d particles" %
@@ -86,9 +84,9 @@ class ShockTubeSetup(Application):
         riemann_solver.set_gamma(gamma)
 
         rho_e, u_e, p_e, e_e, x_e = riemann_solver.solve(
-            x_min=self.xmin, x_max=self.xmax, x_0=self.x0,
-            t=self.tf, p_l=self.pl, p_r=self.pr, rho_l=self.rhol,
-            rho_r=self.rhor, u_l=self.ul, u_r=self.ur, N=101
+            x_min=self.xmin, x_max=self.xmax, x_0=self.x0, t=self.tf,
+            p_l=self.pl, p_r=self.pr, rho_l=self.rhol, rho_r=self.rhor,
+            u_l=self.ul, u_r=self.ur, N=101
         )
         x = pa.x
         rho = pa.rho
@@ -141,26 +139,31 @@ class ShockTubeSetup(Application):
 
     def configure_scheme(self):
         s = self.scheme
-        dxl = 0.5/self.nl
-        ratio = self.rhor/self.rhol
-        nr = ratio*self.nl
-        dxr = 0.5/self.nr
+        dxl = 0.5 / self.nl
+        ratio = self.rhor / self.rhol
+        nr = ratio * self.nl
+        dxr = 0.5 / self.nr
         h0 = self.hdx * self.dxr
         kernel_factor = self.options.hdx
+
         if self.options.scheme == 'mpm':
             s.configure(kernel_factor=kernel_factor)
-            s.configure_solver(dt=self.dt, tf=self.tf,
-                               adaptive_timestep=True, pfreq=50)
+            s.configure_solver(dt=self.dt, tf=self.tf, adaptive_timestep=True,
+                               pfreq=50)
+
         elif self.options.scheme == 'adke':
-            s.configure_solver(dt=self.dt, tf=self.tf,
-                               adaptive_timestep=False, pfreq=50)
+            s.configure_solver(dt=self.dt, tf=self.tf, adaptive_timestep=False,
+                               pfreq=50)
+
         elif self.options.scheme == 'gsph':
-            s.configure_solver(dt=self.dt, tf=self.tf,
-                               adaptive_timestep=False, pfreq=50)
+            s.configure_solver(dt=self.dt, tf=self.tf, adaptive_timestep=False,
+                               pfreq=50)
+
         elif self.options.scheme == 'crk':
-            s.configure_solver(dt=self.dt, tf=self.tf,
-                               adaptive_timestep=False, pfreq=1)
+            s.configure_solver(dt=self.dt, tf=self.tf, adaptive_timestep=False,
+                               pfreq=1)
+
         elif self.options.scheme in ['tsph', 'psph']:
             s.configure(hfact=kernel_factor)
-            s.configure_solver(dt=self.dt, tf=self.tf,
-                               adaptive_timestep=False, pfreq=50)
+            s.configure_solver(dt=self.dt, tf=self.tf, adaptive_timestep=False,
+                               pfreq=50)

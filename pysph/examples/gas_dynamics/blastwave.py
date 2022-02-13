@@ -1,11 +1,9 @@
 """Simulate a 1D blast wave problem (30 seconds).
 """
-import os
-import numpy
 from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
-from pysph.sph.scheme import ADKEScheme, GasDScheme, GSPHScheme, SchemeChooser
 from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
 from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
+from pysph.sph.scheme import ADKEScheme, GasDScheme, GSPHScheme, SchemeChooser
 
 # Numerical constants
 dim = 1
@@ -35,23 +33,20 @@ class Blastwave(ShockTubeSetup):
         self.ur = 0.0
 
     def add_user_options(self, group):
-        group.add_argument(
-            "--hdx", action="store", type=float,
-            dest="hdx", default=1.5,
-            help="Ratio h/dx."
-        )
-        group.add_argument(
-            "--nl", action="store", type=float, dest="nl", default=200,
-            help="Number of particles in left region"
-        )
+        group.add_argument("--hdx", action="store", type=float, dest="hdx",
+                           default=1.5, help="Ratio h/dx.")
+
+        group.add_argument("--nl", action="store", type=float, dest="nl",
+                           default=200,
+                           help="Number of particles in left region")
 
     def consume_user_options(self):
         self.nl = self.options.nl
         self.hdx = self.options.hdx
-        ratio = self.rhor/self.rhol
-        self.nr = ratio*self.nl
-        self.dxl = 0.5/self.nl
-        self.dxr = 0.5/self.nr
+        ratio = self.rhor / self.rhol
+        self.nr = ratio * self.nl
+        self.dxl = 0.5 / self.nl
+        self.dxr = 0.5 / self.nr
         self.h0 = self.hdx * self.dxr
         self.hdx = self.hdx
 
@@ -64,36 +59,30 @@ class Blastwave(ShockTubeSetup):
     def create_scheme(self):
         self.dt = dt
         self.tf = tf
-        adke = ADKEScheme(
-            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
-            alpha=1, beta=1, k=1.0, eps=0.5, g1=0.2, g2=0.4)
+        adke = ADKEScheme(fluids=['fluid'], solids=['boundary'], dim=dim,
+                          gamma=gamma, alpha=1, beta=1, k=1.0, eps=0.5, g1=0.2,
+                          g2=0.4)
 
         # Fix mpm scheme first
-        mpm = GasDScheme(
-            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
-            kernel_factor=1.2, alpha1=1.0, alpha2=0.1,
-            beta=2.0, update_alpha1=True, update_alpha2=True
-        )
+        mpm = GasDScheme(fluids=['fluid'], solids=['boundary'], dim=dim,
+                         gamma=gamma, kernel_factor=1.2, alpha1=1.0,
+                         alpha2=0.1, beta=2.0, update_alpha1=True,
+                         update_alpha2=True)
 
-        gsph = GSPHScheme(
-            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
-            kernel_factor=1.0,
-            g1=0.2, g2=0.4, rsolver=2, interpolation=1, monotonicity=1,
-            interface_zero=True, hybrid=False, blend_alpha=2.0,
-            niter=20, tol=1e-6
-        )
+        gsph = GSPHScheme(fluids=['fluid'], solids=['boundary'], dim=dim,
+                          gamma=gamma, kernel_factor=1.0, g1=0.2, g2=0.4,
+                          rsolver=2, interpolation=1, monotonicity=1,
+                          interface_zero=True, hybrid=False, blend_alpha=2.0,
+                          niter=20, tol=1e-6)
 
-        psph = PSPHScheme(
-            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
-            hfact=1.2
-        )
+        psph = PSPHScheme(fluids=['fluid'], solids=['boundary'], dim=dim,
+                          gamma=gamma, hfact=1.2)
 
-        tsph = TSPHScheme(
-            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
-            hfact=1.2)
+        tsph = TSPHScheme(fluids=['fluid'], solids=['boundary'], dim=dim,
+                          gamma=gamma, hfact=1.2)
 
-        s = SchemeChooser(default='adke', adke=adke, gsph=gsph,
-                          psph=psph, tsph=tsph)
+        s = SchemeChooser(default='adke', adke=adke, gsph=gsph, psph=psph,
+                          tsph=tsph)
         return s
 
 

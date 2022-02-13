@@ -13,12 +13,10 @@ import numpy
 from pysph.base.nnps import DomainManager
 from pysph.base.utils import get_particle_array as gpa
 from pysph.solver.application import Application
-
-from pysph.sph.scheme import GasDScheme, ADKEScheme, GSPHScheme, SchemeChooser
-from pysph.sph.wc.crksph import CRKSPHScheme
 from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
 from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
-
+from pysph.sph.scheme import GasDScheme, ADKEScheme, GSPHScheme, SchemeChooser
+from pysph.sph.wc.crksph import CRKSPHScheme
 # PySPH tools
 from pysph.tools import uniform_distribution as ud
 
@@ -68,9 +66,8 @@ class ShockTube2D(Application):
         self.vr = 0.
 
     def create_domain(self):
-        return DomainManager(
-            xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,
-            periodic_in_x=True, periodic_in_y=True)
+        return DomainManager(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,
+                             periodic_in_x=True, periodic_in_y=True)
 
     def create_particles(self):
         global dx
@@ -123,66 +120,58 @@ class ShockTube2D(Application):
         self.dt = dt
         self.tf = tf
 
-        adke = ADKEScheme(
-            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            alpha=1, beta=1, k=1.0, eps=0.8, g1=0.5, g2=0.5,
-            has_ghosts=True)
+        adke = ADKEScheme(fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+                          alpha=1, beta=1, k=1.0, eps=0.8, g1=0.5, g2=0.5,
+                          has_ghosts=True)
 
-        mpm = GasDScheme(
-            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            kernel_factor=kernel_factor, alpha1=alpha1, alpha2=alpha2,
-            beta=beta, max_density_iterations=1000,
-            density_iteration_tolerance=1e-4, has_ghosts=True
-        )
+        mpm = GasDScheme(fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+                         kernel_factor=kernel_factor, alpha1=alpha1,
+                         alpha2=alpha2, beta=beta, max_density_iterations=1000,
+                         density_iteration_tolerance=1e-4, has_ghosts=True)
 
-        gsph = GSPHScheme(
-            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            kernel_factor=1.5,
-            g1=0.25, g2=0.5, rsolver=2, interpolation=1, monotonicity=2,
-            interface_zero=True, hybrid=False, blend_alpha=2.0,
-            niter=40, tol=1e-6, has_ghosts=True
-        )
+        gsph = GSPHScheme(fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+                          kernel_factor=1.5, g1=0.25, g2=0.5, rsolver=2,
+                          interpolation=1, monotonicity=2, interface_zero=True,
+                          hybrid=False, blend_alpha=2.0, niter=40, tol=1e-6,
+                          has_ghosts=True)
 
-        crksph = CRKSPHScheme(
-            fluids=['fluid'], dim=dim, rho0=0, c0=0, nu=0, h0=0, p0=0,
-            gamma=gamma, cl=2, has_ghosts=True
-        )
+        crksph = CRKSPHScheme(fluids=['fluid'], dim=dim, rho0=0, c0=0, nu=0,
+                              h0=0, p0=0, gamma=gamma, cl=2, has_ghosts=True)
 
-        psph = PSPHScheme(
-            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            hfact=kernel_factor
-        )
+        psph = PSPHScheme(fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+                          hfact=kernel_factor)
 
-        tsph = TSPHScheme(
-            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            hfact=kernel_factor
-        )
+        tsph = TSPHScheme(fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+                          hfact=kernel_factor)
 
-        s = SchemeChooser(
-            default='adke', adke=adke, mpm=mpm, gsph=gsph, crksph=crksph,
-            psph=psph, tsph=tsph
-        )
+        s = SchemeChooser(default='adke', adke=adke, mpm=mpm, gsph=gsph,
+                          crksph=crksph, psph=psph, tsph=tsph)
         return s
 
     def configure_scheme(self):
         s = self.scheme
+
         if self.options.scheme == 'mpm':
             s.configure(kernel_factor=kernel_factor)
-            s.configure_solver(dt=self.dt, tf=self.tf,
-                               adaptive_timestep=True, pfreq=50)
+            s.configure_solver(dt=self.dt, tf=self.tf, adaptive_timestep=True,
+                               pfreq=50)
+
         elif self.options.scheme == 'adke':
-            s.configure_solver(dt=self.dt, tf=self.tf,
-                               adaptive_timestep=False, pfreq=50)
+            s.configure_solver(dt=self.dt, tf=self.tf, adaptive_timestep=False,
+                               pfreq=50)
+
         elif self.options.scheme == 'gsph':
-            s.configure_solver(dt=self.dt, tf=self.tf,
-                               adaptive_timestep=False, pfreq=50)
+            s.configure_solver(dt=self.dt, tf=self.tf, adaptive_timestep=False,
+                               pfreq=50)
+
         elif self.options.scheme == 'crksph':
-            s.configure_solver(dt=self.dt, tf=self.tf,
-                               adaptive_timestep=False, pfreq=50)
+            s.configure_solver(dt=self.dt, tf=self.tf, adaptive_timestep=False,
+                               pfreq=50)
+
         elif self.options.scheme in ['tsph', 'psph']:
             s.configure(hfact=kernel_factor)
-            s.configure_solver(dt=self.dt, tf=self.tf,
-                               adaptive_timestep=False, pfreq=50)
+            s.configure_solver(dt=self.dt, tf=self.tf, adaptive_timestep=False,
+                               pfreq=50)
 
     def post_process(self):
         try:
@@ -210,9 +199,8 @@ class ShockTube2D(Application):
         print(gamma)
         riemann_solver.set_gamma(gamma)
         rho_e, u_e, p_e, e_e, x_e = riemann_solver.solve(
-            x_min=0, x_max=1, x_0=0.5,
-            t=self.tf, p_l=self.pl, p_r=self.pr, rho_l=self.rhol,
-            rho_r=self.rhor, u_l=self.ul, u_r=self.ur, N=101
+            x_min=0, x_max=1, x_0=0.5, t=self.tf, p_l=self.pl, p_r=self.pr,
+            rho_l=self.rhol, rho_r=self.rhor, u_l=self.ul, u_r=self.ur, N=101
         )
 
         x = pa.x
@@ -235,10 +223,8 @@ class ShockTube2D(Application):
         pyplot.savefig(fig, dpi=300)
         pyplot.clf()
 
-        pyplot.scatter(
-            x, e, label='pysph (' + str(self.options.scheme) + ')',
-            s=1, color='k'
-        )
+        pyplot.scatter(x, e, label='pysph (' + str(self.options.scheme) + ')',
+                       s=1, color='k')
         pyplot.plot(x_e, e_e, label='exact')
         pyplot.xlim((0.2, 0.8))
         pyplot.xlabel('x')

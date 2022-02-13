@@ -2,8 +2,9 @@
 Exact solution to Riemann problems.
 """
 
-import numpy
 from math import sqrt
+
+import numpy
 
 
 def set_gamma(g):
@@ -19,7 +20,6 @@ def set_gamma(g):
 
 def solve(x_min=-0.5, x_max=0.5, x_0=0.0, t=0.1, p_l=1.0, p_r=0.1, rho_l=1.0,
           rho_r=0.125, u_l=0.0, u_r=0.0, N=101):
-
     r"""
     Parameters
     ----------
@@ -81,8 +81,8 @@ def solve(x_min=-0.5, x_max=0.5, x_0=0.0, t=0.1, p_l=1.0, p_r=0.1, rho_l=1.0,
     energy = []
     for i in range(0, N):
         s = x[i] / t
-        rho, u, p = complete_solution(rho_l, u_l, p_l, c_l, rho_r, u_r,
-                                      p_r, c_r, p_star, u_star, s)
+        rho, u, p = complete_solution(rho_l, u_l, p_l, c_l, rho_r, u_r, p_r,
+                                      c_r, p_star, u_star, s)
         density.append(rho)
         velocity.append(u)
         pressure.append(p)
@@ -94,7 +94,7 @@ def solve(x_min=-0.5, x_max=0.5, x_0=0.0, t=0.1, p_l=1.0, p_r=0.1, rho_l=1.0,
 
 def _flux_fsolve(pressure, rho1, c1, p1):
     if pressure <= p1:  # Rarefaction
-        return lambda p: (2 / gm1) * c1 * ((p / p1)**gm1_2g - 1.0)
+        return lambda p: (2 / gm1) * c1 * ((p / p1) ** gm1_2g - 1.0)
     else:  # Shock
         return lambda p: (
             (p - p1) * sqrt(((2 / gp1) / rho1) / ((gm1_gp1 * p1) + p))
@@ -108,18 +108,22 @@ def star_pu_fsolve(rho_l, u_l, p_l, c_l, rho_r, u_r, p_r, c_r):
         _flux_fsolve(p_min, rho_r, c_r, p_r)(p_min) + u_r - u_l
     f_max = _flux_fsolve(p_max, rho_l, c_l, p_l)(p_max) + \
         _flux_fsolve(p_max, rho_r, c_r, p_r)(p_max) + u_r - u_l
+
     if (f_min > 0 and f_max > 0):
         p_guess = 0.5 * (0 + p_min)
-        p_star, u_star = _star_pu(rho_l, u_l, p_l, c_l, rho_r,
-                                  u_r, p_r, c_r, p_guess)
-    elif(f_min <= 0 and f_max >= 0):
+        p_star, u_star = _star_pu(rho_l, u_l, p_l, c_l, rho_r, u_r, p_r, c_r,
+                                  p_guess)
+
+    elif (f_min <= 0 and f_max >= 0):
         p_guess = (p_l + p_r) * 0.5
-        p_star, u_star = _star_pu(rho_l, u_l, p_l, c_l, rho_r,
-                                  u_r, p_r, c_r, p_guess)
+        p_star, u_star = _star_pu(rho_l, u_l, p_l, c_l, rho_r, u_r, p_r, c_r,
+                                  p_guess)
+
     else:
         p_guess = 2 * p_max
-        p_star, u_star = _star_pu(rho_l, u_l, p_l, c_l, rho_r,
-                                  u_r, p_r, c_r, p_guess)
+        p_star, u_star = _star_pu(rho_l, u_l, p_l, c_l, rho_r, u_r, p_r, c_r,
+                                  p_guess)
+
     return p_star, u_star
 
 
@@ -140,9 +144,8 @@ def _star_pu(rho_l, u_l, p_l, c_l, rho_r, u_r, p_r, c_r, p_guess):
 
 def _flux_newton(pressure, rho1, c1, p1):
     if pressure <= p1:  # Rarefaction
-        flux = (2 / gm1) * c1 * ((pressure / p1)**gm1_2g - 1.0)
-        flux_derivative = (1.0 / (rho1 * c1)) * \
-            (pressure / p1)**(-gp1_2g)
+        flux = (2 / gm1) * c1 * ((pressure / p1) ** gm1_2g - 1.0)
+        flux_derivative = (1.0 / (rho1 * c1)) * (pressure / p1) ** (-gp1_2g)
         return flux, flux_derivative
     else:  # Shock
         flux = (
@@ -190,10 +193,7 @@ def _compute_guess_p(rho_l, u_l, p_l, c_l, rho_r, u_r, p_r, c_r):
     p_min = min(p_l, p_r)
     p_max = max(p_l, p_r)
     qmax = p_max / p_min
-    if(
-        qmax <= quser and (p_min <= p_linearized and
-                           p_linearized <= p_max)
-    ):
+    if qmax <= quser and (p_min <= p_linearized <= p_max):
         """A Primitive Variable Riemann Solver (PMRS)"""
         return p_linearized
     else:
@@ -210,10 +210,8 @@ def _compute_guess_p(rho_l, u_l, p_l, c_l, rho_r, u_r, p_r, c_r):
             )
         else:
             """A Two-Shock Riemann Solver (TSRS)"""
-            gL = sqrt(((2 / gp1) / rho_l) /
-                      (gm1_gp1 * p_l + p_linearized))
-            gR = sqrt(((2 / gp1) / rho_r) /
-                      (gm1_gp1 * p_r + p_linearized))
+            gL = sqrt(((2 / gp1) / rho_l) / (gm1_gp1 * p_l + p_linearized))
+            gR = sqrt(((2 / gp1) / rho_r) / (gm1_gp1 * p_r + p_linearized))
             return (gL * p_l + gR * p_r - (u_r - u_l)) / (gL + gR)
 
 
@@ -236,16 +234,16 @@ def left_contact(rho_l, u_l, p_l, c_l, p_star, u_star, s):
 
 def left_rarefaction(rho_l, u_l, p_l, c_l, p_star, u_star, s):
     s_head = u_l - c_l
-    s_tail = u_star - c_l * (p_star / p_l)**gm1_2g
+    s_tail = u_star - c_l * (p_star / p_l) ** gm1_2g
     if s <= s_head:
         rho, u, p = rho_l, u_l, p_l
     elif (s > s_head and s <= s_tail):
         u = (2 / gp1) * (c_l + gm1_2 * u_l + s)
         c = (2 / gp1) * (c_l + gm1_2 * (u_l - s))
-        rho = rho_l * (c / c_l)**(2 / gm1)
-        p = p_l * (c / c_l)**(1.0 / gm1_2g)
+        rho = rho_l * (c / c_l) ** (2 / gm1)
+        p = p_l * (c / c_l) ** (1.0 / gm1_2g)
     else:
-        rho = rho_l * (p_star / p_l)**(1.0 / gamma)
+        rho = rho_l * (p_star / p_l) ** (1.0 / gamma)
         u = u_star
         p = p_star
     return rho, u, p
@@ -272,16 +270,16 @@ def right_contact(rho_r, u_r, p_r, c_r, p_star, u_star, s):
 
 def right_rarefaction(rho_r, u_r, p_r, c_r, p_star, u_star, s):
     s_head = u_r + c_r
-    s_tail = u_star + c_r * (p_star / p_r)**gm1_2g
+    s_tail = u_star + c_r * (p_star / p_r) ** gm1_2g
     if s >= s_head:
         rho, u, p = rho_r, u_r, p_r
     elif (s < s_head and s > s_tail):
         u = (2 / gp1) * (-c_r + gm1_2 * u_r + s)
         c = (2 / gp1) * (c_r - gm1_2 * (u_r - s))
-        rho = rho_r * (c / c_r)**(2 / gm1)
-        p = p_r * (c / c_r)**(1.0 / gm1_2g)
+        rho = rho_r * (c / c_r) ** (2 / gm1)
+        p = p_r * (c / c_r) ** (1.0 / gm1_2g)
     else:
-        rho = rho_r * (p_star / p_r)**(1.0 / gamma)
+        rho = rho_r * (p_star / p_r) ** (1.0 / gamma)
         u = u_star
         p = p_star
     return rho, u, p

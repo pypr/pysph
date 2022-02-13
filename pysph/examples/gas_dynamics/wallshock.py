@@ -1,9 +1,9 @@
 """Wall-shock problem in 1D (40 seconds).
 """
 from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
-from pysph.sph.scheme import ADKEScheme, GasDScheme, GSPHScheme, SchemeChooser
 from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
 from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
+from pysph.sph.scheme import ADKEScheme, GasDScheme, GSPHScheme, SchemeChooser
 
 # Numerical constants
 dim = 1
@@ -33,21 +33,18 @@ class WallShock(ShockTubeSetup):
         self.ur = -1.0
 
     def add_user_options(self, group):
-        group.add_argument(
-            "--hdx", action="store", type=float,
-            dest="hdx", default=1.5,
-            help="Ratio h/dx."
-        )
-        group.add_argument(
-            "--nl", action="store", type=float, dest="nl", default=500,
-            help="Number of particles in left region"
-        )
+        group.add_argument("--hdx", action="store", type=float, dest="hdx",
+                           default=1.5, help="Ratio h/dx.")
+        
+        group.add_argument("--nl", action="store", type=float, dest="nl",
+                           default=500,
+                           help="Number of particles in left region")
 
     def consume_user_options(self):
         self.nl = self.options.nl
         self.hdx = self.options.hdx
-        ratio = self.rhor/self.rhol
-        self.nr = ratio*self.nl
+        ratio = self.rhor / self.rhol
+        self.nr = ratio * self.nl
         self.xb_ratio = 5
         self.dxl = (self.x0 - self.xmin) / self.nl
         self.dxr = (self.xmax - self.x0) / self.nr
@@ -55,44 +52,37 @@ class WallShock(ShockTubeSetup):
         self.hdx = self.hdx
 
     def create_particles(self):
-        return self.generate_particles(xmin=self.xmin*self.xb_ratio,
-                                       xmax=self.xmax*self.xb_ratio,
-                                       dxl=self.dxl, dxr=self.dxr,
-                                       m=self.dxl, pl=self.pl,
-                                       pr=self.pr, h0=self.h0, bx=0.02,
-                                       gamma1=gamma1, ul=self.ul, ur=self.ur)
+        return self.generate_particles(xmin=self.xmin * self.xb_ratio,
+                                       xmax=self.xmax * self.xb_ratio,
+                                       dxl=self.dxl, dxr=self.dxr, m=self.dxl,
+                                       pl=self.pl, pr=self.pr, h0=self.h0,
+                                       bx=0.02, gamma1=gamma1, ul=self.ul,
+                                       ur=self.ur)
 
     def create_scheme(self):
         self.dt = dt
         self.tf = tf
 
-        adke = ADKEScheme(
-            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
-            alpha=1, beta=1, k=0.7, eps=0.5, g1=0.5, g2=1.0)
+        adke = ADKEScheme(fluids=['fluid'], solids=['boundary'], dim=dim,
+                          gamma=gamma, alpha=1, beta=1, k=0.7, eps=0.5, g1=0.5,
+                          g2=1.0)
 
-        mpm = GasDScheme(
-            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
-            kernel_factor=1.2, alpha1=1.0, alpha2=0.1,
-            beta=2.0, update_alpha1=True, update_alpha2=True
-        )
+        mpm = GasDScheme(fluids=['fluid'], solids=['boundary'], dim=dim,
+                         gamma=gamma, kernel_factor=1.2, alpha1=1.0,
+                         alpha2=0.1, beta=2.0, update_alpha1=True,
+                         update_alpha2=True)
 
-        gsph = GSPHScheme(
-            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
-            kernel_factor=1.0,
-            g1=0.2, g2=0.4, rsolver=2, interpolation=1, monotonicity=2,
-            interface_zero=True, hybrid=False, blend_alpha=2.0,
-            niter=40, tol=1e-6
-        )
+        gsph = GSPHScheme(fluids=['fluid'], solids=['boundary'], dim=dim,
+                          gamma=gamma, kernel_factor=1.0, g1=0.2, g2=0.4,
+                          rsolver=2, interpolation=1, monotonicity=2,
+                          interface_zero=True, hybrid=False, blend_alpha=2.0,
+                          niter=40, tol=1e-6)
 
-        psph = PSPHScheme(
-            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
-            hfact=1.2
-        )
+        psph = PSPHScheme(fluids=['fluid'], solids=['boundary'], dim=dim,
+                          gamma=gamma, hfact=1.2)
 
-        tsph = TSPHScheme(
-            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
-            hfact=1.2
-        )
+        tsph = TSPHScheme(fluids=['fluid'], solids=['boundary'], dim=dim,
+                          gamma=gamma, hfact=1.2)
 
         s = SchemeChooser(default='adke', adke=adke, mpm=mpm, gsph=gsph,
                           psph=psph, tsph=tsph)
