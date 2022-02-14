@@ -8,6 +8,8 @@ import numpy
 from pysph.base.utils import get_particle_array as gpa
 from pysph.solver.application import Application
 from pysph.sph.scheme import GasDScheme, SchemeChooser, ADKEScheme, GSPHScheme
+from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
+from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
 from pysph.sph.wc.crksph import CRKSPHScheme
 from pysph.base.nnps import DomainManager
 
@@ -104,10 +106,22 @@ class NohImplosion(Application):
         adke = ADKEScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             alpha=1, beta=1, k=1.0, eps=0.8, g1=0.5, g2=0.5,
-            has_ghosts=True)
+            has_ghosts=True
+        )
+
+        psph = PSPHScheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            hfact=1.2
+        )
+
+        tsph = TSPHScheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            hfact=1.2
+        )
 
         s = SchemeChooser(
-            default='crksph', crksph=crksph, mpm=mpm, adke=adke, gsph=gsph
+            default='crksph', crksph=crksph, mpm=mpm, adke=adke, gsph=gsph,
+            psph=psph, tsph=tsph
         )
         s.configure_solver(dt=dt, tf=tf, adaptive_timestep=False)
         return s
@@ -128,6 +142,11 @@ class NohImplosion(Application):
                 dt=dt, tf=tf, adaptive_timestep=False, pfreq=50
             )
         elif self.options.scheme == 'adke':
+            s.configure_solver(
+                dt=dt, tf=tf, adaptive_timestep=False, pfreq=50
+            )
+        elif self.options.scheme in ['tsph', 'psph']:
+            s.configure(hfact=1.2)
             s.configure_solver(
                 dt=dt, tf=tf, adaptive_timestep=False, pfreq=50
             )
@@ -193,6 +212,12 @@ class NohImplosion(Application):
         fname = os.path.join(self.output_dir, 'density.png')
         pyplot.savefig(fname, dpi=300)
         pyplot.close('all')
+
+        fname = os.path.join(self.output_dir, '1dresults.npz')
+        numpy.savez(fname, r=r, rho=rho, p=p)
+
+        fname = os.path.join(self.output_dir, '1dexact.npz')
+        numpy.savez(fname, r=re, rho=rho_e, p=p_e)
 
 
 if __name__ == '__main__':

@@ -8,6 +8,8 @@ from pysph.sph.wc.crksph import CRKSPHScheme
 from pysph.sph.scheme import (
     ADKEScheme, SchemeChooser, GasDScheme, GSPHScheme
 )
+from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
+from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
 from pysph.base.utils import get_particle_array as gpa
 from pysph.base.nnps import DomainManager
 from pysph.solver.application import Application
@@ -84,9 +86,19 @@ class HydrostaticBox(Application):
         adke = ADKEScheme(
             fluids=['fluid'], solids=[], dim=2, gamma=self.gamma,
             alpha=0.1, beta=0.1, k=1.5, eps=0., g1=0.1, g2=0.1,
-            has_ghosts=True)
+            has_ghosts=True
+        )
+        psph = PSPHScheme(
+            fluids=['fluid'], solids=[], dim=2, gamma=self.gamma,
+            hfact=1.2
+        )
+        tsph = TSPHScheme(
+            fluids=['fluid'], solids=[], dim=2, gamma=self.gamma,
+            hfact=1.2
+        )
         s = SchemeChooser(
-            default='crksph', crksph=crk, adke=adke, mpm=mpm, gsph=gsph
+            default='crksph', crksph=crk, adke=adke, mpm=mpm, gsph=gsph,
+            psph=psph, tsph=tsph
         )
         return s
 
@@ -106,6 +118,10 @@ class HydrostaticBox(Application):
                 dt=self.dt, tf=self.tf, adaptive_timestep=False, pfreq=50
             )
         elif self.options.scheme == 'adke':
+            s.configure_solver(dt=self.dt, tf=self.tf,
+                               adaptive_timestep=False, pfreq=50)
+        elif self.options.scheme in ['tsph', 'psph']:
+            s.configure(hfact=1.2)
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=50)
 

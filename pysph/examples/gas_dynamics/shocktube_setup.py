@@ -160,3 +160,7 @@ class ShockTubeSetup(Application):
         elif self.options.scheme == 'crk':
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=1)
+        elif self.options.scheme in ['tsph', 'psph']:
+            s.configure(hfact=kernel_factor)
+            s.configure_solver(dt=self.dt, tf=self.tf,
+                               adaptive_timestep=False, pfreq=50)

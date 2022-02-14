@@ -8,6 +8,8 @@ import numpy
 from pysph.base.utils import get_particle_array as gpa
 from pysph.solver.application import Application
 from pysph.sph.scheme import GasDScheme, SchemeChooser, ADKEScheme, GSPHScheme
+from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
+from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
 from pysph.sph.wc.crksph import CRKSPHScheme
 from pysph.base.nnps import DomainManager
 from pysph.tools import uniform_distribution as ud
@@ -149,9 +151,17 @@ class KHInstability(Application):
             interface_zero=True, hybrid=False, blend_alpha=2.0,
             niter=40, tol=1e-6, has_ghosts=True
         )
-
+        psph = PSPHScheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            hfact=1.2
+        )
+        tsph = TSPHScheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            hfact=1.2
+        )
         s = SchemeChooser(
-            default='crksph', crksph=crk, gsph=gsph, adke=adke, mpm=mpm
+            default='crksph', crksph=crk, gsph=gsph, adke=adke, mpm=mpm,
+            psph=psph, tsph=tsph
         )
 
         return s
@@ -170,6 +180,10 @@ class KHInstability(Application):
             s.configure_solver(dt=dt, tf=tf,
                                adaptive_timestep=False, pfreq=50)
         elif self.options.scheme == 'gsph':
+            s.configure_solver(dt=dt, tf=tf,
+                               adaptive_timestep=False, pfreq=50)
+        elif self.options.scheme in ['tsph', 'psph']:
+            s.configure(hfact=1.2)
             s.configure_solver(dt=dt, tf=tf,
                                adaptive_timestep=False, pfreq=50)
 

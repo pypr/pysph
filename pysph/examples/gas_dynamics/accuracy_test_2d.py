@@ -13,6 +13,8 @@ from pysph.solver.application import Application
 
 from pysph.sph.scheme import GasDScheme, ADKEScheme, GSPHScheme, SchemeChooser
 from pysph.sph.wc.crksph import CRKSPHScheme
+from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
+from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
 
 # PySPH tools
 from pysph.tools import uniform_distribution as ud
@@ -140,8 +142,19 @@ class AccuracyTest2D(Application):
             niter=40, tol=1e-6, has_ghosts=True
         )
 
+        psph = PSPHScheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            hfact=kernel_factor
+        )
+
+        tsph = TSPHScheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            hfact=kernel_factor
+        )
+
         s = SchemeChooser(
-            default='gsph', adke=adke, mpm=mpm, gsph=gsph, crksph=crksph
+            default='gsph', adke=adke, mpm=mpm, gsph=gsph, crksph=crksph,
+            psph=psph, tsph=tsph
         )
         return s
 
@@ -151,13 +164,7 @@ class AccuracyTest2D(Application):
             s.configure(kernel_factor=kernel_factor)
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=True, pfreq=50)
-        elif self.options.scheme == 'adke':
-            s.configure_solver(dt=self.dt, tf=self.tf,
-                               adaptive_timestep=False, pfreq=50)
-        elif self.options.scheme == 'gsph':
-            s.configure_solver(dt=self.dt, tf=self.tf,
-                               adaptive_timestep=False, pfreq=50)
-        elif self.options.scheme == 'crksph':
+        elif self.options.scheme in ['adke', 'gsph', 'crksph', 'tsph', 'psph']:
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=50)
 
