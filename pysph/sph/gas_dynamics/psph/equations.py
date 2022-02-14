@@ -11,9 +11,9 @@ class PSPHSummationDensityAndPressure(Equation):
     def __init__(self, dest, sources, dim, gamma, density_iterations=False,
                  iterate_only_once=False, hfact=1.2, htol=1e-6):
         """
-        :class:`SummationDensity 
+        :class:`SummationDensity
         <pysph.sph.gas_dynamics.basic.SummationDensity>` modified to use
-        number density for calculation of grad-h terms and to calculate 
+        number density for calculation of grad-h terms and to calculate
         pressure and speed of sound as well.
 
         Ref. Appendix F2 [Hopkins2015]_
@@ -23,7 +23,8 @@ class PSPHSummationDensityAndPressure(Equation):
         density_iterations : bint, optional
             Flag to indicate density iterations are required, by default False
         iterate_only_once : bint, optional
-            Flag to indicate if only one iteration is required, by default False
+            Flag to indicate if only one iteration is required,
+             by default False
         hfact : float, optional
             :math:`h_{fact}`, by default 1.2
         htol : double, optional
@@ -368,9 +369,9 @@ class MomentumAndEnergy(Equation):
                energy sans artificial viscosity and artificial conductivity,
 
                 .. math::
-                    \frac{\mathrm{d} E_{i}}{\mathrm{~d} t}= \boldsymbol{v}_{i} 
+                    \frac{\mathrm{d} E_{i}}{\mathrm{~d} t}= \boldsymbol{v}_{i}
                     \cdot \frac{\mathrm{d} \boldsymbol{P}_{i}}{\mathrm{~d} t}-
-                    \sum_{j=1}^{N}(\gamma-1)^{2} m_{i} m_{j} u_{i} u_{j} 
+                    \sum_{j=1}^{N}(\gamma-1)^{2} m_{i} m_{j} u_{i} u_{j}
                     \frac{f_{i j}}{\bar{P}_{i}}\left(\boldsymbol{v}_{i}-
                     \boldsymbol{v}_{j}\right) \cdot \nabla_{i} W_{i j}
                     \left(h_{i}\right)
@@ -378,9 +379,9 @@ class MomentumAndEnergy(Equation):
                it should have been,
 
                 .. math::
-                    \frac{\mathrm{d} E_{i}}{\mathrm{~d} t}= \boldsymbol{v}_{i} 
+                    \frac{\mathrm{d} E_{i}}{\mathrm{~d} t}= \boldsymbol{v}_{i}
                     \cdot \frac{\mathrm{d} \boldsymbol{P}_{i}}{\mathrm{~d} t}+
-                    \sum_{j=1}^{N}(\gamma-1)^{2} m_{i} m_{j} u_{i} u_{j} 
+                    \sum_{j=1}^{N}(\gamma-1)^{2} m_{i} m_{j} u_{i} u_{j}
                     \frac{f_{i j}}{\bar{P}_{i}}\left(\boldsymbol{v}_{i}-
                     \boldsymbol{v}_{j}\right) \cdot \nabla_{i} W_{i j}
                     \left(h_{i}\right).
@@ -389,29 +390,29 @@ class MomentumAndEnergy(Equation):
                using,
 
                 .. math::
-                    \frac{\mathrm{d} u_{i}}{\mathrm{~d} t}= 
-                    \sum_{j=1}^{N}(\gamma-1)^{2} m_{j} u_{i} u_{j} 
+                    \frac{\mathrm{d} u_{i}}{\mathrm{~d} t}=
+                    \sum_{j=1}^{N}(\gamma-1)^{2} m_{j} u_{i} u_{j}
                     \frac{f_{i j}}{\bar{P}_{i}}\left(\boldsymbol{v}_{i}-
                     \boldsymbol{v}_{j}\right) \cdot \nabla_{i} W_{i j}
                     \left(h_{i}\right).
 
-            #. Instead of Equation F18 [Hopkins2015]_ for contribution of 
+            #. Instead of Equation F18 [Hopkins2015]_ for contribution of
                artificial viscosity to the evolution of total
                energy,
 
                 .. math::
-                    \frac{\mathrm{d} E_{i}}{\mathrm{~d} t}= \alpha_{\mathrm{C}} 
+                    \frac{\mathrm{d} E_{i}}{\mathrm{~d} t}= \alpha_{\mathrm{C}}
                     \sum_{j} m_{i} m_{j} \alpha_{i j} \tilde{v}_{s}\left(u_{i}-
                     u_{j}\right) \times \frac{\left|P_{i}-P_{j}\right|}{P_{i}+
                     P_{j}} \frac{\nabla_{i} W_{i j}\left(h_{i}\right)+
                     \nabla_{i} W_{i j}\left(h_{j}\right)}{\bar{\rho}_{i}+
                     \bar{\rho}_{j}} ,
 
-               carefully comparing with [ReadHayfield2012]_ and [KP14]_, 
+               carefully comparing with [ReadHayfield2012]_ and [KP14]_,
                it should have been,
 
                 .. math::
-                    \frac{\mathrm{d} u_{i}}{\mathrm{~d} t}= \alpha_{\mathrm{C}} 
+                    \frac{\mathrm{d} u_{i}}{\mathrm{~d} t}= \alpha_{\mathrm{C}}
                     \sum_{j} m_{i} m_{j} \alpha_{i j} \tilde{v}_{s}\left(u_{i}-
                     u_{j}\right) \frac{\left|P_{i}-P_{j}\right|}{P_{i}+
                     P_{j}} \frac{\nabla_{i} W_{i j}\left(h_{i}\right)+

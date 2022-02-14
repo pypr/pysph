@@ -39,8 +39,8 @@ class Riemann2D(Application):
                            choices=["constant_mass", "constant_volume"],
                            dest="dscheme",
                            default="constant_volume",
-                           help="spatial discretization scheme, one of constant_mass"
-                                "or constant_volume")
+                           help="spatial discretization scheme, one of "
+                                "constant_mass or constant_volume")
         group.add_argument("--nparticles", action="store", type=int,
                            dest="nparticles", default=200)
 

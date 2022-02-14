@@ -35,7 +35,7 @@ class WallShock(ShockTubeSetup):
     def add_user_options(self, group):
         group.add_argument("--hdx", action="store", type=float, dest="hdx",
                            default=1.5, help="Ratio h/dx.")
-        
+
         group.add_argument("--nl", action="store", type=float, dest="nl",
                            default=500,
                            help="Number of particles in left region")

@@ -35,16 +35,16 @@ class TSPHScheme(Scheme):
             #. Adapting smoothing length using MPM [KP14]_ procedure from
                :class:`SummationDensity
                <pysph.sph.gas_dynamics.basic.SummationDensity>`. In this,
-               calculation of grad-h terms are changed to that specified for this
-               scheme.
+               calculation of grad-h terms are changed to that specified for
+               this scheme.
             #. Using the PEC integrator step. No individual
                adaptive time-stepping.
             #. Using :class:`Gaussian Kernel <pysph.base.kernels.Gaussian>`
                by default instead of Cubic Spline with radius scale 1.
 
-        Tip: Reduce the number of points if particle penetration is encountered.
-        This has to be done while running ``gas_dynamics.wc_blastwave`` and
-        ``gas_dynamics.robert``
+        Tip: Reduce the number of points if particle penetration is
+        encountered. This has to be done while running
+        ``gas_dynamics.wc_blastwave`` and ``gas_dynamics.robert``.
 
         Parameters
         ----------
@@ -96,7 +96,8 @@ class TSPHScheme(Scheme):
     def add_user_options(self, group):
         group.add_argument("--alphaav", action="store", type=float,
                            dest="alphaav", default=None,
-                           help="alpha_av for the artificial viscosity switch.")
+                           help="alpha_av for the artificial viscosity "
+                                "switch.")
 
         group.add_argument("--beta", action="store", type=float, dest="beta",
                            default=None,

@@ -2,16 +2,16 @@
 References
 -----------
 
-    .. [CullenDehnen2010] Cullen, Lee, and Walter Dehnen. “Inviscid Smoothed 
-        Particle Hydrodynamics: Inviscid Smoothed Particle Hydrodynamics.” 
-        Monthly Notices of the Royal Astronomical Society 408, no. 2 
-        (October 21, 2010): 669–83. 
+    .. [CullenDehnen2010] Cullen, Lee, and Walter Dehnen. “Inviscid Smoothed
+        Particle Hydrodynamics: Inviscid Smoothed Particle Hydrodynamics.”
+        Monthly Notices of the Royal Astronomical Society 408, no. 2
+        (October 21, 2010): 669–83.
         https://doi.org/10.1111/j.1365-2966.2010.17158.x.
-        
-    .. [ReadHayfield2012] Read, J. I., and T. Hayfield. “SPHS: Smoothed 
-        Particle Hydrodynamics with a Higher Order Dissipation Switch: 
-        SPH with a Higher Order Dissipation Switch.” Monthly Notices of the 
-        Royal Astronomical Society 422, no. 4 (June 1, 2012): 3037–55. 
+
+    .. [ReadHayfield2012] Read, J. I., and T. Hayfield. “SPHS: Smoothed
+        Particle Hydrodynamics with a Higher Order Dissipation Switch:
+        SPH with a Higher Order Dissipation Switch.” Monthly Notices of the
+        Royal Astronomical Society 422, no. 4 (June 1, 2012): 3037–55.
         https://doi.org/10.1111/j.1365-2966.2012.20819.x.
     """
 
@@ -25,8 +25,8 @@ class PSPHScheme(Scheme):
                  alphamin=0.02, alphamax=2.0, betac=0.7, betad=0.05,
                  betaxi=1.0):
         """
-        Pressure-energy formulation [Hopkins2013]_ including Cullen-Dehnen 
-        artificial viscocity switch [CullenDehnen2010]_ with modifications, 
+        Pressure-energy formulation [Hopkins2013]_ including Cullen-Dehnen
+        artificial viscocity switch [CullenDehnen2010]_ with modifications,
         as presented in Appendix F2 of [Hopkins2015]_ .
 
         Notes
@@ -38,16 +38,16 @@ class PSPHScheme(Scheme):
             #. Adapting smoothing length using MPM [KP14]_ procedure from
                :class:`SummationDensity
                <pysph.sph.gas_dynamics.basic.SummationDensity>`. In this,
-               calculation of grad-h terms are changed to that specified for this
-               scheme.
+               calculation of grad-h terms are changed to that specified for
+               this scheme.
             #. Using the PEC integrator step. No individual
                adaptive time-stepping.
             #. Using :class:`Gaussian Kernel <pysph.base.kernels.Gaussian>`
                by default instead of Cubic Spline with radius scale 1.
 
-        Tip: Reduce the number of points if particle penetration is encountered.
-        This has to be done while running ``gas_dynamics.wc_blastwave`` and
-        ``gas_dynamics.robert``
+        Tip: Reduce the number of points if particle penetration is
+        encountered. This has to be done while running
+        ``gas_dynamics.wc_blastwave`` and ``gas_dynamics.robert``.
 
         Parameters
         ----------
@@ -61,13 +61,13 @@ class PSPHScheme(Scheme):
         gamma: float
             :math:`\\gamma` for Equation of state.
         hfact: float
-            :math:`h_{fact}` for smoothing length adaptivity, also referred to 
+            :math:`h_{fact}` for smoothing length adaptivity, also referred to
             as kernel_factor in other gas dynamics schemes.
         betab : float, optional
             :math:`\\beta_b` for artificial viscosity, by default 2.0
         fkern : float, optional
             :math:`f_{kern}`, Factor to scale smoothing length for equivalence
-            with classic kernel when using kernel with altered 
+            with classic kernel when using kernel with altered
             `radius_scale` is being used, by default 1.
         max_density_iterations : int, optional
             Maximum number of iterations to run for one density step,
