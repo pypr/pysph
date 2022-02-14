@@ -4,9 +4,7 @@ from pysph.tools.geometry import remove_repeated_points
 import numpy as np
 from numpy.linalg import norm
 from cyarray.api import UIntArray
-cimport cython
 cimport numpy as np
-import meshio
 
 DTYPE = np.float64
 ctypedef np.float_t DTYPE_t
