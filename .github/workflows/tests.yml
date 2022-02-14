@@ -25,13 +25,13 @@ jobs:
       - name: Install dependencies on Linux/MacOS
         run: |
           conda info
-          conda install -c conda-forge pocl=1.7 pyopencl=2021.2.9
+          conda install -c conda-forge pocl pyopencl==2021.2.11
           python -c 'import pyopencl as cl'
         if: ${{ runner.os != 'Windows' }}
       - name: Install dependencies
         run: |
           conda info
-          conda install -c conda-forge numpy=1.21.4 cython
+          conda install -c conda-forge numpy cython
           python -m pip install -r requirements.txt
           python -m pip install -e ".[dev]"
       - name: Run tests
