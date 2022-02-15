@@ -229,7 +229,8 @@ cdef class CompressedOctreeNNPS(OctreeNNPS):
     cpdef _refresh(self):
         cdef int i
         for i from 0<=i<self.narrays:
-            (<CompressedOctree>self.tree[i]).c_build_tree(self.pa_wrappers[i], self.tree[i].test_parallel)
+            (<CompressedOctree>self.tree[i]).c_build_tree(self.pa_wrappers[i],
+                                                          self.tree[i].test_parallel)
         self.current_tree = (<CompressedOctree>self.tree[self.src_index]).root
         self.current_pids = (<CompressedOctree>self.tree[self.src_index]).pids
 

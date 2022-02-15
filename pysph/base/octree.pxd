@@ -75,7 +75,6 @@ cdef class Octree:
     cdef public double length
     cdef public int depth
     cdef public bint test_parallel
-    cdef public int method
     cdef double machine_eps
 
     cdef double xmin[3]

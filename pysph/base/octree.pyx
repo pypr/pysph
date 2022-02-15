@@ -401,6 +401,8 @@ cdef class Octree:
 
         cdef u_int* p_indices = self.pids
         cdef vector[u_int]* child_indices = new vector[u_int](n)
+
+        # Number of children of a thread belonging to octant, cumulative_map[thread_id][octant_id]
         cdef vector[vector[int]] cumulative_map = vector[vector[int]](num_threads)
         cdef vector[vector[double]] threads_hmax = vector[vector[double]](num_threads)
         cdef vector[int] count = vector[int](8)
@@ -534,7 +536,7 @@ cdef class Octree:
                     new_indices[i] = vector[u_int]()
                 children = 0
 
-                for n in xrange(old_nodes[tid].size()):
+                for n from 0<=n<old_nodes[tid].size():
                     for i from 0<=i<8:
                         new_indices[i].clear()
                         hmax_children[i] = 0
@@ -691,7 +693,6 @@ cdef class Octree:
 
         # Use the parallel method
         if ( (num_threads > 1) or test_parallel ):
-            self.method = 1
             self.root.start_index = 0
             self.root.num_particles = num_particles
             self.depth = self._c_build_tree_level1(pa_wrapper, self.root.xmin,
@@ -699,7 +700,6 @@ cdef class Octree:
 
         # Use the serial method
         else:
-            self.method = 0
             self._next_pid = 0
             for i from 0<=i<num_particles:
                 indices_ptr.push_back(i)
@@ -944,7 +944,7 @@ cdef class CompressedOctree(Octree):
             depth_max = <int>fmax(depth_max, depth_child)
 
         return 1 + depth_max
-    
+
     @cython.cdivision(True)
     @cython.boundscheck(False)
     cdef int _c_build_tree_level1(self, NNPSParticleArrayWrapper pa, double* xmin, double length,
@@ -980,6 +980,8 @@ cdef class CompressedOctree(Octree):
 
         cdef u_int* p_indices = self.pids
         cdef vector[u_int]* child_indices = new vector[u_int](n)
+
+        # Number of children of a thread belonging to octant, cumulative_map[thread_id][octant_id]
         cdef vector[vector[int]] cumulative_map = vector[vector[int]](num_threads)
         cdef vector[vector[double]] threads_hmax = vector[vector[double]](num_threads)
 
@@ -1005,6 +1007,14 @@ cdef class CompressedOctree(Octree):
             threads_ymax[i] = vector[double](8)
             threads_zmax[i] = vector[double](8)
 
+            for j from 0<=j<8:
+                threads_xmin[i][j] = self.dbl_max
+                threads_ymin[i][j] = self.dbl_max
+                threads_zmin[i][j] = self.dbl_max
+
+                threads_xmax[i][j] = -self.dbl_max
+                threads_ymax[i][j] = -self.dbl_max
+                threads_zmax[i][j] = -self.dbl_max
 
         with nogil, parallel():
             # Required to ensure cython treats i,j,k as private-variables for each thread
@@ -1099,6 +1109,7 @@ cdef class CompressedOctree(Octree):
         del child_indices
 
         if (next_level_nodes.empty()):
+            del next_level_nodes
             return 2
         else:
             return self._c_build_tree_bfs(pa, p_indices, next_level_nodes, 1, num_threads)
@@ -1143,6 +1154,8 @@ cdef class CompressedOctree(Octree):
         count[num_threads] = num_nodes
         count[num_threads + 1] = 2
 
+        del level_nodes
+
         with nogil, parallel():
             xmin_current = <double *> malloc(3 * sizeof(double))
             xmax_current = <double *> malloc(3 * sizeof(double))
@@ -1152,16 +1165,18 @@ cdef class CompressedOctree(Octree):
             xmin_new = vector[dbl_ptr](8)
             xmax_new = vector[dbl_ptr](8)
 
+            for i from 0<=i<8:
+                xmin_new[i] = <double *> malloc(3 * sizeof(double))
+                xmax_new[i] = <double *> malloc(3 * sizeof(double))
+
             tid = threadid()
 
             while(count[num_threads]>0):
                 for i from 0<=i<8:
                     new_indices[i] = vector[u_int]()
-                    xmin_new[i] = <double *> malloc(3 * sizeof(double))
-                    xmax_new[i] = <double *> malloc(3 * sizeof(double))
                 children = 0
 
-                for n in xrange(old_nodes[tid].size()):
+                for n from 0<=n<old_nodes[tid].size():
                     for i from 0<=i<8:
                         new_indices[i].clear()
                         hmax_children[i] = 0
@@ -1313,7 +1328,6 @@ cdef class CompressedOctree(Octree):
 
         # Use the parallel method
         if ( (num_threads > 2) or test_parallel ):
-            self.method = 1
             self.root.start_index = 0
             self.root.num_particles = num_particles
             self.depth = self._c_build_tree_level1(pa_wrapper, self.root.xmin,
@@ -1321,7 +1335,6 @@ cdef class CompressedOctree(Octree):
 
         # Use the serial method
         else:
-            self.method = 0
             self._next_pid = 0
             for i from 0<=i<num_particles:
                 indices_ptr.push_back(i)
