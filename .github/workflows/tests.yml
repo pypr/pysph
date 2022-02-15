@@ -1,6 +1,11 @@
 name: Tests
 
-on: pull_request
+on:
+  pull_request:
+  schedule:
+    # Run test at 0400 UTC on Saturday.
+    - cron: '0 4 * * 6'
+
 
 jobs:
   tests:
@@ -31,7 +36,9 @@ jobs:
       - name: Install dependencies
         run: |
           conda info
-          conda install -c conda-forge numpy cython
+          conda install -c conda-forge numpy cython h5py
+          python -m pip install https://github.com/pypr/cyarray/zipball/master
+          python -m pip install https://github.com/pypr/compyle/zipball/master
           python -m pip install -r requirements.txt
           python -m pip install -e ".[dev]"
       - name: Run tests

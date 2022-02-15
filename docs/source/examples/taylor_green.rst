@@ -132,7 +132,7 @@ In this example, the ``create_particles`` method has the following code:
 
         self.scheme.setup_properties([fluid])
 
-The line tht calls ``setup_properties`` passes a list of the particle arrays
+The line that calls ``setup_properties`` passes a list of the particle arrays
 to the scheme so the scheme can configure/setup any additional properties.
 
 
