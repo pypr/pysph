@@ -299,9 +299,25 @@ ZOLTAN, see here, :ref:`pip-cache-issues`.
         $ export ZOLTAN_INCLUDE=$INSTALL_PREFIX/include
         $ export ZOLTAN_LIBRARY=$INSTALL_PREFIX/lib
 
-    You may also set these in the configuration file described in
-    :ref:`config-file`.
 
+    If Zoltan can be installed through your distro's package manager or
+    using alternate tools, it is not mandatory to use the provided zoltan
+    build script.
+
+    For example, if you are on `Arch <https://archlinux.org/>`_ or an
+    Arch-based distro, this can be accomplished using
+    `zoltan <https://aur.archlinux.org/packages/zoltan>`_ or
+    `trilinos <https://aur.archlinux.org/packages/trilinos>`_ from AUR. Then,
+    the environment variables should set as::
+
+        $ export ZOLTAN_INCLUDE=/usr/include
+        $ export ZOLTAN_LIBRARY=/usr/lib
+
+
+    Similarly, for Ubuntu, see :ref:`installing-deps-ubuntu-1804`.
+
+    By the way, you may also set these in the configuration file described in
+    :ref:`config-file`.
 
 -----------------------------------------
 Installing the dependencies on GNU/Linux
