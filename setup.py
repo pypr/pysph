@@ -681,10 +681,10 @@ def setup_package():
 
     # The requirements.
     install_requires = [
-        'numpy', 'mako', 'cyarray', 'compyle', 'Cython>=0.20',
+        'numpy', 'mako', 'cyarray', 'compyle>=0.8', 'Cython>=0.20',
         'setuptools>=42.0.0', 'pytools', 'Beaker'
     ]
-    tests_require = ['pytest>=3.0', 'meshio']
+    tests_require = ['pytest>=3.0', 'h5py']
     if sys.version_info[:2] == (2, 6):
         install_requires += [
             'ordereddict', 'importlib'

@@ -6,7 +6,7 @@ from pysph.base.nnps_base import DomainManagerBase
 from compyle.config import get_config
 from compyle.array import Array, get_backend
 from compyle.parallel import Elementwise, Reduction, Scan
-from compyle.types import annotate, dtype_to_ctype
+from compyle.types import annotate, declare
 
 from pytools import memoize_method
 
@@ -162,8 +162,8 @@ class GPUDomainManager(DomainManagerBase):
     @memoize_method
     def _get_ghosts_reduction_kernel(self):
         @annotate
-        def map_func(i, periodic_in_x, periodic_in_y, periodic_in_z,
-                     x, y, z, xmin, ymin, zmin, xmax, ymax, zmax, cell_size):
+        def map_func(i, x, y, z, xmin, ymin, zmin, xmax, ymax, zmax, cell_size,
+                     periodic_in_x, periodic_in_y, periodic_in_z):
             x_copies, y_copies, z_copies = declare('int', 3)
 
             x_copies = 1
@@ -364,10 +364,10 @@ class GPUDomainManager(DomainManagerBase):
             y = pa_wrapper.pa.gpu.y
             z = pa_wrapper.pa.gpu.z
 
-            num_extra_particles = reduce_knl(periodic_in_x, periodic_in_y,
-                                             periodic_in_z, x, y, z, xmin,
-                                             ymin, zmin, xmax, ymax, zmax,
-                                             cell_size)
+            num_extra_particles = reduce_knl(x, y, z, xmin, ymin, zmin, xmax,
+                                             ymax, zmax, cell_size,
+                                             periodic_in_x, periodic_in_y,
+                                             periodic_in_z)
 
             num_extra_particles = int(num_extra_particles)
 
