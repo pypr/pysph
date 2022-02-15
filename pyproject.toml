@@ -2,7 +2,7 @@
 requires = [
     "Beaker",
     "Cython>=0.20",
-    "compyle",
+    "compyle>=0.8",
     "cyarray",
     "mako",
     "oldest-supported-numpy",

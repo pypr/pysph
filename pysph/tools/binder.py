@@ -141,8 +141,8 @@ def _write_readme_requrements(path):
                 Cython
                 h5py
                 meshio
-                https://github.com/pypr/cyarray/zipball/master
-                https://github.com/pypr/compyle/zipball/master
+                cyarray
+                compyle
                 https://github.com/pypr/pysph/zipball/master
                 ''')
             )
