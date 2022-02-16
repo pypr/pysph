@@ -12,8 +12,8 @@ from pysph.base.nnps import DomainManager
 from pysph.solver.application import Application
 from pysph.sph.scheme import GSPHScheme, SchemeChooser, ADKEScheme, GasDScheme
 from pysph.sph.wc.crksph import CRKSPHScheme
-from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
-from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
+from pysph.sph.gas_dynamics.psph import PSPHScheme
+from pysph.sph.gas_dynamics.tsph import TSPHScheme
 from pysph.examples.gas_dynamics.riemann_2d_config import R2DConfig
 
 # current case from the al possible unique cases

@@ -14,8 +14,8 @@ import numpy
 from pysph.base.utils import get_particle_array as gpa
 from pysph.solver.application import Application
 from pysph.sph.scheme import GasDScheme, SchemeChooser
-from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
-from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
+from pysph.sph.gas_dynamics.psph import PSPHScheme
+from pysph.sph.gas_dynamics.tsph import TSPHScheme
 
 # Numerical constants
 dim = 2

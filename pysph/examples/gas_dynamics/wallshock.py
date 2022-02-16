@@ -2,8 +2,8 @@
 """
 from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
 from pysph.sph.scheme import ADKEScheme, GasDScheme, GSPHScheme, SchemeChooser
-from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
-from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
+from pysph.sph.gas_dynamics.psph import PSPHScheme
+from pysph.sph.gas_dynamics.tsph import TSPHScheme
 
 # Numerical constants
 dim = 1

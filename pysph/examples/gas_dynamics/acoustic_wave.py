@@ -25,8 +25,8 @@ from pysph.solver.application import Application
 from pysph.sph.scheme import \
     GSPHScheme, ADKEScheme, GasDScheme, SchemeChooser
 from pysph.sph.wc.crksph import CRKSPHScheme
-from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
-from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
+from pysph.sph.gas_dynamics.psph import PSPHScheme
+from pysph.sph.gas_dynamics.tsph import TSPHScheme
 
 
 class AcousticWave(Application):

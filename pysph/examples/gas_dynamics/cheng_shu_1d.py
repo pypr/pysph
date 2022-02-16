@@ -22,8 +22,8 @@ from pysph.base.utils import get_particle_array as gpa
 from pysph.base.nnps import DomainManager
 from pysph.solver.application import Application
 from pysph.sph.scheme import GSPHScheme, SchemeChooser
-from pysph.sph.gas_dynamics.psph.scheme import PSPHScheme
-from pysph.sph.gas_dynamics.tsph.scheme import TSPHScheme
+from pysph.sph.gas_dynamics.psph import PSPHScheme
+from pysph.sph.gas_dynamics.tsph import TSPHScheme
 
 
 class ChengShu(Application):

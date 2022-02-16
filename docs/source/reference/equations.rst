@@ -80,24 +80,21 @@ Implicit Incompressible SPH
 Hopkins' ‘Traditional’ SPH (TSPH)
 --------------
 
-.. automodule:: pysph.sph.gas_dynamics.tsph.scheme
-   :members:
+.. automodule:: pysph.sph.gas_dynamics.tsph
+   :members: TSPHScheme, SummationDensity, IdealGasEOS, VelocityGradDivC1,
+             BalsaraSwitch, WallBoundary, UpdateGhostProps, MomentumAndEnergy
    :undoc-members:
-
-.. automodule:: pysph.sph.gas_dynamics.tsph.equations
-   :members:
-   :undoc-members:
+   :member-order: bysource
 
 Hopkins' ‘Modern’ SPH (PSPH)
 --------------
 
-.. automodule:: pysph.sph.gas_dynamics.psph.scheme
-   :members:
+.. automodule:: pysph.sph.gas_dynamics.psph
+   :members: PSPHScheme, PSPHSummationDensityAndPressure, GradientKinsfolkC1,
+             VelocityGradDivC1, LimiterAndAlphas, WallBoundary,
+             UpdateGhostProps, MomentumAndEnergy
    :undoc-members:
-
-.. automodule:: pysph.sph.gas_dynamics.psph.equations
-   :members:
-   :undoc-members:
+   :member-order: bysource
 
 Rigid body motion
 -----------------
