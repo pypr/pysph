@@ -480,6 +480,7 @@ cdef class Octree:
         del child_indices
 
         if (next_level_nodes.empty()):
+            del next_level_nodes
             return 2
         else:
             return self._c_build_tree_bfs(pa, p_indices, next_level_nodes, 1, num_threads)
@@ -522,6 +523,8 @@ cdef class Octree:
         count[num_threads] = num_nodes
         # Stores the depth
         count[num_threads + 1] = 2
+
+        del level_nodes
 
         with nogil, parallel():
             xmin_new = <double *> malloc(3 * sizeof(double))
@@ -638,6 +641,9 @@ cdef class Octree:
                 END_OMP_PRAGMA()
 
                 new_nodes[tid].clear()
+
+            free(xmin)
+            free(xmin_new)
 
         return count[num_threads + 1]
 
@@ -1157,8 +1163,6 @@ cdef class CompressedOctree(Octree):
         del level_nodes
 
         with nogil, parallel():
-            xmin_current = <double *> malloc(3 * sizeof(double))
-            xmax_current = <double *> malloc(3 * sizeof(double))
             xmin = <double *> malloc(3 * sizeof(double))
             hmax_children = vector[double](8)
             new_indices = vector[vector[u_int]](8)
@@ -1296,6 +1300,11 @@ cdef class CompressedOctree(Octree):
                 END_OMP_PRAGMA()
 
                 new_nodes[tid].clear()
+
+            free(xmin)
+            for i from 0<=i<8:
+                free(xmin_new[i])
+                free(xmax_new[i])
 
         return count[num_threads + 1]
 
