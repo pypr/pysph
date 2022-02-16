@@ -21,7 +21,7 @@ cdef class OctreeNNPS(NNPS):
     ##########################################################################
     # Data Attributes
     ##########################################################################
-    cdef public list tree
+    cdef list tree
     cdef cOctreeNode* current_tree
     cdef u_int* current_pids
 

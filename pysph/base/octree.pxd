@@ -75,7 +75,6 @@ cdef class Octree:
     cdef public double length
     cdef public int depth
     cdef public bint test_parallel
-    cdef public int method
     cdef double machine_eps
 
     cdef double xmin[3]
@@ -104,7 +103,7 @@ cdef class Octree:
     
     cdef int _c_build_tree_bfs(self, NNPSParticleArrayWrapper pa,
             u_int* p_indices, vector[cOctreeNode *]* level_nodes,
-            int level) nogil
+            int level, int num_threads) nogil
 
     cdef void _plot_tree(self, OctreeNode node, ax)
 
