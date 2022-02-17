@@ -57,9 +57,6 @@ class SurfaceForceAdami(Equation):
         f20 = (d_pi20[d_idx]/(d_V[d_idx]*d_V[d_idx]) + s_pi20[s_idx]/s2)
         f21 = (d_pi21[d_idx]/(d_V[d_idx]*d_V[d_idx]) + s_pi21[s_idx]/s2)
         f22 = (d_pi22[d_idx]/(d_V[d_idx]*d_V[d_idx]) + s_pi22[s_idx]/s2)
-        # d_au[d_idx] += (DWIJ[0]*f00 + DWIJ[1]*f01 + DWIJ[2]*f02)/d_m[d_idx]
-        # d_av[d_idx] += (DWIJ[0]*f10 + DWIJ[1]*f11 + DWIJ[2]*f12)/d_m[d_idx]
-        # d_aw[d_idx] += (DWIJ[0]*f20 + DWIJ[1]*f21 + DWIJ[2]*f22)/d_m[d_idx]
         d_au[d_idx] += (DWIJ[0]*f00 + DWIJ[1]*f10 + DWIJ[2]*f20)/d_m[d_idx]
         d_av[d_idx] += (DWIJ[0]*f01 + DWIJ[1]*f11 + DWIJ[2]*f21)/d_m[d_idx]
         d_aw[d_idx] += (DWIJ[0]*f02 + DWIJ[1]*f12 + DWIJ[2]*f22)/d_m[d_idx]
@@ -280,7 +277,7 @@ class InterfaceCurvatureFromDensity(Equation):
     def post_loop(self, d_idx, d_wij_sum, d_nx, d_kappa):
 
         if self.with_morris_correction:
-            if abs(d_wij_sum[d_idx]) > 1e-12:
+            if d_wij_sum[d_idx] > 1e-12:
                 d_kappa[d_idx] /= d_wij_sum[d_idx]
 
 
@@ -298,7 +295,7 @@ class SolidWallPressureBCnoDensity(Equation):
         d_wij[d_idx] += WIJ
 
     def post_loop(self, d_idx, d_wij, d_p, d_rho):
-        if abs(d_wij[d_idx]) > 1e-14:
+        if d_wij[d_idx] > 1e-14:
             d_p[d_idx] /= d_wij[d_idx]
 
 
@@ -664,7 +661,7 @@ class InterfaceCurvatureFromNumberDensity(Equation):
     def post_loop(self, d_idx, d_wij_sum, d_nx, d_kappa):
         # correct the curvature estimate. Eq. (23) in [JM00]
         if self.with_morris_correction:
-            if abs(d_wij_sum[d_idx]) > 1e-12:
+            if d_wij_sum[d_idx] > 1e-12:
                 d_kappa[d_idx] /= d_wij_sum[d_idx]
 
 
@@ -787,7 +784,6 @@ class AdamiReproducingDivergence(Equation):
         # dot product in the denominator of Eq. (20)
         xijdotdwij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
 
-        tmp = 1.0
         tmp = min(d_N[d_idx], s_N[s_idx])
 
         # accumulate the contributions
@@ -1096,8 +1092,8 @@ def get_surface_tension_equations(fluids, solids, scheme, rho0, p0, c0, b,
             equations.append(MomentumEquationViscosityAdami(dest=i,
                                                             sources=fluids))
             equations.append(CSFSurfaceTensionForceAdami(dest=i,
-                                                        sources=None,
-                                                        sigma=sigma))
+                                                         sources=None,
+                                                         sigma=sigma))
             if len(solids) != 0:
                 equations.append(SolidWallNoSlipBC(dest=i, sources=solids,
                                  nu=nu))
