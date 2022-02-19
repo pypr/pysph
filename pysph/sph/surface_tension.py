@@ -19,7 +19,6 @@ References
    mesoscopic flows", JCP 2006, 213, pp 844-861 [XA06]
 
 """
-from pysph.sph.equation import Equation
 
 from math import sqrt
 
@@ -34,6 +33,7 @@ from pysph.sph.wc.transport_velocity import SummationDensity, \
 
 from pysph.sph.wc.linalg import gj_solve, augmented_matrix
 
+from pysph.sph.basic_equations import IsothermalEOS
 
 from pysph.sph.wc.basic import TaitEOS
 
@@ -57,9 +57,9 @@ class SurfaceForceAdami(Equation):
         f20 = (d_pi20[d_idx]/(d_V[d_idx]*d_V[d_idx]) + s_pi20[s_idx]/s2)
         f21 = (d_pi21[d_idx]/(d_V[d_idx]*d_V[d_idx]) + s_pi21[s_idx]/s2)
         f22 = (d_pi22[d_idx]/(d_V[d_idx]*d_V[d_idx]) + s_pi22[s_idx]/s2)
-        d_au[d_idx] += (DWIJ[0]*f00 + DWIJ[1]*f01 + DWIJ[2]*f02)/d_m[d_idx]
-        d_av[d_idx] += (DWIJ[0]*f10 + DWIJ[1]*f11 + DWIJ[2]*f12)/d_m[d_idx]
-        d_aw[d_idx] += (DWIJ[0]*f20 + DWIJ[1]*f21 + DWIJ[2]*f22)/d_m[d_idx]
+        d_au[d_idx] += (DWIJ[0]*f00 + DWIJ[1]*f10 + DWIJ[2]*f20)/d_m[d_idx]
+        d_av[d_idx] += (DWIJ[0]*f01 + DWIJ[1]*f11 + DWIJ[2]*f21)/d_m[d_idx]
+        d_aw[d_idx] += (DWIJ[0]*f02 + DWIJ[1]*f12 + DWIJ[2]*f22)/d_m[d_idx]
 
 
 class ConstructStressMatrix(Equation):
@@ -139,7 +139,14 @@ class MomentumEquationViscosityAdami(Equation):
         d_aw[d_idx] += factor*VIJ[2]
 
 
-class MomentumEquationPressureGradientAdami(Equation):
+class MomentumEquationPressureGradientHuAdams(Equation):
+    def __init__(self, dest, sources, gx=0.0, gy=0.0, gz=0.0):
+        self.gx = gx
+        self.gy = gy
+        self.gz = gz
+        super(MomentumEquationPressureGradientHuAdams,
+              self).__init__(dest, sources)
+
 
     def initialize(self, d_au, d_av, d_aw, d_idx):
         d_au[d_idx] = 0.0
@@ -153,6 +160,59 @@ class MomentumEquationPressureGradientAdami(Equation):
         d_au[d_idx] += -(p_i+p_j)*DWIJ[0]/d_m[d_idx]
         d_av[d_idx] += -(p_i+p_j)*DWIJ[1]/d_m[d_idx]
         d_aw[d_idx] += -(p_i+p_j)*DWIJ[2]/d_m[d_idx]
+
+    def post_loop(self, d_idx, d_au, d_av, d_aw):
+        d_au[d_idx] += self.gx
+        d_av[d_idx] += self.gy
+        d_aw[d_idx] += self.gz
+
+
+class MomentumEquationPressureGradientAdami(Equation):
+    def __init__(self, dest, sources, gx=0.0, gy=0.0, gz=0.0):
+        self.gx = gx
+        self.gy = gy
+        self.gz = gz
+        super(MomentumEquationPressureGradientAdami,
+              self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_au, d_av, d_aw):
+        d_au[d_idx] = 0.0
+        d_av[d_idx] = 0.0
+        d_aw[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, d_m, d_rho, s_rho,
+             d_au, d_av, d_aw, d_p, s_p,
+             d_V, s_V, DWIJ):
+
+        # averaged pressure Eq. (7)
+        rhoi = d_rho[d_idx]
+        rhoj = s_rho[s_idx]
+        p_i = d_p[d_idx]
+        p_j = s_p[s_idx]
+
+        pij = rhoj * p_i + rhoi * p_j
+        pij /= (rhoj + rhoi)
+
+        # particle volumes; d_V is inverse volume
+        Vi = 1./d_V[d_idx]
+        Vj = 1./s_V[s_idx]
+        Vi2 = Vi * Vi
+        Vj2 = Vj * Vj
+
+        # inverse mass of destination particle
+        mi1 = 1.0/d_m[d_idx]
+
+        # accelerations 1st term in Eq. (8)
+        tmp = -pij * mi1 * (Vi2 + Vj2)
+
+        d_au[d_idx] += tmp * DWIJ[0]
+        d_av[d_idx] += tmp * DWIJ[1]
+        d_aw[d_idx] += tmp * DWIJ[2]
+
+    def post_loop(self, d_idx, d_au, d_av, d_aw):
+        d_au[d_idx] += self.gx
+        d_av[d_idx] += self.gy
+        d_aw[d_idx] += self.gz
 
 
 class MomentumEquationViscosityMorris(Equation):
@@ -245,7 +305,7 @@ class SummationDensitySourceMass(Equation):
         d_rho[d_idx] = 0.0
 
     def loop(self, d_idx, d_V, d_rho, d_m, WIJ, s_m, s_idx):
-        d_rho[d_idx] += s_m[s_idx]*WIJ
+        d_rho[d_idx] += d_m[d_idx]*WIJ
 
     def post_loop(self, d_idx, d_V, d_rho, d_m):
         d_V[d_idx] = d_rho[d_idx]/d_m[d_idx]
@@ -705,31 +765,43 @@ class AdamiReproducingDivergence(Equation):
 
     def loop(self, d_idx, s_idx, d_kappa, d_wij_sum,
              d_nx, d_ny, d_nz, s_nx, s_ny, s_nz, d_V, s_V,
-             DWIJ, XIJ, RIJ, EPS):
+             DWIJ, XIJ, RIJ, EPS, d_N, s_N, d_color, s_color):
         # particle volumes
         Vi = 1./d_V[d_idx]
         Vj = 1./s_V[s_idx]
 
+        color_diff = abs(d_color[d_idx] - s_color[s_idx])
+
+        if color_diff == 1.0:
+            phi_ij = -1.0
+        else:
+            phi_ij = 1.0
         # dot product in the numerator of Eq. (20)
-        nijdotdwij = (d_nx[d_idx] - s_nx[s_idx]) * DWIJ[0] + \
-            (d_ny[d_idx] - s_ny[s_idx]) * DWIJ[1] + \
-            (d_nz[d_idx] - s_nz[s_idx]) * DWIJ[2]
+        nijdotdwij = (d_nx[d_idx] - phi_ij * s_nx[s_idx]) * DWIJ[0] + \
+            (d_ny[d_idx] - phi_ij * s_ny[s_idx]) * DWIJ[1] + \
+            (d_nz[d_idx] - phi_ij * s_nz[s_idx]) * DWIJ[2]
 
         # dot product in the denominator of Eq. (20)
         xijdotdwij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
 
+        tmp = min(d_N[d_idx], s_N[s_idx])
+
         # accumulate the contributions
-        d_kappa[d_idx] += nijdotdwij * Vj
-        d_wij_sum[d_idx] += xijdotdwij * Vj
+        d_kappa[d_idx] += tmp * nijdotdwij * Vj
+        d_wij_sum[d_idx] += tmp * xijdotdwij * Vj
 
     def post_loop(self, d_idx, d_kappa, d_wij_sum):
         # normalize the curvature estimate
-        if d_wij_sum[d_idx] > 1e-12:
+        if abs(d_wij_sum[d_idx]) > 1e-12:
             d_kappa[d_idx] /= d_wij_sum[d_idx]
-        d_kappa[d_idx] *= -self.dim
+        d_kappa[d_idx] *= self.dim
 
 
 class CSFSurfaceTensionForceAdami(Equation):
+    def __init__(self, dest, sources, sigma):
+        self.sigma = sigma
+        super(CSFSurfaceTensionForceAdami, self).__init__(dest, sources)
+
     def initialize(self, d_idx, d_au, d_av, d_aw):
         d_au[d_idx] = 0.0
         d_av[d_idx] = 0.0
@@ -737,9 +809,9 @@ class CSFSurfaceTensionForceAdami(Equation):
 
     def post_loop(self, d_idx, d_au, d_av, d_aw, d_kappa, d_cx, d_cy, d_cz,
                   d_m, d_alpha, d_rho):
-        d_au[d_idx] += -d_alpha[d_idx]*d_kappa[d_idx]*d_cx[d_idx]/d_rho[d_idx]
-        d_av[d_idx] += -d_alpha[d_idx]*d_kappa[d_idx]*d_cy[d_idx]/d_rho[d_idx]
-        d_aw[d_idx] += -d_alpha[d_idx]*d_kappa[d_idx]*d_cz[d_idx]/d_rho[d_idx]
+        d_au[d_idx] += -self.sigma * d_kappa[d_idx] * d_cx[d_idx]/d_rho[d_idx]
+        d_av[d_idx] += -self.sigma * d_kappa[d_idx] * d_cy[d_idx]/d_rho[d_idx]
+        d_aw[d_idx] += -self.sigma * d_kappa[d_idx] * d_cz[d_idx]/d_rho[d_idx]
 
 
 class ShadlooViscosity(Equation):
@@ -813,8 +885,14 @@ class AdamiColorGradient(Equation):
         rhoj = s_rho[s_idx]
         rhoij1 = 1./(rhoi + rhoj)
 
+        color_diff = abs((d_color[d_idx] - s_color[s_idx]))
         # Eq. (15) in [A10]
-        cij = rhoj*rhoij1*d_color[d_idx] + rhoi*rhoij1*s_color[s_idx]
+
+        if color_diff == 0.0:
+            cij = 0.0
+        else:
+            cij = rhoj * rhoij1 * 0.0 + rhoi * rhoij1 * 1.0
+
 
         # comute the gradient
         tmp = cij * (Vi2 + Vj2)/Vi
@@ -832,7 +910,7 @@ class AdamiColorGradient(Equation):
 
         # avoid sqrt computations on non-interface particles
         h2 = d_h[d_idx]*d_h[d_idx]
-        if mod_gradc2 > 1e-4/h2:
+        if mod_gradc2 > 0.0:
             # this normal is reliable in the sense of [JM00]
             d_N[d_idx] = 1.0
 
@@ -951,12 +1029,13 @@ def get_surface_tension_equations(fluids, solids, scheme, rho0, p0, c0, b,
         result = []
         equations = []
         for i in fluids+solids:
-            equations.append(SummationDensity(dest=i, sources=fluids+solids))
+            equations.append(SummationDensitySourceMass(dest=i,
+                                                        sources=fluids+solids))
         result.append(Group(equations, real=real))
         equations = []
         for i in fluids:
-            equations.append(TaitEOS(dest=i, sources=None, rho0=rho0, c0=c0,
-                             gamma=gamma, p0=p0))
+            equations.append(TaitEOS(dest=i, sources=None, c0=c0,
+                             gamma=gamma, p0=p0, rho0=rho0))
         for i in solids:
             equations.append(SolidWallPressureBCnoDensity(dest=i,
                              sources=fluids))
@@ -972,7 +1051,7 @@ def get_surface_tension_equations(fluids, solids, scheme, rho0, p0, c0, b,
         result.append(Group(equations, real=real))
         equations = []
         for i in fluids:
-            equations.append(MomentumEquationPressureGradientAdami(dest=i,
+            equations.append(MomentumEquationPressureGradientHuAdams(dest=i,
                              sources=fluids+solids))
             equations.append(MomentumEquationViscosityAdami(dest=i,
                                                             sources=fluids))
@@ -985,12 +1064,13 @@ def get_surface_tension_equations(fluids, solids, scheme, rho0, p0, c0, b,
         result = []
         equations = []
         for i in fluids+solids:
-            equations.append(SummationDensity(dest=i, sources=fluids+solids))
+            equations.append(SummationDensitySourceMass(dest=i,
+                                                        sources=fluids+solids))
         result.append(Group(equations, real=real))
         equations = []
         for i in fluids:
-            equations.append(StateEquation(dest=i, sources=None, rho0=rho0,
-                                           p0=p0, b=b))
+            equations.append(TaitEOS(dest=i, sources=None, c0=c0,
+                             gamma=gamma, p0=p0, rho0=rho0))
         for i in solids:
             equations.append(SolidWallPressureBCnoDensity(dest=i,
                                                           sources=fluids))
@@ -1007,11 +1087,13 @@ def get_surface_tension_equations(fluids, solids, scheme, rho0, p0, c0, b,
         result.append(Group(equations, real=real))
         equations = []
         for i in fluids:
-            equations.append(MomentumEquationPressureGradient(
-                dest=i, sources=fluids+solids, pb=0.0))
+            equations.append(MomentumEquationPressureGradientAdami(
+                dest=i, sources=fluids+solids))
             equations.append(MomentumEquationViscosityAdami(dest=i,
                                                             sources=fluids))
-            equations.append(CSFSurfaceTensionForceAdami(dest=i, sources=None))
+            equations.append(CSFSurfaceTensionForceAdami(dest=i,
+                                                         sources=None,
+                                                         sigma=sigma))
             if len(solids) != 0:
                 equations.append(SolidWallNoSlipBC(dest=i, sources=solids,
                                  nu=nu))
@@ -1020,12 +1102,13 @@ def get_surface_tension_equations(fluids, solids, scheme, rho0, p0, c0, b,
         result = []
         equations = []
         for i in fluids+solids:
-            equations.append(SummationDensity(dest=i, sources=fluids+solids))
+            equations.append(SummationDensitySourceMass(dest=i,
+                                                        sources=fluids+solids))
         result.append(Group(equations, real=real))
         equations = []
         for i in fluids:
-            equations.append(StateEquation(dest=i, sources=None, rho0=rho0,
-                                           p0=p0, b=b))
+            equations.append(IsothermalEOS(dest=i, sources=None,
+                                           p0=p0, c0=c0, rho0=rho0))
             equations.append(SY11ColorGradient(dest=i, sources=fluids+solids))
         for i in solids:
             equations.append(SolidWallPressureBCnoDensity(dest=i,
@@ -1073,7 +1156,7 @@ def get_surface_tension_equations(fluids, solids, scheme, rho0, p0, c0, b,
         equations = []
         for i in fluids:
             equations.append(TaitEOS(dest=i, sources=None, rho0=rho0, c0=c0,
-                                     gamma=gamma, p0=0.0))
+                                     gamma=gamma, p0=p0))
             equations.append(SmoothedColor(dest=i, sources=fluids+solids))
         for i in solids:
             equations.append(SolidWallPressureBCnoDensity(dest=i,
