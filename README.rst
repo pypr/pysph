@@ -219,8 +219,8 @@ There are many more examples, they can be listed by simply running::
     $ pysph run
 
 
-Works using PySPH
------------------
+Research papers using PySPH
+----------------------------
 
 The following are some of the works that use PySPH,
 
@@ -300,9 +300,11 @@ The bibtex entry is:::
 Support
 -------
 
-If you have any questions or are running into any difficulties with PySPH,
-please email or post your questions on the pysph-users mailing list here:
-https://groups.google.com/d/forum/pysph-users
+If you have any questions or are running into any difficulties with PySPH, you
+can use the `PySPH discussions <https://github.com/pypr/pysph/discussions>`_.
 
 Please also take a look at the `PySPH issue tracker
-<https://github.com/pypr/pysph/issues>`_.
+<https://github.com/pypr/pysph/issues>`_ if you have bugs or issues to report.
+
+You could also email or post your questions on the pysph-users mailing list here:
+https://groups.google.com/d/forum/pysph-users
