@@ -1,3 +1,9 @@
+1.0b2
+-----
+
+* Release date: Still under development.
+
+
 1.0b1
 -----
 
