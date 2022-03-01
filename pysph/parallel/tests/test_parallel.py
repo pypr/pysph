@@ -95,7 +95,8 @@ class MPIReduceArrayTestCase(unittest.TestCase):
     def test_parallel_reduce(self):
         args = ['--directory=%s' % self.root]
         run_parallel_script.run(
-            filename='simple_reduction.py', args=args, nprocs=4, path=path
+            filename='simple_reduction.py', args=args, nprocs=4, path=path,
+            timeout=60.0
         )
 
 
