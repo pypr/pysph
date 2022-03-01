@@ -1,8 +1,49 @@
 1.0b1
 -----
 
-* Release date: Still under development.
-* Remove pyzoltan, cyarray into their own packages on pypi.
+Around 140 pull requests were merged. Thanks to all who contributed to this
+release (in alphabetical order): Abhinav Muta, Aditya Bhosale, Amal Sebastian,
+Ananyo Sen, Antonio Valentino, Dinesh Adepu, Jeffrey D. Daye, Navaneet, Miloni
+Atal, Pawan Negi, Prabhu Ramachandran, Rohan Kaushik, Tetsuo Koyama, and Yash
+Kothari.
+
+* Release date: 1st March 2022.
+
+* Enhancements:
+
+  * Use github actions for tests and also test OpenCL support on CI.
+  * Parallelize the build step of the octree NNPS on the CPU.
+  * Support for packing initial particle distributions.
+  * Add support for setting load balancing weights for particle arrays.
+  * Use meshio to read data and convert them into particles.
+  * Add support for conditional group of equations.
+  * Add options to control loop limits in a Group.
+  * Add ``pysph binder``, ``pysph cull``, and ``pysph cache``.
+  * Use OpenMP for initialize, loop and post_loop.
+  * Added many SPH schemes: CRKSPH, SISPH, basic ISPH, SWE, TSPH, PSPH.
+  * Added a mirror boundary condition along coordinate axes.
+  * Add support for much improved inlets and outlets.
+  * Add option ``--reorder-freq`` to turn on spatial reordering of particles.
+  * API: Integrators explicitly call update_domain.
+  * Basic CUDA support.
+  * Many important improvements to the pysph Mayavi viewer.
+  * Many improvements to the 3D and 2D jupyter viewer.
+  * ``Application.customize_output`` can be used to customize viewer.
+  * Use ``~/.compyle/config.py`` for user customizations.
+  * Remove pyzoltan, cyarray, and compyle into their own packages on pypi.
+
+* Bug fixes:
+
+  * Fix issue with update_nnps being called too many times when set for a
+    group.
+  * Many OpenCL related fixes and improvements.
+  * Fix bugs in the parallel manager code and add profiling information.
+  * Fix hdf5 compressed output.
+  * Fix ``pysph dump_vtk``
+  * Many fixes to various schemes.
+  * Fix memory leak with the neighbor caching.
+  * Fix issues with using PySPH on FreeBSD.
+
 
 1.0a6
 -----
