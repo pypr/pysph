@@ -158,6 +158,7 @@ class InterpolatorView(HasTraits):
                 Item(name='set_bounds', show_label=False),
                 Item(name='recompute_bounds', show_label=False),
                 Item(name='show_legend'),
+                id='pysph.mayavi_viewer.interpolator_view'
                 )
 
     # Private protocol  ###################################################
@@ -386,7 +387,8 @@ class ParticleArrayHelper(HasTraits):
                 label='Vectors',
             ),
             layout='tabbed'
-        )
+        ),
+        id='pysph.mayavi_viewer.particle_array_helper'
     )
 
     # Private protocol ############################################
@@ -632,7 +634,10 @@ class ParticleArrayHelper(HasTraits):
 
 class PythonShellView(HasTraits):
     ns = Dict()
-    view = View(Item('ns', editor=ShellEditor(), show_label=False))
+    view = View(
+        Item('ns', editor=ShellEditor(), show_label=False),
+        id='pysph.mayavi_viewer.python_shell_view'
+    )
 
 
 class ViewerHandler(Handler):
@@ -812,10 +817,12 @@ class MayaviViewer(HasTraits):
                   Group(
                     Item('scene', editor=SceneEditor(scene_class=MayaviScene),
                          height=400, width=600, show_label=False),
-                  )
+                  ),
+                  id='pysph.mayavi_viewer.hsplit'
                 ),
                 resizable=True,
                 title='PySPH Particle Viewer',
+                id='pysph.mayavi_viewer.viewer',
                 height=640,
                 width=1024,
                 handler=ViewerHandler
