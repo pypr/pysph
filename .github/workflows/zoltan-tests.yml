@@ -1,6 +1,11 @@
 name: ZOLTAN/MPI Tests
 
-on: pull_request
+on:
+  pull_request:
+  schedule:
+    # Run test at 0400 UTC on day 1 of every month to create auto-generated
+    # code afresh and cache it.
+    - cron: '0 4 1 * *'  # Ref https://crontab.guru/#0_4_1_*_*
 
 jobs:
   tests:
@@ -41,6 +46,18 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install -r requirements-test.txt
           python setup.py develop
+      # Cache auto-generated code. Cache key changes every month.
+      # Thanks https://stackoverflow.com/a/60942437
+      - name: Get month to use as cache key.
+        id: month
+        run: echo "::set-output name=month::$(date +'%m')"
+      - name: Deal with auto-generated code cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.pysph
+            ~/.compyle
+          key: zoltan-${{ steps.month.outputs.month }}
       - name: Run tests
         run: |
           python -m pytest -v -m 'slow or parallel'
