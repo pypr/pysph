@@ -5,6 +5,9 @@ on:
   schedule:
     # Run test at 0400 UTC on Saturday.
     - cron: '0 4 * * 6'
+    # Run test at 0400 UTC on day 1 of the month to create auto-generated
+    # code afresh and cache it.
+    - cron: '0 4 1 * *'  # Ref https://crontab.guru/#0_4_1_*_*
 
 
 jobs:
@@ -41,6 +44,18 @@ jobs:
           python -m pip install https://github.com/pypr/compyle/zipball/master
           python -m pip install -r requirements.txt
           python -m pip install -e ".[dev]"
+      # Cache auto-generated code. Cache key changes every month.
+      # Thanks https://stackoverflow.com/a/60942437
+      - name: Get month to use as cache key.
+        id: month
+        run: echo "::set-output name=month::$(date +'%m')"
+      - name: Deal with auto-generated code cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.pysph
+            ~/.compyle
+          key: ${{ runner.os }}-${{ steps.month.outputs.month }}
       - name: Run tests
         run: |
           python -m pytest -v -m 'not slow or slow'
