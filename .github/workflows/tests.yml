@@ -44,6 +44,7 @@ jobs:
           python -m pip install https://github.com/pypr/compyle/zipball/master
           python -m pip install -r requirements.txt
           python -m pip install -e ".[dev]"
+          python -m pip list
       # Cache auto-generated code. Cache key changes every month.
       # Thanks https://stackoverflow.com/a/60942437
       - name: Get month to use as cache key.
