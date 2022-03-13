@@ -1,7 +1,6 @@
 import sys
 from mako.template import Template
 
-disable_unicode = False if sys.version_info.major > 2 else True
 
 NNPS_TEMPLATE = r"""
 
@@ -140,7 +139,7 @@ def _generate_nnps_code(sorted, wgs, setup, loop, vars, types,
     # need to be fixed throughout the simulation since
     # currently this function is only called at the start of
     # the simulation.
-    return Template(NNPS_TEMPLATE, disable_unicode=disable_unicode).render(
+    return Template(NNPS_TEMPLATE).render(
         data_t=data_t, sorted=sorted, wgs=wgs, setup=setup, loop_code=loop,
         vars=vars, types=types
     )

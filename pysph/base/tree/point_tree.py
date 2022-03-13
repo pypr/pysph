@@ -15,9 +15,6 @@ import pyopencl.tools
 
 from mako.template import Template
 
-# For Mako
-disable_unicode = False if sys.version_info.major > 2 else True
-
 
 class IncompatibleTreesException(Exception):
     pass
@@ -116,7 +113,7 @@ def _get_macros_preamble(c_type, sorted, dim):
 
         return res;
     }
-    """, disable_unicode=disable_unicode).render(data_t=c_type, sorted=sorted,
+    """).render(data_t=c_type, sorted=sorted,
                                                  dim=dim)
     return result
 
@@ -129,7 +126,7 @@ def _get_node_bound_kernel_parameters(dim, data_t, xvars):
         ${data_t} xmin[${dim}] = {${', '.join(['INFINITY'] * dim)}};
         ${data_t} xmax[${dim}] = {${', '.join(['-INFINITY'] * dim)}};
         ${data_t} hmax = 0;
-        """, disable_unicode=disable_unicode).render(dim=dim, data_t=data_t)
+        """).render(dim=dim, data_t=data_t)
 
     result['args'] = Template(
         r"""int *pids,
@@ -141,7 +138,7 @@ def _get_node_bound_kernel_parameters(dim, data_t, xvars):
         ${data_t}${dim} *node_xmin,
         ${data_t}${dim} *node_xmax,
         ${data_t} *node_hmax
-        """, disable_unicode=disable_unicode).render(dim=dim,
+        """).render(dim=dim,
                                                      data_t=data_t,
                                                      xvars=xvars)
 
@@ -155,7 +152,7 @@ def _get_node_bound_kernel_parameters(dim, data_t, xvars):
         % endfor
         hmax = fmax(h[pid] * radius_scale, hmax);
         }
-        """, disable_unicode=disable_unicode).render(dim=dim, xvars=xvars)
+        """).render(dim=dim, xvars=xvars)
 
     result['node_operation'] = Template(
         r"""
@@ -170,7 +167,7 @@ def _get_node_bound_kernel_parameters(dim, data_t, xvars):
             % endfor
             hmax = fmax(hmax, node_hmax[child_offset + ${i}]);
         % endfor
-        """, disable_unicode=disable_unicode).render(dim=dim)
+        """).render(dim=dim)
 
     result['output_expr'] = Template(
         """
@@ -179,7 +176,7 @@ def _get_node_bound_kernel_parameters(dim, data_t, xvars):
             node_xmax[node_idx].s${d} = xmax[${d}];
         % endfor
         node_hmax[node_idx] = hmax;
-        """, disable_unicode=disable_unicode).render(dim=dim)
+        """).render(dim=dim)
 
     return result
 
@@ -202,8 +199,7 @@ def _get_leaf_neighbor_kernel_parameters(data_t, dim, args, setup, operation,
             node_hmax1 = node_hmax_dst[cid_dst];
 
             %(setup)s;
-            """ % dict(setup=setup),
-                          disable_unicode=disable_unicode).render(
+            """ % dict(setup=setup)).render(
             data_t=data_t, dim=dim),
         'node_operation': Template("""
             node_xmin2 = node_xmin_src[cid_src];
@@ -216,7 +212,7 @@ def _get_leaf_neighbor_kernel_parameters(data_t, dim, args, setup, operation,
                 flag = 0;
                 break;
             }
-            """, disable_unicode=disable_unicode).render(data_t=data_t),
+            """).render(data_t=data_t),
         'leaf_operation': Template("""
             node_xmin2 = node_xmin_src[cid_src];
             node_xmax2 = node_xmax_src[cid_src];
@@ -228,17 +224,14 @@ def _get_leaf_neighbor_kernel_parameters(data_t, dim, args, setup, operation,
                                 node_xmin2, node_xmax2)) {
                 %(operation)s;
             }
-            """ % dict(operation=operation),
-                                   disable_unicode=disable_unicode).render(),
+            """ % dict(operation=operation)).render(),
         'output_expr': output_expr,
         'args': Template("""
             ${data_t}${dim} *node_xmin_src, ${data_t}${dim} *node_xmax_src,
             ${data_t} *node_hmax_src,
             ${data_t}${dim} *node_xmin_dst, ${data_t}${dim} *node_xmax_dst,
             ${data_t} *node_hmax_dst,
-            """ + args, disable_unicode=disable_unicode).render(data_t=data_t,
-                                                                dim=dim)
-
+            """ + args).render(data_t=data_t, dim=dim)
     }
     return result
 
