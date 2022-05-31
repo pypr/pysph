@@ -33,15 +33,22 @@ from pysph.base.z_order_gpu_nnps_kernels import (ZOrderNbrsKernel,
 from pysph.base.gpu_helper_kernels import get_elwise, get_scan
 from pysph.base.z_order_gpu_nnps_kernels import *
 
+cdef extern from *:
+    """
+    #if defined(_WIN32) || defined(MS_WINDOWS) || defined(_MSC_VER)
+      #if (_MSC_VER < 1800)
+      inline double log2(double n) {
+          return log(n)/log(2);
+      }
+      #endif
+    #endif
+    """
+
 IF UNAME_SYSNAME == "Windows":
     cdef inline double fmin(double x, double y) nogil:
         return x if x < y else y
     cdef inline double fmax(double x, double y) nogil:
         return x if x > y else y
-
-    @cython.cdivision(True)
-    cdef inline double log2(double n) nogil:
-        return log(n)/log(2)
 
 
 cdef class ZOrderGPUNNPS(GPUNNPS):
@@ -120,13 +127,13 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         cdef uint64_t max_key = 1 + array.maximum(self.pid_keys[pa_index])
 
-        self.cell_lengths[pa_index] = array.zeros(max_key, np.int32, 
+        self.cell_lengths[pa_index] = array.zeros(max_key, np.int32,
                                                   backend=self.backend)
         self.cell_start_indices[pa_index] = array.zeros_like(
             self.cell_lengths[pa_index])
-        sorted_indices = array.zeros(pa_gpu.get_number_of_particles(), np.int32, 
+        sorted_indices = array.zeros(pa_gpu.get_number_of_particles(), np.int32,
                                      backend=self.backend)
-        sorted_keys = array.zeros(pa_gpu.get_number_of_particles(), np.uint64, 
+        sorted_keys = array.zeros(pa_gpu.get_number_of_particles(), np.uint64,
                                      backend=self.backend)
 
         count_cells_knl = get_elwise(count_cells, self.backend)
@@ -137,11 +144,11 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         sort_offsets = array.zeros(pa_gpu.get_number_of_particles(), np.int32,
                                    backend=self.backend)
 
-        count_cells_knl(self.pid_keys[pa_index], self.cell_size, 
+        count_cells_knl(self.pid_keys[pa_index], self.cell_size,
                         self.cell_lengths[pa_index], sort_offsets)
-        start_indices_knl(counts=self.cell_lengths[pa_index], 
+        start_indices_knl(counts=self.cell_lengths[pa_index],
                           indices=self.cell_start_indices[pa_index])
-        sort_knl(self.pid_keys[pa_index], sort_offsets, 
+        sort_knl(self.pid_keys[pa_index], sort_offsets,
                  self.cell_start_indices[pa_index],
                  sorted_indices, sorted_keys)
 

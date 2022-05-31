@@ -22,15 +22,23 @@ cdef extern from "<algorithm>" namespace "std" nogil:
     void sort[Iter, Compare](Iter first, Iter last, Compare comp)
     void sort[Iter](Iter first, Iter last)
 
+cdef extern from *:
+    """
+    #if defined(_WIN32) || defined(MS_WINDOWS) || defined(_MSC_VER)
+      #if (_MSC_VER < 1800)
+      inline double log2(double n) {
+          return log(n)/log(2);
+      }
+      #endif
+    #endif
+    """
+
 IF UNAME_SYSNAME == "Windows":
     cdef inline double fmin(double x, double y) nogil:
         return x if x < y else y
     cdef inline double fmax(double x, double y) nogil:
         return x if x > y else y
 
-    @cython.cdivision(True)
-    cdef inline double log2(double n) nogil:
-        return log(n)/log(2)
 
 #############################################################################
 cdef class StratifiedSFCNNPS(NNPS):
@@ -333,7 +341,7 @@ cdef class StratifiedSFCNNPS(NNPS):
 
     cdef int _neighbor_boxes_func(self, int i, int j, int k, int H,
             int* current_key_to_idx_level, uint64_t max_key,
-            double current_cell_size, double* current_hmax_level, 
+            double current_cell_size, double* current_hmax_level,
             vector[int]* nbr_boxes):
         if self.asymmetric:
             return self._neighbor_boxes_asym(i, j, k, H, current_key_to_idx_level,
@@ -479,10 +487,10 @@ cdef class StratifiedSFCNNPS(NNPS):
                     current_hmax_level[key_stripped] = h_ptr[pid]
                 else:
                     current_hmax_level[key_stripped] = fmax(current_hmax_level[key_stripped], h_ptr[pid])
-            
+
             pid = current_pids[0]
             key = current_keys[0]
-            
+
             find_cell_id_raw(
                 x_ptr[pid] - xmin[0],
                 y_ptr[pid] - xmin[1],
@@ -498,7 +506,7 @@ cdef class StratifiedSFCNNPS(NNPS):
             current_hmax_level = current_hmax[level]
             hmax_cell = current_hmax_level[key_stripped]
             mask_length = 0
-            
+
             current_key_to_nbr_idx_level = current_key_to_nbr_idx[level]
             current_key_to_nbr_length_level = current_key_to_nbr_length[level]
 
@@ -517,7 +525,7 @@ cdef class StratifiedSFCNNPS(NNPS):
                     )
 
                 H = self._get_H(hmax_cell, current_cells[k])
-                
+
                 num_boxes = self._neighbor_boxes_func(
                         c_x, c_y, c_z,
                         H, current_key_to_idx[k], current_max_key,
@@ -527,7 +535,7 @@ cdef class StratifiedSFCNNPS(NNPS):
 
                 n += num_boxes
                 mask_length += num_boxes
-            
+
             current_key_to_nbr_length_level[key_bottom] = mask_length
 
             # nbrs of all cids in particle array i
@@ -552,10 +560,10 @@ cdef class StratifiedSFCNNPS(NNPS):
                 mask_length = 0
                 current_key_to_nbr_idx_level = current_key_to_nbr_idx[level]
                 current_key_to_nbr_length_level = current_key_to_nbr_length[level]
-                    
+
                 if current_key_to_nbr_idx_level[key_bottom] == -1:
                     current_key_to_nbr_idx_level[key_bottom] = n
- 
+
                     for k from 0<=k<self.num_levels:
                         if current_cells[k] == 0:
                             continue
@@ -569,7 +577,7 @@ cdef class StratifiedSFCNNPS(NNPS):
                             )
 
                         H = self._get_H(hmax_cell, current_cells[k])
-                        
+
                         num_boxes = self._neighbor_boxes_func(
                                 c_x, c_y, c_z,
                                 H, current_key_to_idx[k], current_max_key,
@@ -579,7 +587,7 @@ cdef class StratifiedSFCNNPS(NNPS):
 
                         n += num_boxes
                         mask_length += num_boxes
-                    
+
                     current_key_to_nbr_length_level[key_bottom] = mask_length
 
     @cython.cdivision(True)
@@ -627,7 +635,7 @@ cdef class StratifiedSFCNNPS(NNPS):
 
         cdef uint32_t* current_pids
         cdef uint64_t* current_keys
-        cdef int** current_key_to_nbr_idx 
+        cdef int** current_key_to_nbr_idx
         cdef int** current_key_to_nbr_length
         cdef int* current_key_to_nbr_idx_level
         cdef int* current_key_to_nbr_length_level
@@ -648,7 +656,7 @@ cdef class StratifiedSFCNNPS(NNPS):
 
             current_key_to_nbr_idx = self.key_to_nbr_idx[i]
             current_key_to_nbr_length = self.key_to_nbr_idx[i]
-            
+
             for j from 0<=j<self.num_levels:
                 num_cells_level = current_num_cells[j]
                 for k from 0<=k<self.num_levels:
