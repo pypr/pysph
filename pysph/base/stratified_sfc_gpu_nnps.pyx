@@ -27,16 +27,22 @@ cimport cython
 import numpy as np
 cimport numpy as np
 
+cdef extern from *:
+    """
+    #if defined(_WIN32) || defined(MS_WINDOWS) || defined(_MSC_VER)
+      #if (_MSC_VER < 1800)
+      inline double log2(double n) {
+          return log(n)/log(2);
+      }
+      #endif
+    #endif
+    """
 
 IF UNAME_SYSNAME == "Windows":
     cdef inline double fmin(double x, double y) nogil:
         return x if x < y else y
     cdef inline double fmax(double x, double y) nogil:
         return x if x > y else y
-
-    @cython.cdivision(True)
-    cdef inline double log2(double n) nogil:
-        return log(n)/log(2)
 
 
 cdef class StratifiedSFCGPUNNPS(GPUNNPS):
