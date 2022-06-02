@@ -27,6 +27,7 @@ from pysph.sph.scheme import \
 from pysph.sph.wc.crksph import CRKSPHScheme
 from pysph.sph.gas_dynamics.psph import PSPHScheme
 from pysph.sph.gas_dynamics.tsph import TSPHScheme
+from pysph.sph.gas_dynamics.magma2 import MAGMA2Scheme
 
 
 class AcousticWave(Application):
@@ -124,9 +125,16 @@ class AcousticWave(Application):
             fluids=['fluid'], solids=[], dim=self.dim, gamma=self.gamma,
             hfact=1.2)
 
+        # Using MAGMA2 procedure to adapt h results in wiggles which keep
+        # growing. The MPM procedure is well-behaved for adapting h
+        # for this problem.
+        magma2 = MAGMA2Scheme(
+            fluids=['fluid'], solids=[], dim=self.dim, gamma=self.gamma,
+            hfact=1.2, has_ghosts=True, adaptive_h_scheme='mpm')
+
         s = SchemeChooser(
             default='gsph', gsph=gsph, mpm=mpm, crksph=crksph, adke=adke,
-            psph=psph, tsph=tsph
+            psph=psph, tsph=tsph, magma2=magma2
         )
 
         return s
@@ -154,6 +162,10 @@ class AcousticWave(Application):
 
         elif self.options.scheme in ['tsph', 'psph']:
             s.configure(hfact=1.2)
+            s.configure_solver(dt=self.dt, tf=self.tf,
+                               adaptive_timestep=False, pfreq=50)
+
+        elif self.options.scheme == 'magma2':
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=50)
 

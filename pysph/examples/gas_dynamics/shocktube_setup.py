@@ -13,14 +13,14 @@ from pysph.examples.gas_dynamics import riemann_solver
 
 class ShockTubeSetup(Application):
 
-    def generate_particles(self, xmin, xmax, dxl, dxr, m, pl, pr, h0,  bx,
-                           gamma1, ul=0, ur=0, constants={}):
-        xt1 = numpy.arange(xmin - bx + 0.5 * dxl, 0, dxl)
-        xt2 = numpy.arange(0.5 * dxr, xmax + bx, dxr)
+    def generate_particles(self, xmin, xmax, dxl, dxr, rhol, rhor, pl, pr, bx,
+                           gamma1, h0=None, x0=0.0, ul=0, ur=0, constants={}):
+        xt1 = numpy.arange(xmin - bx + 0.5 * dxl, x0, dxl)
+        xt2 = numpy.arange(x0 + 0.5 * dxr, xmax + bx, dxr)
         xt = numpy.concatenate([xt1, xt2])
         leftb_indices = numpy.where(xt <= xmin)[0]
-        left_indices = numpy.where((xt > xmin) & (xt < 0))[0]
-        right_indices = numpy.where((xt >= 0) & (xt < xmax))[0]
+        left_indices = numpy.where((xt > xmin) & (xt < x0))[0]
+        right_indices = numpy.where((xt >= x0) & (xt < xmax))[0]
         rightb_indices = numpy.where(xt >= xmax)[0]
         x1 = xt[left_indices]
         x2 = xt[right_indices]
@@ -29,19 +29,32 @@ class ShockTubeSetup(Application):
 
         x = numpy.concatenate([x1, x2])
         b = numpy.concatenate([b1, b2])
-        right_indices = numpy.where(x > 0.0)[0]
+        right_indices = numpy.where(x > x0)[0]
 
-        rho = numpy.ones_like(x) * m / dxl
-        rho[right_indices] = m / dxr
+        smooth_ic = self.smooth_ic if hasattr(self, 'smooth_ic') else False
+        if smooth_ic:  # ref footnote 3 of doi.org/10.1016/j.newar.2009.08.007
+            deltax = 1.5 * numpy.mean(x[1:] - x[:-1])
+            p = (pl - pr) / (1 + numpy.exp((x - x0) / deltax)) + pr
+            u = (ul - ur) / (1 + numpy.exp((x - x0) / deltax)) + ur
+            rho = (rhol - rhor) / (1 + numpy.exp((x - x0) / deltax)) + rhor
+        else:
+            rho = numpy.ones_like(x) * rhol
+            rho[right_indices] = rhor
+            p = numpy.ones_like(x) * pl
+            p[right_indices] = pr
+            u = numpy.ones_like(x) * ul
+            u[right_indices] = ur
+        dx = numpy.ones_like(x) * dxl
+        dx[right_indices] = dxr
+        m = rho * dx
 
-        p = numpy.ones_like(x) * pl
-        p[right_indices] = pr
+        if h0 is None:
+            dx = numpy.ones_like(x) * dxl
+            dx[right_indices] = dxr
+            h = dx * self.hdx
+        else:
+            h = numpy.ones_like(x) * h0
 
-        u = numpy.ones_like(x) * ul
-        u[right_indices] = ur
-
-        h = numpy.ones_like(x) * h0
-        m = numpy.ones_like(x) * m
         e = p / (gamma1 * rho)
         wij = numpy.ones_like(x)
 
@@ -141,11 +154,6 @@ class ShockTubeSetup(Application):
 
     def configure_scheme(self):
         s = self.scheme
-        dxl = 0.5/self.nl
-        ratio = self.rhor/self.rhol
-        nr = ratio*self.nl
-        dxr = 0.5/self.nr
-        h0 = self.hdx * self.dxr
         kernel_factor = self.options.hdx
         if self.options.scheme == 'mpm':
             s.configure(kernel_factor=kernel_factor)
@@ -162,5 +170,8 @@ class ShockTubeSetup(Application):
                                adaptive_timestep=False, pfreq=1)
         elif self.options.scheme in ['tsph', 'psph']:
             s.configure(hfact=kernel_factor)
+            s.configure_solver(dt=self.dt, tf=self.tf,
+                               adaptive_timestep=False, pfreq=50)
+        elif self.options.scheme == 'magma2':
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=50)

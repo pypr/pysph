@@ -96,6 +96,20 @@ Hopkins' ‘Modern’ SPH (PSPH)
    :undoc-members:
    :member-order: bysource
 
+MAGMA2
+--------------
+
+.. automodule:: pysph.sph.gas_dynamics.magma2
+   :members: IncreaseSmoothingLength, UpdateSmoothingLength,
+             SummationDensityMPMStyle, IdealGasEOS, AuxiliaryGradient,
+             CorrectionMatrix, FirstGradient, SecondGradient,
+             EntropyBasedDissipationTrigger, WallBoundary, UpdateGhostProps
+             MomentumAndEnergyMI1, MomentumAndEnergyMI2,
+             MomentumAndEnergyStdGrad, EvaluateTildeMu,
+             SettleByArtificialPressure
+   :undoc-members:
+   :member-order: bysource
+
 Rigid body motion
 -----------------
 
