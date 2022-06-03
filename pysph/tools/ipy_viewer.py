@@ -27,6 +27,7 @@ class Viewer(object):
         self.path = path
         self.paths_list = get_files(path)
 
+        self.cull_factor = 1
         # Caching #
         # Note : Caching is only used by get_frame and widget handlers.
         if cache:
@@ -369,7 +370,7 @@ class Viewer(object):
 
             file_count = len(self.paths_list) - 1
 
-            for i in np.arange(0, file_count + 1, self.cull_factor):
+            for i in range(0, file_count + 1, self.cull_factor):
                 self._widgets.frame.value = i
                 self._frame_handler(None)
                 if self.viewer_type == 'Viewer2D':
