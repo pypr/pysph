@@ -11,8 +11,10 @@ ${' '*4*level}${l}
 #######################################################################
 ## Call any `pre` functions
 #######################################################################
+_prof_global = ProfileContext("AccelerationEval.${group.name}")
 % if group.pre:
-${indent(helper.get_pre_call(group), 0)}
+with profile_ctx("AccelerationEval.${group.name}.pre"):
+    ${indent(helper.get_pre_call(group), 1)}
 % endif
 #######################################################################
 ## Iterate over destinations in this group.
@@ -37,8 +39,10 @@ ${indent(all_eqs.get_py_initialize_code(), 0)}
 #######################################################################
 % if all_eqs.has_initialize():
 # Initialization for destination ${dest}.
+_prof = ProfileContext("AccelerationEval.${group.name}_d_${dest}.initialize")
 for d_idx in ${helper.get_parallel_range(group)}:
     ${indent(all_eqs.get_initialize_code(helper.object.kernel), 1)}
+_prof.stop()
 % endif
 #######################################################################
 ## Handle all the equations that do not have a source.
@@ -46,8 +50,10 @@ for d_idx in ${helper.get_parallel_range(group)}:
 % if len(eqs_with_no_source.equations) > 0:
 % if eqs_with_no_source.has_loop():
 # SPH Equations with no sources.
+_prof = ProfileContext("AccelerationEval.${group.name}_d_${dest}_no_sources.loop")
 for d_idx in ${helper.get_parallel_range(group)}:
     ${indent(eqs_with_no_source.get_loop_code(helper.object.kernel), 1)}
+_prof.stop()
 % endif
 % endif
 #######################################################################
@@ -65,10 +71,13 @@ ${indent(helper.get_src_array_setup(source, eq_group), 0)}
 src_array_index = src.index
 
 % if eq_group.has_initialize_pair():
+_prof = ProfileContext("AccelerationEval.${group.name}_d_${dest}_s_${source}.initialize_pair")
 for d_idx in ${helper.get_parallel_range(group)}:
     ${indent(eq_group.get_initialize_pair_code(helper.object.kernel), 1)}
+_prof.stop()
 % endif
 
+_prof = ProfileContext("AccelerationEval.${group.name}_d_${dest}_s_${source}.loop")
 % if eq_group.has_loop() or eq_group.has_loop_all():
 #######################################################################
 ## Iterate over destination particles.
@@ -99,21 +108,26 @@ ${helper.get_parallel_block()}
 % endif ## if eq_group.has_loop() or has_loop_all():
 # Source ${source} done.
 # --------------------------------------
+_prof.stop()
 % endfor
 ###################################################################
 ## Do any post_loop assignments for the destination.
 ###################################################################
 % if all_eqs.has_post_loop():
 # Post loop for destination ${dest}.
+_prof = ProfileContext("AccelerationEval.${group.name}_d_${dest}.post_loop")
 for d_idx in ${helper.get_parallel_range(group)}:
     ${indent(all_eqs.get_post_loop_code(helper.object.kernel), 1)}
+_prof.stop()
 % endif
 
 ###################################################################
 ## Do any reductions for the destination.
 ###################################################################
 % if all_eqs.has_reduce():
+_prof = ProfileContext("AccelerationEval.${group.name}_d_${dest}.reduce")
 ${indent(all_eqs.get_reduce_code(), 0)}
+_prof.stop()
 % endif
 
 # Destination ${dest} done.
@@ -133,8 +147,10 @@ with profile_ctx("nnps.update"):
 ## Call any `post` functions
 #######################################################################
 % if group.post:
-${indent(helper.get_post_call(group), 0)}
+with profile_ctx("AccelerationEval.${group.name}.post"):
+    ${indent(helper.get_post_call(group), 1)}
 % endif
+_prof_global.stop()
 </%def>
 
 from libc.stdio cimport printf
@@ -150,7 +166,7 @@ prange = range
 from cython.parallel import parallel, prange, threadid
 % endif
 
-from compyle.profile import profile_ctx
+from compyle.profile import profile_ctx, ProfileContext
 from pysph.base.particle_array cimport ParticleArray
 from pysph.base.nnps_base cimport NNPS
 from pysph.base.reduce_array import serial_reduce_array
@@ -275,7 +291,7 @@ cdef class AccelerationEval:
         % for g_idx, group in enumerate(helper.object.mega_groups):
         % if len(group.data) > 0: # No equations in this group.
         # ---------------------------------------------------------------------
-        # Group ${g_idx}.
+        # Group ${group.name}.
         % if group.condition is not None:
         if ${helper.get_condition_call(group)}:
         <%
@@ -320,7 +336,7 @@ cdef class AccelerationEval:
         ${indent(helper.get_iteration_check(group), indent_lvl)}
         % endif
 
-        # Group ${g_idx} done.
+        # Group ${group.name} done.
         # ---------------------------------------------------------------------
         % endif # (if len(group.data) > 0)
         % endfor
