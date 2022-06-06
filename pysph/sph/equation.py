@@ -44,6 +44,15 @@ def indent(text, prefix='    '):
     return ''.join(prefix + line for line in text.splitlines(True))
 
 
+def _counter():
+    """Counter to give an id to Group when a name if not given."""
+    c = 0
+    while True:
+        yield c
+        c += 1
+
+
+group_counter = _counter()
 ##############################################################################
 # `Context` class.
 ##############################################################################
@@ -449,7 +458,7 @@ class Group(object):
 
     def __init__(self, equations, real=True, update_nnps=False, iterate=False,
                  max_iterations=1, min_iterations=0, pre=None, post=None,
-                 condition=None, start_idx=0, stop_idx=None):
+                 condition=None, start_idx=0, stop_idx=None, name=None):
         """Constructor.
 
         Parameters
@@ -505,6 +514,11 @@ class Group(object):
             that this works like a range stop parameter so the last value is
             not included.
 
+        name: str
+            The passed string is used to name the Group in the profiling info
+            csv file to make it easy to read. If a string is not passed it
+            defaults to the name 'Group'.
+
         Notes
         -----
 
@@ -530,6 +544,9 @@ class Group(object):
         self.condition = condition
         self.start_idx = start_idx
         self.stop_idx = stop_idx
+        self.name = 'Group_%d' % next(group_counter)
+        if name is not None:
+            self.name = name
 
         only_groups = [x for x in equations if isinstance(x, Group)]
         if (len(only_groups) > 0) and (len(only_groups) != len(equations)):
@@ -825,9 +842,15 @@ class CythonGroup(Group):
         lines = []
         for i, equation in enumerate(self.equations):
             if hasattr(equation, 'py_initialize'):
-                code = ('self.all_equations["{name}"].py_initialize'
-                        '(dst.array, t, dt)').format(name=equation.var_name)
-                lines.append(code)
+                code = [
+                    'with profile_ctx'
+                    '("AccelerationEval.%s.py_initialize"):' % self.name
+                ]
+                code += [
+                    indent('self.all_equations["{name}"].py_initialize'
+                           '(dst.array, t, dt)').format(name=equation.var_name)
+                ]
+                lines.extend(code)
         return '\n'.join(lines)
 
     def get_reduce_code(self):

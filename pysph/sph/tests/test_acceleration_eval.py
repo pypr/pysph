@@ -278,7 +278,7 @@ class TestMegaGroup(unittest.TestCase):
         g = Group(
             equations=[], real=False, update_nnps=True, iterate=True,
             max_iterations=20, min_iterations=2, pre=nothing, post=nothing,
-            start_idx=1, stop_idx=2
+            start_idx=1, stop_idx=2, name='Dummy'
         )
 
         # When
@@ -286,7 +286,7 @@ class TestMegaGroup(unittest.TestCase):
 
         # Then
         props = ('real update_nnps iterate max_iterations condition '
-                 'min_iterations pre post start_idx stop_idx').split()
+                 'min_iterations pre post start_idx stop_idx name').split()
         for prop in props:
             self.assertEqual(getattr(mg, prop), getattr(g, prop))
 
@@ -1268,16 +1268,16 @@ class TestAEvalMultipleDests(unittest.TestCase):
         # acceleration eval as that requires a Cython object and not a mock
         # instance.
         profile_info = get_profile_info()
-        n_up_dom = profile_info[0]['Integrator.update_domain']['calls']
-        n_up = profile_info[0]['nnps.update']['calls']
+        n_up_dom = profile_info[1]['Integrator.update_domain']['calls']
+        n_up = profile_info[1]['nnps.update']['calls']
         # When
         a_eval.compute(0.1, 0.1)
 
         # Then
         profile_info = get_profile_info()
-        ncall = profile_info[0]['Integrator.update_domain']['calls']
+        ncall = profile_info[1]['Integrator.update_domain']['calls']
         self.assertEqual(ncall, n_up_dom + 1)
-        ncall = profile_info[0]['nnps.update']['calls']
+        ncall = profile_info[1]['nnps.update']['calls']
         self.assertEqual(ncall, n_up + 1)
 
 
