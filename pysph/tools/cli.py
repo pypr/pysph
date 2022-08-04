@@ -23,6 +23,11 @@ def output_vtk(args):
     main(args)
 
 
+def dump_xdmf(args):
+    from pysph.tools.dump_xdmf import main
+    main(args)
+
+
 def _has_pysph_dir():
     init_py = join('pysph', '__init__.py')
     init_pyc = join('pysph', '__init__.pyc')
@@ -75,6 +80,12 @@ def main():
         add_help=False
     )
     vtk_out.set_defaults(func=output_vtk)
+
+    xdmf_out = subparsers.add_parser(
+        'dump_xdmf', help='Generate XDMF',
+        add_help=False
+    )
+    xdmf_out.set_defaults(func=dump_xdmf)
 
     tests = subparsers.add_parser(
         'test', help='Run entire PySPH test-suite',

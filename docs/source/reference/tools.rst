@@ -21,6 +21,11 @@ PySPH or to generate new files.
 
 .. autofunction:: pysph.solver.utils.load_and_concatenate
 
+Dump XDMF
+~~~~~~~~~~~~~
+.. automodule:: pysph.tools.dump_xdmf
+    :members:
+    :undoc-members:
 
 Interpolator
 ------------
