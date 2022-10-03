@@ -25,11 +25,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python ${{ matrix.python-version }}
-        uses: conda-incubator/setup-miniconda@v2
+        uses: actions/setup-python@v4
         with:
-          auto-update-conda: true
           python-version: ${{ matrix.python-version }}
-          channels: conda-forge
       - name: Install dependencies on Linux/MacOS
         run: |
           conda info
@@ -38,14 +36,12 @@ jobs:
         if: ${{ runner.os != 'Windows' }}
       - name: Install dependencies
         run: |
-          conda info
-          ls -lah  pysph/base
-          conda install -c conda-forge numpy cython h5py
-          python -m pip install https://github.com/pypr/cyarray/zipball/master
-          python -m pip install https://github.com/pypr/compyle/zipball/master
-          python -m pip install -r requirements.txt
-          python -m pip install -e ".[dev]"
-          python -m pip list
+          pip install numpy cython h5py
+          pip install https://github.com/pypr/cyarray/zipball/master
+          pip install https://github.com/pypr/compyle/zipball/master
+          pip install -r requirements.txt
+          pip install -e ".[dev]"
+          pip list
       # Cache auto-generated code. Cache key changes every month.
       # Thanks https://stackoverflow.com/a/60942437
       - name: Get month to use as cache key.
