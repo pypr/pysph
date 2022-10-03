@@ -667,7 +667,7 @@ def _is_cythonize_default():
 
 
 def setup_package():
-    from setuptools import find_packages, setup
+    from setuptools import find_namespace_packages, setup
     if MODE == 'info':
         cmdclass = {}
     else:
@@ -739,7 +739,7 @@ def setup_package():
           url='http://github.com/pypr/pysph',
           license="BSD",
           keywords="SPH simulation computational fluid dynamics",
-          packages=find_packages(),
+          packages=find_namespace_packages(),
           package_data={
               '': ['*.pxd', '*.mako', '*.txt.gz', '*.txt', '*.txt.bz2',
                    '*.vtk.gz', '*.gz', '*.csv',
