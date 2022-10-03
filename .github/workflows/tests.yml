@@ -39,6 +39,7 @@ jobs:
       - name: Install dependencies
         run: |
           conda info
+          ls -lah  pysph/base
           conda install -c conda-forge numpy cython h5py
           python -m pip install https://github.com/pypr/cyarray/zipball/master
           python -m pip install https://github.com/pypr/compyle/zipball/master
