@@ -152,6 +152,8 @@ def get_openmp_flags():
     import shutil
     import tempfile
     test_code = dedent("""
+    # cython: language_level=3, embedsignature=True
+    # distutils: language=c++
     from cython.parallel import parallel, prange, threadid
     cimport openmp
     def n_threads():

@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest] # [ubuntu-latest, macos-latest, windows-latest]
-        python-version: [3.9]
+        python-version: [3.10.6]
 
     runs-on: ${{ matrix.os }}
     defaults:
@@ -36,7 +36,12 @@ jobs:
         if: ${{ runner.os != 'Windows' }}
       - name: Install dependencies
         run: |
-          pip install numpy cython h5py
+          python -m venv venv
+          cd venv
+          source ./Scripts/activate
+          cd ..
+          python -m pip install pip==22.2.2
+          pip install numpy==1.23.1 cython==0.29.32 h5py==3.7.0
           pip install https://github.com/pypr/cyarray/zipball/master
           pip install https://github.com/pypr/compyle/zipball/master
           pip install -r requirements.txt
@@ -56,4 +61,8 @@ jobs:
           key: ${{ runner.os }}-${{ steps.month.outputs.month }}
       - name: Run tests
         run: |
+          cd venv
+          source ./Scripts/activate
+          cd ..
+          ls -lah pysph/base
           python -m pytest pysph/parallel/tests/test_openmp.py -v -m 'not slow or slow'
