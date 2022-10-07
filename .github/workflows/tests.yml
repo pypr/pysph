@@ -40,12 +40,13 @@ jobs:
           cd venv
           source ./Scripts/activate
           cd ..
-          python -m pip install pip==22.2.2
-          pip install numpy==1.23.1 cython==0.29.32 h5py==3.7.0
+          python -m pip install pip
+          pip install numpy cython h5py
           pip install https://github.com/pypr/cyarray/zipball/master
           pip install https://github.com/pypr/compyle/zipball/master
           pip install -r requirements.txt
           pip install -v -e ".[dev]"
+          python setup.py develop
           pip list
       # Cache auto-generated code. Cache key changes every month.
       # Thanks https://stackoverflow.com/a/60942437
