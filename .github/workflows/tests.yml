@@ -36,16 +36,12 @@ jobs:
         if: ${{ runner.os != 'Windows' }}
       - name: Install dependencies
         run: |
-          python -m venv venv
-          cd venv
-          source ./Scripts/activate
-          cd ..
-          python -m pip install pip
-          pip install numpy cython h5py
+          python -m pip install --upgrade pip setuptools wheel
+          pip install numpy cython h5py pytest
           pip install https://github.com/pypr/cyarray/zipball/master
           pip install https://github.com/pypr/compyle/zipball/master
           pip install -r requirements.txt
-          pip install -v ".[dev]"
+          python setup.py develop --user
           pip list
       # Cache auto-generated code. Cache key changes every month.
       # Thanks https://stackoverflow.com/a/60942437
@@ -61,8 +57,5 @@ jobs:
           key: ${{ runner.os }}-${{ steps.month.outputs.month }}
       - name: Run tests
         run: |
-          cd venv
-          source ./Scripts/activate
-          cd ..
           ls -lah pysph/base
           python -m pytest pysph/parallel/tests/test_openmp.py -v -m 'not slow or slow'
