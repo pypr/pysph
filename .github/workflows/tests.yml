@@ -45,8 +45,7 @@ jobs:
           pip install https://github.com/pypr/cyarray/zipball/master
           pip install https://github.com/pypr/compyle/zipball/master
           pip install -r requirements.txt
-          pip install -v -e ".[dev]"
-          python setup.py develop
+          pip install -v ".[dev]"
           pip list
       # Cache auto-generated code. Cache key changes every month.
       # Thanks https://stackoverflow.com/a/60942437
