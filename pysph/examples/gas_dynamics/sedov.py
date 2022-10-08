@@ -16,6 +16,7 @@ from pysph.solver.application import Application
 from pysph.sph.scheme import GasDScheme, SchemeChooser
 from pysph.sph.gas_dynamics.psph import PSPHScheme
 from pysph.sph.gas_dynamics.tsph import TSPHScheme
+from pysph.sph.gas_dynamics.magma2 import MAGMA2Scheme
 
 # Numerical constants
 dim = 2
@@ -75,8 +76,16 @@ class SedovPointExplosion(Application):
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             hfact=kernel_factor
         )
+
+        # Reconstruction does not work with this initial condition and
+        # initial distribution combination.
+        magma2 = MAGMA2Scheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            ndes=40, reconstruction_order=0
+        )
+
         s = SchemeChooser(
-            default='mpm', mpm=mpm, psph=psph, tsph=tsph
+            default='mpm', mpm=mpm, psph=psph, tsph=tsph, magma2=magma2
         )
         return s
 

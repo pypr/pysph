@@ -15,6 +15,7 @@ from pysph.sph.scheme import GasDScheme, ADKEScheme, GSPHScheme, SchemeChooser
 from pysph.sph.wc.crksph import CRKSPHScheme
 from pysph.sph.gas_dynamics.psph import PSPHScheme
 from pysph.sph.gas_dynamics.tsph import TSPHScheme
+from pysph.sph.gas_dynamics.magma2 import MAGMA2Scheme
 
 # PySPH tools
 from pysph.tools import uniform_distribution as ud
@@ -152,9 +153,14 @@ class AccuracyTest2D(Application):
             hfact=kernel_factor
         )
 
+        magma2 = MAGMA2Scheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            hfact=None, has_ghosts=True, ndes=50
+        )
+
         s = SchemeChooser(
             default='gsph', adke=adke, mpm=mpm, gsph=gsph, crksph=crksph,
-            psph=psph, tsph=tsph
+            psph=psph, tsph=tsph, magma2=magma2
         )
         return s
 
@@ -164,7 +170,8 @@ class AccuracyTest2D(Application):
             s.configure(kernel_factor=kernel_factor)
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=True, pfreq=50)
-        elif self.options.scheme in ['adke', 'gsph', 'crksph', 'tsph', 'psph']:
+        elif self.options.scheme in ['adke', 'gsph', 'crksph', 'tsph', 'psph',
+                                     'magma2']:
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=50)
 

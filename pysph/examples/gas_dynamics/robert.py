@@ -2,9 +2,11 @@
 """
 
 from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
-from pysph.sph.scheme import ADKEScheme, GasDScheme, GSPHScheme, SchemeChooser
+from pysph.sph.scheme import (ADKEScheme, GasDScheme, GSPHScheme,
+                              SchemeChooser, add_bool_argument)
 from pysph.sph.gas_dynamics.psph import PSPHScheme
 from pysph.sph.gas_dynamics.tsph import TSPHScheme
+from pysph.sph.gas_dynamics.magma2 import MAGMA2Scheme
 
 # Numerical constants
 dim = 1
@@ -43,25 +45,36 @@ class Robert(ShockTubeSetup):
             "--nl", action="store", type=float, dest="nl", default=1930,
             help="Number of particles in left region"
         )
+        group.add_argument(
+            "--dscheme", choices=["constant_mass", "constant_volume"],
+            dest="dscheme", default="constant_mass",
+            help="Spatial discretization scheme, one of {'constant_mass', "
+                 "'constant_volume'}."
+        )
+        add_bool_argument(group, 'smooth-ic', dest='smooth_ic', default=False,
+                          help="Smooth the initial condition.")
 
     def consume_user_options(self):
         self.nl = self.options.nl
         self.hdx = self.options.hdx
-        ratio = self.rhor/self.rhol
+        self.dscheme = self.options.dscheme
         self.xb_ratio = 2
-        self.nr = ratio*self.nl
-        self.dxl = 0.5/self.nl
-        self.dxr = 0.5/self.nr
+        self.dxl = (self.x0 - self.xmin) / self.nl
+        if self.dscheme == 'constant_mass':
+            ratio = self.rhor / self.rhol
+            self.dxr = self.dxl / ratio
+        else:
+            self.dxr = self.dxl
         self.h0 = self.hdx * self.dxr
         self.hdx = self.hdx
 
     def create_particles(self):
-        return self.generate_particles(xmin=self.xmin*self.xb_ratio,
-                                       xmax=self.xmax*self.xb_ratio,
-                                       dxl=self.dxl, dxr=self.dxr,
-                                       m=self.dxr, pl=self.pl, pr=self.pr,
-                                       h0=self.h0, bx=0.03, gamma1=gamma1,
-                                       ul=self.ul, ur=self.ur)
+        return self.generate_particles(
+            xmin=self.xmin * self.xb_ratio, xmax=self.xmax * self.xb_ratio,
+            x0=self.x0, rhol=self.rhol, dxl=self.dxl, dxr=self.dxr,
+            rhor=self.rhor, pl=self.pl, pr=self.pr, bx=0.03, gamma1=gamma1,
+            ul=self.ul, ur=self.ur, h0=self.h0
+        )
 
     def create_scheme(self):
         self.dt = dt
@@ -100,8 +113,14 @@ class Robert(ShockTubeSetup):
             hfact=1.2
         )
 
+        # MAGMA2 doesn't work with default parameters for this problem. Need
+        # to use --timestep=0.5e-4.
+        magma2 = MAGMA2Scheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            adaptive_h_scheme='mpm', hfact=1.2, recycle_accelerations=False
+        )
         s = SchemeChooser(default='adke', adke=adke, mpm=mpm, gsph=gsph,
-                          psph=psph, tsph=tsph)
+                          psph=psph, tsph=tsph, magma2=magma2)
         return s
 
 

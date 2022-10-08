@@ -14,6 +14,7 @@ from pysph.sph.scheme import GSPHScheme, SchemeChooser, ADKEScheme, GasDScheme
 from pysph.sph.wc.crksph import CRKSPHScheme
 from pysph.sph.gas_dynamics.psph import PSPHScheme
 from pysph.sph.gas_dynamics.tsph import TSPHScheme
+from pysph.sph.gas_dynamics.magma2 import MAGMA2Scheme
 from pysph.examples.gas_dynamics.riemann_2d_config import R2DConfig
 
 # current case from the al possible unique cases
@@ -269,9 +270,16 @@ class Riemann2D(Application):
             hfact=1.2
         )
 
+        # This scheme only works with constant volume discretisation and
+        # StdGrad formulation if reconstruction order 2 is to be used.
+        magma2 = MAGMA2Scheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            has_ghosts=True, ndes=50, reconstruction_order=2
+        )
+
         s = SchemeChooser(
             default='gsph', gsph=gsph, adke=adke, crksph=crksph, mpm=mpm,
-            psph=psph, tsph=tsph
+            psph=psph, tsph=tsph, magma2=magma2
         )
         return s
 
@@ -292,6 +300,9 @@ class Riemann2D(Application):
                                adaptive_timestep=False, pfreq=50)
         elif self.options.scheme in ['tsph', 'psph']:
             s.configure(hfact=kernel_factor)
+            s.configure_solver(dt=self.dt, tf=self.tf,
+                               adaptive_timestep=False, pfreq=50)
+        elif self.options.scheme == 'magma2':
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=50)
 

@@ -1,9 +1,11 @@
 """Simulate the Sjogreen problem in 1D (10 seconds).
 """
 from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
-from pysph.sph.scheme import ADKEScheme, GasDScheme, GSPHScheme, SchemeChooser
+from pysph.sph.scheme import (ADKEScheme, GasDScheme, GSPHScheme,
+                              SchemeChooser, add_bool_argument)
 from pysph.sph.gas_dynamics.psph import PSPHScheme
 from pysph.sph.gas_dynamics.tsph import TSPHScheme
+from pysph.sph.gas_dynamics.magma2 import MAGMA2Scheme
 import numpy
 
 # Numerical constants
@@ -47,26 +49,36 @@ class SjoGreen(ShockTubeSetup):
             "--nl", action="store", type=float, dest="nl", default=200,
             help="Number of particles in left region"
         )
+        group.add_argument(
+            "--dscheme", choices=["constant_mass", "constant_volume"],
+            dest="dscheme", default="constant_mass",
+            help="Spatial discretization scheme, one of {'constant_mass', "
+                 "'constant_volume'}."
+        )
+        add_bool_argument(group, 'smooth-ic', dest='smooth_ic', default=False,
+                          help="Smooth the initial condition.")
 
     def consume_user_options(self):
         self.nl = self.options.nl
         self.hdx = self.options.hdx
-        ratio = self.rhor/self.rhol
-        self.nr = ratio*self.nl
-        self.dxl = 0.5/self.nl
-        self.dxr = 0.5/self.nr
+        self.smooth_ic = self.options.smooth_ic
+        self.dscheme = self.options.dscheme
+        self.dxl = (self.x0 - self.xmin) / self.nl
+        if self.dscheme == 'constant_mass':
+            ratio = self.rhor / self.rhol
+            self.dxr = self.dxl / ratio
+        else:
+            self.dxr = self.dxl
         self.h0 = self.hdx * self.dxr
-        self.hdx = self.hdx
 
     def create_particles(self):
         lng = numpy.zeros(1, dtype=float)
         consts = {'lng': lng}
-
         return self.generate_particles(
-            xmin=self.xmin, xmax=self.xmax, dxl=self.dxl, dxr=self.dxr,
-            m=self.dxl, pl=self.pl, pr=self.pr, h0=self.h0, bx=0.03,
-            gamma1=gamma1, ul=self.ul, ur=self.ur, constants=consts
-        )
+            xmin=self.xmin, xmax=self.xmax, x0=self.x0, rhol=self.rhol,
+            rhor=self.rhor, pl=self.pl, pr=self.pr, bx=0.03, gamma1=gamma1,
+            ul=self.ul, ur=self.ur, dxl=self.dxl, dxr=self.dxr, h0=self.h0,
+            constants=consts)
 
     def create_scheme(self):
         self.dt = dt
@@ -100,8 +112,13 @@ class SjoGreen(ShockTubeSetup):
             hfact=1.5
         )
 
+        magma2 = MAGMA2Scheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            ndes=7
+        )
+
         s = SchemeChooser(default='adke', adke=adke, mpm=mpm, gsph=gsph,
-                          psph=psph, tsph=tsph)
+                          psph=psph, tsph=tsph, magma2=magma2)
         return s
 
 

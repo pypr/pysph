@@ -10,8 +10,8 @@ from pysph.solver.application import Application
 from pysph.sph.scheme import GasDScheme, SchemeChooser, ADKEScheme, GSPHScheme
 from pysph.sph.gas_dynamics.psph import PSPHScheme
 from pysph.sph.gas_dynamics.tsph import TSPHScheme
+from pysph.sph.gas_dynamics.magma2 import MAGMA2Scheme
 from pysph.sph.wc.crksph import CRKSPHScheme
-from pysph.base.nnps import DomainManager
 
 # problem constants
 dim = 2
@@ -46,7 +46,7 @@ vr = -1.0
 class NohImplosion(Application):
     def create_particles(self):
         x, y = numpy.mgrid[
-            xmin:xmax:dx, ymin:ymax:dx]
+            xmin+dxb2:xmax:dx, ymin+dxb2:ymax:dx]
 
         # positions
         x = x.ravel()
@@ -75,12 +75,6 @@ class NohImplosion(Application):
               % (fluid.get_number_of_particles()))
 
         return [fluid, ]
-
-    def create_domain(self):
-        return DomainManager(
-            xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,
-            mirror_in_x=True, mirror_in_y=True
-        )
 
     def create_scheme(self):
         mpm = GasDScheme(
@@ -118,10 +112,12 @@ class NohImplosion(Application):
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             hfact=1.2
         )
-
+        magma2 = MAGMA2Scheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma, ndes=30
+        )
         s = SchemeChooser(
             default='crksph', crksph=crksph, mpm=mpm, adke=adke, gsph=gsph,
-            psph=psph, tsph=tsph
+            psph=psph, tsph=tsph, magma2=magma2
         )
         s.configure_solver(dt=dt, tf=tf, adaptive_timestep=False)
         return s
@@ -147,6 +143,10 @@ class NohImplosion(Application):
             )
         elif self.options.scheme in ['tsph', 'psph']:
             s.configure(hfact=1.2)
+            s.configure_solver(
+                dt=dt, tf=tf, adaptive_timestep=False, pfreq=50
+            )
+        elif self.options.scheme == 'magma2':
             s.configure_solver(
                 dt=dt, tf=tf, adaptive_timestep=False, pfreq=50
             )

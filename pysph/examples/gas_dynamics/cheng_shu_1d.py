@@ -24,6 +24,7 @@ from pysph.solver.application import Application
 from pysph.sph.scheme import GSPHScheme, SchemeChooser
 from pysph.sph.gas_dynamics.psph import PSPHScheme
 from pysph.sph.gas_dynamics.tsph import TSPHScheme
+from pysph.sph.gas_dynamics.magma2 import MAGMA2Scheme
 
 
 class ChengShu(Application):
@@ -91,8 +92,12 @@ class ChengShu(Application):
             fluids=['fluid'], solids=[], dim=self.dim, gamma=self.gamma,
             hfact=1.2)
 
+        magma2 = MAGMA2Scheme(
+            fluids=['fluid'], solids=[], dim=self.dim, gamma=self.gamma,
+            ndes=7, has_ghosts=True)
+
         s = SchemeChooser(
-            default='gsph', gsph=gsph, psph=psph, tsph=tsph
+            default='gsph', gsph=gsph, psph=psph, tsph=tsph, magma2=magma2,
         )
 
         return s
@@ -106,6 +111,9 @@ class ChengShu(Application):
             )
         elif self.options.scheme in ['tsph', 'psph']:
             s.configure(hfact=1.2)
+            s.configure_solver(dt=self.dt, tf=self.tf,
+                               adaptive_timestep=False, pfreq=1000)
+        elif self.options.scheme == 'magma2':
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=1000)
 

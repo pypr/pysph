@@ -12,6 +12,7 @@ from pysph.sph.wc.crksph import CRKSPHScheme
 from pysph.base.utils import get_particle_array as gpa
 from pysph.base.nnps import DomainManager
 from pysph.solver.application import Application
+from pysph.sph.gas_dynamics.magma2 import MAGMA2Scheme
 import numpy
 
 # Numerical constants
@@ -125,9 +126,14 @@ class WCBlastwave(Application):
             hfact=1.2
         )
 
+        magma2 = MAGMA2Scheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma, ndes=7,
+            has_ghosts=True, recycle_accelerations=False
+        )
+
         s = SchemeChooser(
             default='gsph', gsph=gsph, adke=adke, mpm=mpm, crksph=crk,
-            psph=psph, tsph=tsph
+            psph=psph, tsph=tsph, magma2=magma2
             )
         return s
 
@@ -148,6 +154,9 @@ class WCBlastwave(Application):
                                adaptive_timestep=False, pfreq=20)
         elif self.options.scheme in ['tsph', 'psph']:
             s.configure(hfact=1.2)
+            s.configure_solver(dt=self.dt, tf=self.tf,
+                               adaptive_timestep=False, pfreq=50)
+        elif self.options.scheme == 'magma2':
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=50)
 

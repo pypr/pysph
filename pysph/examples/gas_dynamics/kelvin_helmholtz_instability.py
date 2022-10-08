@@ -10,6 +10,7 @@ from pysph.solver.application import Application
 from pysph.sph.scheme import GasDScheme, SchemeChooser, ADKEScheme, GSPHScheme
 from pysph.sph.gas_dynamics.psph import PSPHScheme
 from pysph.sph.gas_dynamics.tsph import TSPHScheme
+from pysph.sph.gas_dynamics.magma2 import MAGMA2Scheme
 from pysph.sph.wc.crksph import CRKSPHScheme
 from pysph.base.nnps import DomainManager
 from pysph.tools import uniform_distribution as ud
@@ -159,9 +160,13 @@ class KHInstability(Application):
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             hfact=1.2
         )
+        magma2 = MAGMA2Scheme(
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            ndes=50, has_ghosts=True
+        )
         s = SchemeChooser(
             default='crksph', crksph=crk, gsph=gsph, adke=adke, mpm=mpm,
-            psph=psph, tsph=tsph
+            psph=psph, tsph=tsph, magma2=magma2
         )
 
         return s
@@ -184,6 +189,9 @@ class KHInstability(Application):
                                adaptive_timestep=False, pfreq=50)
         elif self.options.scheme in ['tsph', 'psph']:
             s.configure(hfact=1.2)
+            s.configure_solver(dt=dt, tf=tf,
+                               adaptive_timestep=False, pfreq=50)
+        elif self.options.scheme == 'magma2':
             s.configure_solver(dt=dt, tf=tf,
                                adaptive_timestep=False, pfreq=50)
 
