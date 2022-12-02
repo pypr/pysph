@@ -24,9 +24,7 @@ from compyle.translator import CUDAConverter
 from compyle.config import get_config
 
 
-getfullargspec = getattr(
-    inspect, 'getfullargspec', inspect.getargspec
-)
+getfullargspec = inspect.getfullargspec
 
 
 def camel_to_underscore(name):

@@ -18,9 +18,7 @@ from compyle.api import CythonGenerator, get_func_definition
 from compyle.cython_generator import get_parallel_range
 
 
-getfullargspec = getattr(
-    inspect, 'getfullargspec', inspect.getargspec
-)
+getfullargspec = inspect.getfullargspec
 
 
 class IntegratorCythonHelper(object):

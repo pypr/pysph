@@ -101,9 +101,7 @@ from .acceleration_eval_cython_helper import (
 
 logger = logging.getLogger(__name__)
 
-getfullargspec = getattr(
-    inspect, 'getfullargspec', inspect.getargspec
-)
+getfullargspec = inspect.getfullargspec
 
 
 def get_converter(backend):
