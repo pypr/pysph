@@ -226,7 +226,7 @@ def get_points_from_mgrid(pa_grid, pa_mesh, x_list, y_list, z_list,
     cdef list selected_points = []
     cdef int counter = 0, l = 0
     # Iterating over each triangle
-    for i in range(np.shape(x_list)[0]):
+    for i in range(len(x_list)):
         prism_normals, prism_points, prism_face_centres = prism(
             normals[i], vectors[i], dx_sph
         )
