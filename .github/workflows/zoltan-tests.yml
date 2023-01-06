@@ -26,7 +26,7 @@ jobs:
         shell: bash -l {0}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install Linux packages ZOLTAN support
         run: |
           sudo apt-get update
@@ -51,9 +51,9 @@ jobs:
       # Thanks https://stackoverflow.com/a/60942437
       - name: Get month to use as cache key.
         id: month
-        run: echo "::set-output name=month::$(date +'%m')"
+        run: echo "month==$(date +'%m')" >> $GITHUB_OUTPUT
       - name: Deal with auto-generated code cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             ~/.pysph
