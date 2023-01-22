@@ -38,6 +38,33 @@ class InterpolateSPH(Equation):
         d_prop[d_idx] += s_m[s_idx]/s_rho[s_idx]*WIJ*s_temp_prop[s_idx]
 
 
+class SplashInterpolateProperty(Equation):
+    def __init__(self, dest, sources, nx=1, ny=1, nz=1):
+        self.nx = nx
+        self.ny = ny
+        self.nz = nz
+        super().__init__(dest, sources)
+
+    def loop(self, d_idx, s_idx, WI, s_ix, s_iy, s_iz, d_interpolated,
+             d_m, d_rho, d_prop2interp):
+        pxidx = declare('int')
+        pxidx = s_ix[s_idx] * self.ny * self.nz + s_iy[s_idx] * self.nz + \
+                s_iz[s_idx]
+
+        d_interpolated[pxidx] += (d_m[d_idx] /
+                                  d_rho[d_idx]) * WI * d_prop2interp[d_idx]
+
+
+class SplashInterpolateUnity(SplashInterpolateProperty):
+    def loop(self, d_idx, s_idx, WI, s_ix, s_iy, s_iz, d_unity,
+             d_m, d_rho, d_prop2interp):
+        pxidx = declare('int')
+        pxidx = s_ix[s_idx] * self.ny * self.nz + s_iy[s_idx] * self.nz + \
+                s_iz[s_idx]
+
+        d_unity[pxidx] += (d_m[d_idx] / d_rho[d_idx]) * WI
+
+
 class SPHFirstOrderApproximationPreStep(Equation):
     def __init__(self, dest, sources, dim=1):
         self.dim = dim
@@ -198,6 +225,16 @@ def get_nx_ny_nz(num_points, bounds):
 
     return dimensions
 
+def infer_nx_ny_nz_from_shape(shape):
+    if len(shape) == 1:
+        nx, = shape
+        ny, nz = 1, 1
+    elif len(shape) == 2:
+        nx, ny = shape
+        nz = 1
+    else:
+        nx, ny, nz = shape
+    return nx, ny, nz
 
 class Interpolator(object):
     """Convenient class to interpolate particle properties onto a uniform grid
@@ -470,6 +507,254 @@ class Interpolator(object):
         for array in self.particle_arrays:
             if 'temp_prop' not in array.properties:
                 array.add_property('temp_prop')
+
+
+class SplashInterpolator(Interpolator):
+    """
+    Just another :py:class:`~pysph.tools.Interpolator` based on [Price2007]_.
+
+    Notes
+    -----
+
+    Not everything from [Price2007]_ is implemented here. For example, the
+    case of really coarse interpolation grid where the consecutive points on
+    the interpolation grid are father than twice the smoothing
+    length(read half of the pixel width > smoothing length, in the paper
+    terminology) is not implemented.
+
+    Some details about how the SPLASH method from [Price2007]_ is implemented
+    here:
+
+    - Make a new particle array named *interp_data* with all particles from
+      all the source arrays.
+    - Add a new property named *prop2interp* and copy over the property to be
+      interpolated *interp_data* particle array.
+    - Add a constant array named *interpolated* to the particle array named
+      *interp_data*. Since this is supposed to hold interpolated data, that
+      should dictate the size of this array.
+    - Create a new particle array named *dummy4interp*. This contains the
+      points onto which the properties need to be interpolated. So, the *x*,
+      *y* and *z* values would represent the location of the points onto which
+      the property of interest need to be interpolated. *ix*, *iy* and *iz*
+      which are the x, y and z indices of the points on the interpolation grid
+      respectively.
+    - Evaluate :py:class:`~pysph.tools.SplashInterpolateProperty` equation
+      with *dummy4interp* and *interp_data* as the source and destination
+      particle arrays respectively.
+
+
+    References
+    ----------
+
+    .. [Price2007] Price, Daniel J. "SPLASH: An interactive visualisation tool
+       for Smoothed Particle Hydrodynamics simulations." Publications of the
+       Astronomical Society of Australia 24, no. 3 (2007): 159-173.
+       https://doi.org/10.1071/AS07022.
+    """
+
+    def __init__(self, particle_arrays, num_points=125000, kernel=None,
+                 x=None, y=None, z=None, domain_manager=None,
+                 equations=None, normalize=False):
+        """
+        The x, y, z coordinates need not be specified, and if they are not,
+        the bounds of the interpolated domain is automatically computed and
+        `num_points` number of points are used in this domain uniformly placed.
+
+        Parameters
+        ----------
+
+        particle_arrays: list
+            A list of particle arrays.
+        num_points: int
+            the number of points to interpolate on to.
+        kernel: Kernel
+            the kernel to use for interpolation.
+        x: ndarray
+            the x-coordinate of points on which to interpolate.
+        y: ndarray
+            the y-coordinate of points on which to interpolate.
+        z: ndarray
+            the z-coordinate of points on which to interpolate.
+        domain_manager: DomainManager
+            An optional Domain manager for periodic domains.
+        equations: sequence
+            A sequence of equations or groups.  Defaults to None.  This is
+            used only if the default interpolation equations are inadequate.
+        normalize: bool
+            Weather to divide the interpolated property at each point
+            by an interpolated unity at the same point.
+        """
+        self.normalize = normalize
+        main_pa = self._create_main_pa(particle_arrays)
+
+        self.particle_arrays = []
+        self._set_particle_arrays([main_pa])
+        bounds = get_bounding_box(self.particle_arrays)
+        shape = get_nx_ny_nz(num_points, bounds)
+        self.nx, self.ny, self.nz = infer_nx_ny_nz_from_shape(shape)
+        self.dim = 3 - list(shape).count(1)
+
+        if kernel is None:
+            self.kernel = Gaussian(dim=self.dim)
+        else:
+            self.kernel = kernel
+
+        self.shape = shape
+        self.pa = None
+        self.nnps = None
+        self.equations = equations
+        self.func_eval = None
+        self.domain_manager = domain_manager
+        if x is None and y is None and z is None:
+            self.set_domain(bounds, shape)
+        else:
+            self.set_interpolation_points(x=x, y=y, z=z)
+
+    def _create_main_pa(self, particle_arrays):
+        main_pa = get_particle_array(name='interp_data')
+        for array in particle_arrays:
+            main_pa.append_parray(array)
+            for key in main_pa.default_values.keys():
+                main_pa.default_values[key] = 0
+        return main_pa
+
+    def interpolate(self, prop):
+        """Interpolate given property.
+
+        Parameters
+        ----------
+
+        prop: str
+            The name of the property to interpolate.
+
+        Returns
+        -------
+        A numpy array suitably shaped with the property interpolated.
+        """
+        for array in self.particle_arrays:
+            if prop not in array.properties:
+                data = 0.0
+            else:
+                data = array.get(prop, only_real_particles=False)
+
+            array.get('prop2interp', only_real_particles=False)[:] = data
+
+        main_pa = self.particle_arrays[0]
+        main_pa.interpolated[:] = 0.0
+        if self.normalize:
+            main_pa.unity[:] = 0.0
+
+        self.func_eval.compute(0.0, 0.1)  # These are junk arguments.
+
+        if self.normalize:
+            main_pa.interpolated /= main_pa.unity
+
+        result = main_pa.interpolated.copy()
+
+        result.shape = self.shape
+        return result.squeeze()
+
+    def set_interpolation_points(self, x=None, y=None, z=None):
+        tmp = None
+        for tmp in (x, y, z):
+            if tmp is not None:
+                break
+        if tmp is None:
+            raise RuntimeError('At least one non-None array must be given.')
+
+        def _get_array(_t):
+            return np.asarray(_t) if _t is not None else np.zeros_like(tmp)
+
+        x, y, z = _get_array(x), _get_array(y), _get_array(z)
+
+        self.shape = x.shape
+        nx, ny, nz = infer_nx_ny_nz_from_shape(self.shape)
+        if nx == self.nx and ny == self.ny and nz == self.nz:
+            recompile_func_eval = False
+        else:
+            self.nx, self.ny, self.nz = nx, ny, nz
+            recompile_func_eval = True  # since nx, ny or nz have changed
+
+        self.pa = self._create_particle_array(x, y, z)
+
+        main_pa = self.particle_arrays[0]
+        if 'interpolated' in main_pa.constants:
+            # Since there is no pa.remove_constant() main_pa need to be nuked
+            # and created again.
+            if main_pa.interpolated.size != x.size:
+                main_pa = self._create_main_pa(self.particle_arrays)
+                self._set_particle_arrays([main_pa])
+
+        main_pa = self.particle_arrays[0]
+        main_pa.add_constant('interpolated', np.zeros_like(x))
+        if self.normalize:
+            main_pa.add_constant('unity', np.zeros_like(x))
+
+        arrays = self.particle_arrays + [self.pa]
+
+        if self.func_eval is None or recompile_func_eval:
+            self._compile_acceleration_eval(arrays)
+
+        self.update_particle_arrays(self.particle_arrays)
+
+    def _create_particle_array(self, x, y, z):
+        self.nx, self.ny, self.nz = infer_nx_ny_nz_from_shape(self.shape)
+
+        xr = x.ravel()
+        yr = y.ravel()
+        zr = z.ravel()
+        self.x, self.y, self.z = x.squeeze(), y.squeeze(), z.squeeze()
+
+        ix, iy, iz = np.mgrid[0:self.nx, 0:self.ny, 0:self.nz]
+
+        pa = get_particle_array(name='dummy4interp', x=xr, y=yr, z=zr)
+        pa.add_property('ix', 'int', data=ix)
+        pa.add_property('iy', 'int', data=iy)
+        pa.add_property('iz', 'int', data=iz)
+
+        return pa
+
+    def update_particle_arrays(self, particle_arrays):
+        main_pa = self._create_main_pa(particle_arrays)
+        main_pa.add_constant('interpolated', np.zeros_like(self.x))
+        if self.normalize:
+            main_pa.add_constant('unity', np.zeros_like(self.x))
+        self._set_particle_arrays([main_pa])
+
+        arrays = self.particle_arrays + [self.pa]
+        self._create_nnps(arrays)
+        self.func_eval.update_particle_arrays(arrays)
+
+    def _set_particle_arrays(self, particle_arrays):
+        self.particle_arrays = particle_arrays
+        for array in self.particle_arrays:
+            if 'prop2interp' not in array.properties:
+                array.add_property('prop2interp')
+
+    def _compile_acceleration_eval(self, arrays):
+        if self.equations is None:
+            equations = [
+                SplashInterpolateProperty(dest='interp_data',
+                                          sources=['dummy4interp'],
+                                          nx=self.nx,
+                                          ny=self.ny,
+                                          nz=self.nz)]
+            if self.normalize:
+                equations.append(
+                    SplashInterpolateUnity(
+                        dest='interp_data',
+                        sources=['dummy4interp'],
+                        nx=self.nx,
+                        ny=self.ny,
+                        nz=self.nz)
+                )
+
+            equation_groups = [Group(equations, real=False)]
+        else:
+            equation_groups = self.equations
+        self.func_eval = AccelerationEval(arrays, equation_groups, self.kernel)
+        compiler = SPHCompiler(self.func_eval, None)
+        compiler.compile()
 
 
 def main(fname, prop, npoint):

@@ -35,6 +35,12 @@ This module provides a convenient class called
 scalar values from the points onto either a mesh or a collection of other
 points.  SPH interpolation is performed with a simple Shepard filtering.
 
+These is also a :py:class:`~interpolator.SplashInterpolator` which can be used
+just like :py:class:`~interpolator.Interpolator`.
+:py:class:`~interpolator.SplashInterpolator` may result in higher errors than
+:py:class:`~interpolator.Interpolator` but is expected to capture the finer
+details when smoothing length is not constant.
+
 .. automodule:: pysph.tools.interpolator
     :members:
     :undoc-members:
