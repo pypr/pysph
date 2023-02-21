@@ -120,12 +120,16 @@ class DamBreak3D(Application):
         p_y = np.repeat(0, 2)
         p_z = np.array([0.021, 0.101])
 
+        interp = None
         for sd, arrays1, arrays2, arrays3 in iter_output(
                 files, "fluid", "obstacle", "boundary"
         ):
             t.append(sd["t"]*factor_x)
-            interp = Interpolator([arrays1, arrays2, arrays3],
-                                  x=p_x, y=p_y, z=p_z, method="shepard")
+            if interp is None:
+                interp = Interpolator([arrays1, arrays2, arrays3],
+                                      x=p_x, y=p_y, z=p_z, method="shepard")
+            else:
+                interp.update_particle_arrays([arrays1, arrays2, arrays3])
             p0.append(interp.interpolate('p')*factor_y)
 
         fname = os.path.join(self.output_dir, 'results.npz')

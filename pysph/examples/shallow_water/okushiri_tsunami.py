@@ -415,13 +415,17 @@ class OkushiriTsunami(Application):
                                                y_loc_to_interpolate)):
             t_arr = []
             dw_arr = []
+            interp = None
             for fname in self.output_files:
                 data = load(fname)
                 fluid = data['arrays']['fluid']
                 t_arr.append(data['solver_data']['t'])
-                interp = Interpolator([fluid], kernel=kernel)
-                interp.set_interpolation_points(x_loc,
-                                                y_loc)
+                if interp is None:
+                    interp = Interpolator([fluid], kernel=kernel)
+                    interp.set_interpolation_points(x_loc,
+                                                    y_loc)
+                else:
+                    interp.update_particle_arrays([fluid])
                 dw_interp = interp.interpolate('dw')
                 dw_arr.append(dw_interp)
 

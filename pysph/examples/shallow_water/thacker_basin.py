@@ -254,13 +254,17 @@ class ThackerBasin(Application):
         y_loc_to_interpolate = 0.0
 
         kernel = CubicSpline(dim=2)
+        interp = None
         for fname in self.output_files:
             data = load(fname)
             fluid = data['arrays']['fluid']
             t_arr.append(data['solver_data']['t'])
-            interp = Interpolator([fluid], kernel=kernel)
-            interp.set_interpolation_points(x_loc_to_interpolate,
-                                            y_loc_to_interpolate)
+            if interp is None:
+                interp = Interpolator([fluid], kernel=kernel)
+                interp.set_interpolation_points(x_loc_to_interpolate,
+                                                y_loc_to_interpolate)
+            else:
+                interp.update_particle_arrays([fluid])
             u_interp = interp.interpolate('u')
             v_interp = interp.interpolate('v')
             dw_interp = interp.interpolate('dw')

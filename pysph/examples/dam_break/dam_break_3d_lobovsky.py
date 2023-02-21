@@ -121,10 +121,14 @@ class DamBreak3D(Application):
 
         from mayavi import mlab
 
+        interp = None
         for sd, arrays1, arrays2 in iter_output(files, "fluid", "boundary"):
             t.append(sd["t"]*factor_x)
-            interp = Interpolator([arrays1, arrays2],
-                                  x=p_x, y=p_y, z=p_z, method="shepard")
+            if interp is None:
+                interp = Interpolator([arrays1, arrays2],
+                                      x=p_x, y=p_y, z=p_z, method="shepard")
+            else:
+                interp.update_particle_arrays([arrays1, arrays2])
             p0.append(interp.interpolate('p')*factor_y)
 
         fname = os.path.join(self.output_dir, 'results.npz')

@@ -137,10 +137,14 @@ class DamBreak3D(Application):
         vp_y = 0.0
         vp_z = 0.026
 
+        interp = None
         for sd, arrays in iter_output(files, "fluid"):
             t.append(sd["t"])
-            interp = Interpolator([arrays],
-                                  x=vp_x, y=vp_y, z=vp_z, method="shepard")
+            if interp is None:
+                interp = Interpolator([arrays],
+                                      x=vp_x, y=vp_y, z=vp_z, method="shepard")
+            else:
+                interp.update_particle_arrays([arrays])
             u.append(interp.interpolate('u'))
 
         u = np.array(u)

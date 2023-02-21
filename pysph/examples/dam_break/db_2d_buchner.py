@@ -115,10 +115,14 @@ class DamBreak2DBuchner(DamBreak2D):
 
         t = []
         p0 = []
+        interp = None
         for sd, arrays1, arrays2 in iter_output(files, "fluid", "boundary"):
             t.append(sd["t"]*factor_x)
-            interp = Interpolator([arrays1, arrays2], x=[container_width],
-                                  y=[H*0.2], method=self.interp_method)
+            if interp is None:
+                interp = Interpolator([arrays1, arrays2], x=[container_width],
+                                      y=[H*0.2], method=self.interp_method)
+            else:
+                interp.update_particle_arrays([arrays1, arrays2])
             p0.append(interp.interpolate('p')*factor_y)
 
         plt.plot(t, p0, label="Computed")
