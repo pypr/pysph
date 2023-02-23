@@ -220,46 +220,50 @@ class SloshingTankPitch(Application):
         t = []
         p0 = []
         xc0 = 0.0
+        interp = None
         for sd, arrays1, arrays2 in iter_output(files, "fluid", "boundary"):
             t.append(sd["t"])
-            xc = arrays2.x.mean()
-            if sd["t"] == 0:
-                xc0 = xc
-            # Point 1: Bottom right corner of the tank
-            # Point 2: Top right corner of the tank
-            # Point 3: Bottom left corner of the tank
-            if xc > xc0:
-                z1 = arrays2.z.min()
-                x2 = arrays2.x.max()
-                x1 = arrays2.x[np.where(arrays2.z == z1)[0][0]]
-                z2 = arrays2.x[np.where(arrays2.x == x2)[0][0]]
-                angle = np.arctan((z2-z1)/(x2-x1))
-                x3 = arrays2.x.min()
-                z3 = arrays2.z[np.where(arrays2.x == x3)[0][0]]
+            if interp is None:
+                xc = arrays2.x.mean()
+                if sd["t"] == 0:
+                    xc0 = xc
+                # Point 1: Bottom right corner of the tank
+                # Point 2: Top right corner of the tank
+                # Point 3: Bottom left corner of the tank
+                if xc > xc0:
+                    z1 = arrays2.z.min()
+                    x2 = arrays2.x.max()
+                    x1 = arrays2.x[np.where(arrays2.z == z1)[0][0]]
+                    z2 = arrays2.x[np.where(arrays2.x == x2)[0][0]]
+                    angle = np.arctan((z2-z1)/(x2-x1))
+                    x3 = arrays2.x.min()
+                    z3 = arrays2.z[np.where(arrays2.x == x3)[0][0]]
 
-            if xc <= xc0:
-                z2 = arrays2.z.max()
-                x1 = arrays2.x.max()
-                x2 = arrays2.x[np.where(arrays2.z == z2)[0][0]]
-                z1 = arrays2.z[np.where(arrays2.x == x1)[0][0]]
-                angle = np.arctan((z2-z1)/(x2-x1)) + pi
-                z3 = arrays2.z.min()
-                x3 = arrays2.x[np.where(arrays2.z == z3)[0][0]]
+                if xc <= xc0:
+                    z2 = arrays2.z.max()
+                    x1 = arrays2.x.max()
+                    x2 = arrays2.x[np.where(arrays2.z == z2)[0][0]]
+                    z1 = arrays2.z[np.where(arrays2.x == x1)[0][0]]
+                    angle = np.arctan((z2-z1)/(x2-x1)) + pi
+                    z3 = arrays2.z.min()
+                    x3 = arrays2.x[np.where(arrays2.z == z3)[0][0]]
 
-            if x3-x1 == 0:
-                vec = np.array([-1, 0])
+                if x3-x1 == 0:
+                    vec = np.array([-1, 0])
+                else:
+                    vec = np.array([x3-x1, z3-z1])
+                    vec = vec/np.linalg.norm(vec)
+
+                dx = self.dx
+                # Probes at 0.17 m above Point 1 and 0.45 m above Point 3
+                x_probe = [x1 + 0.17*cos(angle) + 3.25*dx*vec[0], x3 + 0.45*cos(angle) - 3.25*dx*vec[0]]
+                z_probe = [z1 + 0.17*sin(angle) + 3.25*dx*vec[1], z3 + 0.45*sin(angle) - 3.25*dx*vec[1]]
+                y_probe = [0, 0]
+                interp = Interpolator([arrays1, arrays2], x=x_probe,
+                                    y=y_probe, z=z_probe,
+                                    method=self.interp_method)
             else:
-                vec = np.array([x3-x1, z3-z1])
-                vec = vec/np.linalg.norm(vec)
-
-            dx = self.dx
-            # Probes at 0.17 m above Point 1 and 0.45 m above Point 3
-            x_probe = [x1 + 0.17*cos(angle) + 3.25*dx*vec[0], x3 + 0.45*cos(angle) - 3.25*dx*vec[0]]
-            z_probe = [z1 + 0.17*sin(angle) + 3.25*dx*vec[1], z3 + 0.45*sin(angle) - 3.25*dx*vec[1]]
-            y_probe = [0, 0]
-            interp = Interpolator([arrays1, arrays2], x=x_probe,
-                                  y=y_probe, z=z_probe,
-                                  method=self.interp_method)
+                interp.update_particle_arrays([arrays1, arrays2])
             p0.append(interp.interpolate('p'))
 
         p0 = np.array(p0)
