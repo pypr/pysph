@@ -36,18 +36,15 @@ tf = 0.005
 # domain size
 xmin = 0.
 xmax = 1
-dx = 0.002
-ny = 50
 ymin = 0
-ymax = ny * dx
-x0 = 0.5  # initial discontuinity
+ymax = 0.1
+x0 = 0.5  # initial discontinuity
 
 # scheme constants
 alpha1 = 1.0
 alpha2 = 1.0
 beta = 2.0
 kernel_factor = 1.5
-h0 = kernel_factor * dx
 
 
 class ShockTube2D(Application):
@@ -56,10 +53,8 @@ class ShockTube2D(Application):
         self.xmax = xmax
         self.ymin = ymin
         self.ymax = ymax
-        self.dx = dx
         self.hdx = 1.7
         self.x0 = x0
-        self.ny = ny
         self.pl = 1000
         self.pr = 0.01
         self.rhol = 1.0
@@ -72,9 +67,14 @@ class ShockTube2D(Application):
     def add_user_options(self, group):
         add_bool_argument(group, 'smooth-ic', dest='smooth_ic', default=False,
                           help="Smooth the initial condition.")
+        group.add_argument(
+            "--dx", action="store", type=float, dest="dx",
+            default=0.002, help="Particle spacing"
+        )
 
     def consume_user_options(self):
         self.smooth_ic = self.options.smooth_ic
+        self.dx = self.options.dx
 
     def create_domain(self):
         return DomainManager(
@@ -82,7 +82,7 @@ class ShockTube2D(Application):
             periodic_in_x=True, periodic_in_y=True)
 
     def create_particles(self):
-        global dx
+        dx = self.dx
         data = ud.uniform_distribution_cubic2D(dx, xmin, xmax, ymin, ymax)
 
         x = data[0]
@@ -110,7 +110,7 @@ class ShockTube2D(Application):
             p[right_indices] = self.pr
 
         # const h and mass
-        h = numpy.ones_like(x) * self.hdx * self.dx
+        h = numpy.ones_like(x) * self.hdx * dx
         m = numpy.ones_like(x) * volume * rho
 
         # ul = ur = 0
