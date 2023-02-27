@@ -201,9 +201,9 @@ class PSPHScheme(Scheme):
                 dest=fluid, sources=all_pa, hfact=self.hfact,
                 density_iterations=True, dim=self.dim,
                 htol=self.density_iteration_tolerance, gamma=self.gamma))
-            equations.append(
-                Group(equations=g1, update_nnps=True, iterate=True,
-                      max_iterations=self.max_density_iterations))
+        equations.append(
+            Group(equations=g1, update_nnps=True, iterate=True,
+                  max_iterations=self.max_density_iterations))
 
         g2 = []
         for fluid in self.fluids:

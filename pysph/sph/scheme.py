@@ -1171,8 +1171,8 @@ class GSPHScheme(Scheme):
         monotonicity : int
             Type of monotonicity algorithm to use:
             0 : First order GSPH
-            1 : I02 algorithm
-            2 : IwIn algorithm
+            1 : I02 algorithm # https://doi.org/10.1006/jcph.2002.7053
+            2 : IwIn algorithm # https://doi.org/10.1111/j.1365-2966.2011.19588.x  # noqa: E501
         interface_zero : bool
             Set Interface position s^*_{ij} = 0 for the Riemann problem.
         hybrid, blend_alpha : bool, double
@@ -1204,22 +1204,42 @@ class GSPHScheme(Scheme):
         self.niter = niter
         self.tol = tol
         self.has_ghosts = has_ghosts
+        self.rsolver_choices = {'non_diffusive': 0,
+                                'van_leer': 1,
+                                'exact': 2,
+                                'hllc': 3,
+                                'ducowicz': 4,
+                                'hlle': 5,
+                                'roe': 6,
+                                'llxf': 7,
+                                'hllc_ball': 8,
+                                'hll_ball': 9,
+                                'hllsy': 10}
+        self.interpolation_choices = {'delta': 0,
+                                      'linear': 1,
+                                      'cubic': 2}
+        self.monotonicity_choices = {'first_order': 0,
+                                     'i02': 1,
+                                     'iwin': 2}
 
     def add_user_options(self, group):
         group.add_argument(
-            "--rsolver", action="store", type=int, dest="rsolver",
-            default=None,
-            help="Riemann solver to use."
+            "--rsolver", action="store", type=str, dest="rsolver",
+            default=None, choices=set(self.rsolver_choices.keys()),
+            help=f"Riemann solver to use, one of :"
+                 f"{set(self.rsolver_choices.keys())}"
         )
         group.add_argument(
-            "--interpolation", action="store", type=int, dest="interpolation",
-            default=None,
-            help="Interpolation algorithm to use."
+            "--interpolation", action="store", type=str, dest="interpolation",
+            default=None, choices=set(self.interpolation_choices.keys()),
+            help=f"Interpolation algorithm to use, one of :"
+                 f"{set(self.interpolation_choices.keys())}"
         )
         group.add_argument(
-            "--monotonicity", action="store", type=int, dest="monotonicity",
-            default=None,
-            help="Monotonicity algorithm to use."
+            "--monotonicity", action="store", type=str, dest="monotonicity",
+            default=None, choices=set(self.monotonicity_choices.keys()),
+            help=f"Monotonicity algorithm to use, one of :"
+                 f"{set(self.monotonicity_choices.keys())}"
         )
         group.add_argument(
             "--g1", action="store", type=float, dest="g1",
@@ -1253,12 +1273,23 @@ class GSPHScheme(Scheme):
         )
 
     def consume_user_options(self, options):
-        vars = ['gamma', 'g1', 'g2', 'rsolver', 'interpolation',
-                'monotonicity', 'interface_zero', 'hybrid',
-                'blend_alpha']
+        vars = ['gamma', 'g1', 'g2', 'interface_zero',
+                'hybrid', 'blend_alpha']
         data = dict((var, self._smart_getattr(options, var))
                     for var in vars)
+        map_vars = ['monotonicity', 'rsolver', 'interpolation']
+        for var in map_vars:
+            data[var] = self._smart_getattr_mapped(options, var)
         self.configure(**data)
+
+    def _smart_getattr_mapped(self, obj, var):
+        res = getattr(obj, var)
+        if res is None:
+            return getattr(self, var)
+        else:
+            choices = getattr(self, f'{var}_choices')
+            return choices[res]
+
 
     def configure_solver(self, kernel=None, integrator_cls=None,
                          extra_steppers=None, **kw):

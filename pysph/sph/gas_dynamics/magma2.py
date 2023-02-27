@@ -708,7 +708,7 @@ class CorrectionMatrix(Equation):
                 drowcol = dsi2 + row * dim + col
                 d_cm[drowcol] += mbbyrhob * XIJ[row] * XIJ[col] * WI
 
-    def post_loop(self, d_idx, d_dv, d_divv, d_cm):
+    def post_loop(self, d_idx, d_cm):
         invcm, cm, idmat = declare('matrix(9)', 3)
         augcm = declare('matrix(18)')
         dsi2, row, col, rowcol, dim, dimsq = declare('int', 6)
@@ -926,7 +926,7 @@ class EntropyBasedDissipationTrigger(Equation):
 class WallBoundary(Equation):
     """:class:`WallBoundary
     <pysph.sph.gas_dynamics.boundary_equations.WallBoundary>` modified
-    for GADGET2.
+    for MAGMA2.
     """
 
     def __init__(self, dest, sources, dim):
@@ -1058,7 +1058,7 @@ class WallBoundary(Equation):
 class UpdateGhostProps(Equation):
     """
     :class:`MPMUpdateGhostProps
-    <pysph.sph.gas_dynamics.basic.MPMUpdateGhostProps>` modified for GADGET2.
+    <pysph.sph.gas_dynamics.basic.MPMUpdateGhostProps>` modified for MAGMA2.
     """
 
     def __init__(self, dest, dim, sources=None):
