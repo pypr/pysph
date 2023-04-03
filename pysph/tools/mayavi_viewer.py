@@ -25,7 +25,7 @@ from traits.api import (Any, Array, Dict, HasTraits, Instance,  # noqa: E402
     on_trait_change, List, Str, Int, Range, Float, Bool, Button,
     Directory, Event, Password, Property, cached_property)
 from traitsui.api import (View, Item, Group, Handler, HSplit, ListEditor,
-    EnumEditor, HGroup, ShellEditor)  # noqa: E402
+    EnumEditor, HGroup, ShellEditor, ButtonEditor, Spring)  # noqa: E402
 from mayavi.core.api import PipelineBase  # noqa: E402
 from mayavi.core.ui.api import (
     MayaviScene, SceneEditor, MlabSceneModel)  # noqa: E402
@@ -691,7 +691,8 @@ class MayaviViewer(HasTraits):
     update_files = Button('Refresh')
     file_count = Range(low='_low', high='_n_files', value=0,
                        desc='the file counter')
-    play = Bool(False, desc='if all files are played automatically')
+    play = Bool(False, desc='if all files are being played automatically')
+
     play_delay = Float(0.2, enter_set=True, auto_set=False,
                        desc='the delay between loading files')
     play_step = Int(1, enter_set=True, auto_set=False,
@@ -700,7 +701,19 @@ class MayaviViewer(HasTraits):
     # This is len(files) - 1.
     _n_files = Int(0)
     _low = Int(0)
-
+    
+    ## Playback Control Buttons
+    play_pause_label = Property(observe="play", desc='change label of the '
+                                                     'play button to pause if '
+                                                     'playing and vice-versa')
+    play_pause_button = Button(desc='Play/Pause')
+    go2next = Button(label='⏩', desc='Next File')
+    go2prev = Button(label='⏪', desc='Previous File')
+    go2first = Button(label='⏮', desc='First File')
+    go2last = Button(label='⏭', desc='Last File')
+    _pbcbw = -50  # playback control button width
+    _pbcbh = -30  # playback control button height
+    
     ########################################
     # Timer traits.
     timer = Instance(Timer)
@@ -744,7 +757,43 @@ class MayaviViewer(HasTraits):
                                 padding=0,
                             ),
                             HGroup(
-                                Item(name='play'),
+                                Spring(),
+                                Item('go2first',
+                                     enabled_when='file_count > _low',
+                                     show_label=False,
+                                     width=_pbcbw, 
+                                     height=_pbcbh,
+                                     tooltip='First File'),
+                                Item('go2prev',
+                                     enabled_when='file_count > _low',
+                                     show_label=False,
+                                     width=_pbcbw, 
+                                     height=_pbcbh,
+                                     tooltip='Previous File'),
+                                Item('play_pause_button',
+                                     enabled_when='file_count < _n_files',
+                                     show_label=False,
+                                     tooltip='Play/Pause',
+                                     editor=ButtonEditor(
+                                         label_value="play_pause_label"),
+                                     width=_pbcbw,
+                                     height=_pbcbh),
+                                Item('go2next',
+                                     enabled_when='file_count < _n_files',
+                                     show_label=False,
+                                     width=_pbcbw,
+                                     height=_pbcbh,
+                                     tooltip='Next File'),
+                                Item('go2last',
+                                     enabled_when='file_count < _n_files',
+                                     show_label=False,
+                                     width=_pbcbw,
+                                     height=_pbcbh,
+                                     tooltip='Last File'),
+                                Spring(),
+                                padding=0
+                            ),
+                            HGroup(
                                 Item(name='play_step',
                                      label='Step'),
                                 Item(name='play_delay',
@@ -1165,6 +1214,24 @@ class MayaviViewer(HasTraits):
     def _play_delay_changed(self):
         if self.play:
             self._play_changed(self.play)
+
+    def _get_play_pause_label(self):
+        return '⏸' if self.play else '⏵'
+
+    def _play_pause_button_fired(self):
+        self.play = not self.play
+
+    def _go2next_fired(self):
+        self.file_count +=1
+
+    def _go2prev_fired(self):
+        self.file_count -=1
+
+    def _go2first_fired(self):
+        self.file_count = self._low
+
+    def _go2last_fired(self):
+        self.file_count = self._n_files
 
     def _scalar_changed(self, value):
         for pa in self.particle_arrays:
