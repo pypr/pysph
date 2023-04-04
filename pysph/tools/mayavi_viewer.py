@@ -1152,6 +1152,7 @@ class MayaviViewer(HasTraits):
             else:
                 self.timer.Stop()
                 pc = nf
+                self.play = False
         elif pc < 0:
             if self.loop:
                 pc = nf
