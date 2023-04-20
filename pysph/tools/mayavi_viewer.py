@@ -771,7 +771,6 @@ class MayaviViewer(HasTraits):
                                      height=_pbcbh,
                                      tooltip='Previous File'),
                                 Item('play_pause_button',
-                                     enabled_when='file_count < _n_files',
                                      show_label=False,
                                      tooltip='Play/Pause',
                                      editor=ButtonEditor(
@@ -1165,6 +1164,9 @@ class MayaviViewer(HasTraits):
 
         if self.record:
             self._do_snap()
+
+        if self.play:
+            self._play_changed(self.play)
 
     def _loop_changed(self, value):
         if value and self.play:
