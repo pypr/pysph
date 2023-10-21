@@ -636,7 +636,8 @@ class PythonShellView(HasTraits):
     ns = Dict()
     view = View(
         Item('ns', editor=ShellEditor(), show_label=False),
-        id='pysph.mayavi_viewer.python_shell_view'
+        id='pysph.mayavi_viewer.python_shell_view',
+        resizable=True
     )
 
 
