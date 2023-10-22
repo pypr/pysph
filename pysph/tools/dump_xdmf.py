@@ -53,10 +53,19 @@ def main(argv=None):
     )
 
     parser.add_argument(
-        "--no-vectorize-velocity", action="store_false",
+        "--vectorize-velocity", action=argparse.BooleanOptionalAction,
+        default=True,
         dest='vectorize_velocity',
         help="reference u,v and w such that they are read as separate scalar "
              "quantities through xdmf"
+    )
+
+    parser.add_argument(
+        "--combine-particle-arrays", action=argparse.BooleanOptionalAction,
+        default=False,
+        dest='combine_particle_arrays',
+        help="Combine all particle arrays into a single xdmf file. If False, "
+             "separate xdmf files will be generated for each particle array."
     )
 
     if len(argv) > 0 and argv[0] in ['-h', '--help']:
@@ -79,11 +88,12 @@ def run(options):
             outfile = Path(ifile).stem + '.xdmf'
 
         files2xdmf(files, outdir.joinpath(outfile),
-                   options.relative_path, options.vectorize_velocity)
+                   options.relative_path, options.vectorize_velocity,
+                   options.combine_particle_arrays)
 
 
 def files2xdmf(absolute_files, outfilename, refer_relative_path,
-               vectorize_velocity):
+               vectorize_velocity, combine_particle_arrays):
     # Assuming output_props and strides does not change for the files in a
     # folder, just obtain those from the first file.
     particles_info = {}
@@ -137,12 +147,24 @@ def files2xdmf(absolute_files, outfilename, refer_relative_path,
     else:
         files = absolute_files
 
-    with open(outfilename, 'w') as xdmf_file:
-        print(xdmf_template.render(times=times, files=files,
-                                   particles_info=particles_info,
-                                   n_particles=n_particles,
-                                   vectorize_velocity=vectorize_velocity),
-              file=xdmf_file)
+    if combine_particle_arrays:
+        with open(outfilename, 'w') as xdmf_file:
+            print(xdmf_template.render(times=times, files=files,
+                                       particles_info=particles_info,
+                                       n_particles=n_particles,
+                                       vectorize_velocity=vectorize_velocity),
+                  file=xdmf_file)
+    else:
+        for pname in particles_info.keys():
+            outfilename_pname = outfilename.parent.joinpath(
+                f'{outfilename.stem}_{pname}{outfilename.suffix}')
+            with open(outfilename_pname, 'w') as xdmf_file:
+                print(xdmf_template.render(
+                    times=times, files=files,
+                    particles_info={pname: particles_info[pname]},
+                    n_particles={pname: n_particles[pname]},
+                    vectorize_velocity=vectorize_velocity),
+                      file=xdmf_file)
 
 
 if __name__ == '__main__':
