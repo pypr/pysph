@@ -1,6 +1,6 @@
 # Standard library imports
 from functools import reduce
-
+interpolator_methods = ['shepard', 'sph', 'order1', 'splash', 'splash_norm']
 # Library imports.
 import numpy as np
 
@@ -36,6 +36,30 @@ class InterpolateSPH(Equation):
 
     def loop(self, d_idx, s_idx, s_rho, s_m, s_temp_prop, d_prop, WIJ):
         d_prop[d_idx] += s_m[s_idx]/s_rho[s_idx]*WIJ*s_temp_prop[s_idx]
+
+
+class SPLASHInterpolateProperty(Equation):
+    def initialize(self, d_idx, d_prop):
+        d_prop[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, s_rho, s_m, s_temp_prop, d_prop, WI):
+        d_prop[d_idx] += (s_m[s_idx]/s_rho[s_idx])*WI*s_temp_prop[s_idx]
+
+
+class SPLASHInterpolatePropertyNormalized(Equation):
+    def initialize(self, d_idx, d_unity, d_prop):
+        d_unity[d_idx] = 0.0
+        d_prop[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, s_rho, s_m, s_temp_prop, WJ, d_unity,
+             d_prop):
+        common = (s_m[s_idx]/s_rho[s_idx])*WJ
+        d_unity[d_idx] += common
+        d_prop[d_idx] += common * s_temp_prop[s_idx]
+
+    def post_loop(self, d_idx, d_unity, d_prop):
+        if d_unity[d_idx] > 1e-12:
+            d_prop[d_idx] /= d_unity[d_idx]
 
 
 class SPHFirstOrderApproximationPreStep(Equation):
@@ -253,7 +277,7 @@ class Interpolator(object):
         self.func_eval = None
         self.domain_manager = domain_manager
         self.method = method
-        if method not in ['sph', 'shepard', 'order1']:
+        if method not in interpolator_methods:
             raise RuntimeError('%s method is not implemented' % (method))
         if x is None and y is None and z is None:
             self.set_domain(bounds, shape)
@@ -342,10 +366,11 @@ class Interpolator(object):
             array.get('temp_prop', only_real_particles=False)[:] = data
 
         self.func_eval.compute(0.0, 0.1)  # These are junk arguments.
-        if comp and (self.method in ['sph', 'shepard']):
+        if comp and (self.method in ['sph', 'shepard',
+                                     'splash', 'splash_norm']):
             raise RuntimeError("Error: use 'order1' method to evaluate"
                                "gradient")
-        elif self.method in ['sph', 'shepard']:
+        elif self.method in ['sph', 'shepard', 'splash', 'splash_norm']:
             result = self.pa.prop.copy()
         else:
             if comp > 3:
@@ -414,8 +439,11 @@ class Interpolator(object):
             x=xr, y=yr, z=zr, h=h,
             number_density=np.zeros_like(xr)
         )
-        if self.method in ['sph', 'shepard']:
+        if self.method in ['sph', 'shepard', 'splash']:
             pa.add_property('prop')
+        elif self.method == 'splash_norm':
+            pa.add_property('prop')
+            pa.add_property('unity')
         else:
             pa.add_property('moment', stride=16)
             pa.add_property('p_sph', stride=4)
@@ -435,6 +463,16 @@ class Interpolator(object):
                 equations = [
                     InterpolateSPH(dest='interpolate',
                                         sources=names)
+                ]
+            elif self.method == 'splash':
+                equations = [
+                    SPLASHInterpolateProperty(dest='interpolate',
+                                              sources=names)
+                ]
+            elif self.method == 'splash_norm':
+                equations = [
+                    SPLASHInterpolatePropertyNormalized(dest='interpolate',
+                                                        sources=names)
                 ]
             else:
                 equations = [
