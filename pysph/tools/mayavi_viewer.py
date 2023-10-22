@@ -13,6 +13,7 @@ import numpy
 import os
 import os.path
 import time
+import inspect
 
 if not os.environ.get('ETS_TOOLKIT'):
     # Set the default toolkit to qt4 unless the user has explicitly
@@ -39,6 +40,7 @@ from pysph.solver.utils import load, dump, output_formats  # noqa: E402
 from pysph.solver.utils import remove_irrelevant_files, _sort_key  # noqa: E402
 from pysph.tools.interpolator import (
         get_bounding_box, get_nx_ny_nz, Interpolator)  # noqa: E402
+from pysph.base import kernels
 
 import logging  # noqa: E402
 logger = logging.getLogger()
@@ -121,6 +123,12 @@ class InterpolatorView(HasTraits):
     # The scalar to interpolate.
     scalar = Str('rho', desc='name of the active scalar to view')
 
+    # The kernel to use.
+    kernel = Str('CubicSpline', desc='name of the kernel to use')
+
+    # The dimension of the problem.
+    dim = Int
+
     # Sync'd trait with the scalar lut manager.
     show_legend = Bool(False, desc='if the scalar legend is to be displayed')
 
@@ -143,6 +151,9 @@ class InterpolatorView(HasTraits):
 
     scalar_list = List
 
+    kernels_list = List([name for name, obj in inspect.getmembers(kernels)
+                         if inspect.isclass(obj)])
+
     scene = Instance(MlabSceneModel)
 
     source = Instance(PipelineBase)
@@ -153,6 +164,8 @@ class InterpolatorView(HasTraits):
     view = View(Item(name='visible'),
                 Item(name='scalar',
                      editor=EnumEditor(name='scalar_list')),
+                Item(name='kernel',
+                     editor=EnumEditor(name='kernels_list')),
                 Item(name='num_points'),
                 Item(name='bounds'),
                 Item(name='set_bounds', show_label=False),
@@ -170,18 +183,33 @@ class InterpolatorView(HasTraits):
 
     def _setup_interpolator(self):
         if self.interpolator is None:
+            bounds = get_bounding_box(self.particle_arrays)
+            shape = get_nx_ny_nz(self.num_points, bounds)
+            self.dim = 3 - list(shape).count(1)
+            kernel = getattr(kernels, self.kernel)
             interpolator = Interpolator(
                 self.particle_arrays, num_points=self.num_points,
-                method='shepard'
+                method='shepard', kernel=kernel(dim=self.dim)
             )
             self.bounds = interpolator.bounds
             self.interpolator = interpolator
+            self._kernel_has_changed = False
         else:
             if self._arrays_changed:
                 self.interpolator.update_particle_arrays(self.particle_arrays)
                 self._arrays_changed = False
 
     # Trait handlers  #####################################################
+    def _kernel_changed(self, kernel_name):
+        if self.interpolator is not None:
+            kernel = getattr(kernels, kernel_name)
+            self.interpolator = Interpolator(
+                self.particle_arrays, num_points=self.num_points,
+                method='shepard', kernel=kernel(dim=self.dim)
+            )
+            self._update_plot()
+
+
     def _particle_arrays_changed(self, pas):
         if len(pas) > 0:
             all_props = reduce(set.union,
@@ -702,7 +730,7 @@ class MayaviViewer(HasTraits):
     # This is len(files) - 1.
     _n_files = Int(0)
     _low = Int(0)
-    
+
     ## Playback Control Buttons
     play_pause_label = Property(observe="play", desc='change label of the '
                                                      'play button to pause if '
@@ -714,7 +742,7 @@ class MayaviViewer(HasTraits):
     go2last = Button(label='⏭', desc='Last File')
     _pbcbw = -50  # playback control button width
     _pbcbh = -30  # playback control button height
-    
+
     ########################################
     # Timer traits.
     timer = Instance(Timer)
