@@ -41,7 +41,7 @@ from pysph.solver.utils import remove_irrelevant_files, _sort_key  # noqa: E402
 from pysph.tools.interpolator import (
         get_bounding_box, get_nx_ny_nz, Interpolator)  # noqa: E402
 from pysph.base import kernels
-
+from pysph.tools.interpolator import interpolator_methods
 import logging  # noqa: E402
 logger = logging.getLogger()
 
@@ -126,6 +126,8 @@ class InterpolatorView(HasTraits):
     # The kernel to use.
     kernel = Str('CubicSpline', desc='name of the kernel to use')
 
+    method = Str('shepard', desc='name of the method to use')
+
     # The dimension of the problem.
     dim = Int
 
@@ -154,6 +156,8 @@ class InterpolatorView(HasTraits):
     kernels_list = List([name for name, obj in inspect.getmembers(kernels)
                          if inspect.isclass(obj)])
 
+    methods_list = List(interpolator_methods)
+
     scene = Instance(MlabSceneModel)
 
     source = Instance(PipelineBase)
@@ -166,6 +170,8 @@ class InterpolatorView(HasTraits):
                      editor=EnumEditor(name='scalar_list')),
                 Item(name='kernel',
                      editor=EnumEditor(name='kernels_list')),
+                Item(name='method',
+                     editor=EnumEditor(name='methods_list')),
                 Item(name='num_points'),
                 Item(name='bounds'),
                 Item(name='set_bounds', show_label=False),
@@ -189,7 +195,7 @@ class InterpolatorView(HasTraits):
             kernel = getattr(kernels, self.kernel)
             interpolator = Interpolator(
                 self.particle_arrays, num_points=self.num_points,
-                method='shepard', kernel=kernel(dim=self.dim)
+                method=self.method, kernel=kernel(dim=self.dim)
             )
             self.bounds = interpolator.bounds
             self.interpolator = interpolator
@@ -200,6 +206,15 @@ class InterpolatorView(HasTraits):
                 self._arrays_changed = False
 
     # Trait handlers  #####################################################
+    def _method_changed(self, method):
+        if self.interpolator is not None:
+            kernel = getattr(kernels, self.kernel)
+            self.interpolator = Interpolator(
+                self.particle_arrays, num_points=self.num_points,
+                method=method, kernel=kernel(dim=self.dim)
+            )
+            self._update_plot()
+
     def _kernel_changed(self, kernel_name):
         if self.interpolator is not None:
             kernel = getattr(kernels, kernel_name)
