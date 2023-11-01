@@ -41,9 +41,8 @@ def main(argv=None):
 
     parser.add_argument(
         "-d", "--outdir", metavar="path/to/outdir", type=str,
-        default=Path(),
-        help="directory to output xdmf file(s), defaults to current working "
-             "directory"
+        default=None,
+        help="directory to output xdmf file(s), defaults to input path"
     )
 
     parser.add_argument(
@@ -77,17 +76,50 @@ def main(argv=None):
 
 
 def run(options):
-    outdir = Path(options.outdir).absolute()
-    outdir.mkdir(parents=True, exist_ok=True)
+    if options.outdir is not None:
+        Path(options.outdir).mkdir(parents=True, exist_ok=True)
+
     for ifile in options.inputfile:
+        # there can be two cases:
+        # 1. input is a hdf5 file, refer it in a single xdmf file
+        # if --combine-particle-arrays is True else separate xdmf files for
+        # each particle array. The name of the xdmf file will be inferred from
+        # the name of the hdf5 file. if the input is a list of hdf5 files, then
+        # each hdf5 file will be dealt with separately.
+        # 2. input is a directory, refer all the hdf5 files inside it in a
+        # single xdmf file if --combine-particle-arrays is True else separate
+        # xdmf files for each particle array. The name of the xdmf file will
+        # be inferred from the name of the directory.
+        # Note: pa name will be appended to outfilename later
+        # if combine_particle_arrays is false.
+
         if Path(ifile).is_dir():
-            files = get_files(ifile, endswith='hdf5')
-            outfile = Path(ifile).name + '.xdmf'
+            idir = Path(ifile).absolute()
+            files = get_files(f'{idir}', endswith='hdf5')
+
+            if options.outdir is not None:
+                outdir = Path(options.outdir).absolute()
+            else:
+                outdir = idir
+
+            if outdir != idir:
+                outfilename = Path(idir).name + '.xdmf'
+            elif options.combine_particle_arrays:
+                outfilename = 'all_pa.xdmf'
+            else:
+                outfilename = 'pa.xdmf'
         else:
             files = [Path(ifile).absolute()]
-            outfile = Path(ifile).stem + '.xdmf'
 
-        files2xdmf(files, outdir.joinpath(outfile),
+            if options.outdir is not None:
+                outdir = Path(options.outdir).absolute()
+            else:
+                outdir = Path(ifile).parent
+
+            outfilename = Path(ifile).stem + '.xdmf'
+
+        outfile = outdir.joinpath(outfilename).absolute()
+        files2xdmf(files, outfile,
                    options.relative_path, options.vectorize_velocity,
                    options.combine_particle_arrays)
 
