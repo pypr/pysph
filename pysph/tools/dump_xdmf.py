@@ -5,21 +5,23 @@ Separate xdmf file will be generated for each hdf5 file input. If directory is
 input, a single xdmf file will be generated assuming all the hdf5 files inside
 the directory as timeseris data.
 """
-
 import argparse
+import shutil
 import sys
 from pathlib import Path
 
 import h5py
 from mako.template import Template
 
-from pysph.solver.utils import get_files
+from pysph.solver.utils import get_files, ProgressBar
 
 
 def main(argv=None):
     """ Main function to generate XDMF file(s) referencing the heavy data
     stored using HDF5 by PySPH.
     """
+    cols, _ = shutil.get_terminal_size()
+    print("Generating XDMF".center(cols, '-'))
 
     if argv is None:
         argv = sys.argv[1:]
@@ -73,6 +75,7 @@ def main(argv=None):
 
     options, extra = parser.parse_known_args(argv)
     run(options)
+    print("Done Generating XDMF".center(cols, '-'))
 
 
 def run(options):
@@ -132,6 +135,8 @@ def files2xdmf(absolute_files, outfilename, refer_relative_path,
     n_particles = {}
     stride = {}
     fname = absolute_files[0]
+
+    print(f'Reading properties and strides from {fname}...', end='')
     with h5py.File(fname, 'r') as data:  # will fail here if not .hdf5 file
         for pname in data['particles'].keys():
             n_particles[pname] = []
@@ -155,20 +160,30 @@ def files2xdmf(absolute_files, outfilename, refer_relative_path,
                 particles_info[pname] = {'output_props': output_props,
                                          'stride': stride,
                                          'attr_type': attr_type}
+    print('done')
 
+    print(f'Reading number of particles and time')
+    # When there is only one file, len(absolute_files) - 1 will be 0.
+    # But for ProgressBar, tf should be > 0.
+    # So, we set tf to max(1, len(absolute_files) - 1) but do not show the
+    # progress bar in this case.
+    progress_max = max(len(absolute_files) - 1, 1)
+    progress_bar = ProgressBar(ti=0, tf=progress_max,
+                               show=True if progress_max > 1 else False)
     # time (and number of particles may) change for different files in a
     # folder, so obtain that from each file.
     times = []
-    for fname in absolute_files:
+    for i, fname in enumerate(absolute_files):
+        progress_bar.update(i)
         with h5py.File(fname, 'r') as data:  # will fail here if not .hdf5 file
             times.append(data['solver_data'].attrs.get('t'))
             for pname in data['particles'].keys():
                 for arrname, arr in data[f'particles/{pname}/arrays/'].items():
                     if arr.attrs['stored']:
-                        n = int(arr.shape[0]/arr.attrs.get('stride'))
+                        n = int(arr.shape[0] / arr.attrs.get('stride'))
                         n_particles[pname].append(n)
                         break
-
+    progress_bar.finish()
     template_file = Path(__file__).parent.absolute().joinpath(
         'xdmf_template.mako')
     xdmf_template = Template(filename=str(template_file))
@@ -190,13 +205,15 @@ def files2xdmf(absolute_files, outfilename, refer_relative_path,
         for pname in particles_info.keys():
             outfilename_pname = outfilename.parent.joinpath(
                 f'{outfilename.stem}_{pname}{outfilename.suffix}')
+            print(f'Writing {outfilename_pname}...', end='')
             with open(outfilename_pname, 'w') as xdmf_file:
                 print(xdmf_template.render(
                     times=times, files=files,
                     particles_info={pname: particles_info[pname]},
                     n_particles={pname: n_particles[pname]},
                     vectorize_velocity=vectorize_velocity),
-                      file=xdmf_file)
+                    file=xdmf_file)
+            print('done')
 
 
 if __name__ == '__main__':
