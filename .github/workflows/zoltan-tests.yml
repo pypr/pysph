@@ -40,7 +40,7 @@ jobs:
       - name: Install dependencies
         run: |
           conda info
-          conda install -c conda-forge numpy cython
+          conda install -c conda-forge numpy 'cython<3.0'
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install mpi4py
           python -m pip install https://github.com/pypr/cyarray/zipball/master

@@ -681,7 +681,7 @@ def setup_package():
 
     # The requirements.
     install_requires = [
-        'numpy', 'mako', 'cyarray', 'compyle>=0.8', 'Cython>=0.20',
+        'numpy', 'mako', 'cyarray', 'compyle>=0.8', 'Cython<3.0',
         'setuptools>=42.0.0', 'pytools', 'Beaker'
     ]
     tests_require = ['pytest>=3.0', 'h5py', 'vtk']
