@@ -1183,8 +1183,8 @@ class Application(object):
         if options.adaptive_timestep is not None:
             solver.set_adaptive_timestep(options.adaptive_timestep)
 
-            # set solver cfl number
-            solver.set_cfl(options.cfl)
+        # set solver cfl number
+        solver.set_cfl(options.cfl)
 
         if options.n_damp is not None:
             solver.set_n_damp(options.n_damp)
