@@ -11,7 +11,7 @@ from numpy.linalg import eigh
 cimport numpy
 import numpy
 
-cdef extern:
+cdef extern from "math.h":
     double fabs(double) nogil
 
 # this is cython substitute for const values
