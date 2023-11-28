@@ -47,13 +47,6 @@ ELSE:
     cpdef set_number_of_threads(int n):
         print("OpenMP not available, cannot set number of threads.")
 
-
-IF UNAME_SYSNAME == "Windows":
-    cdef inline double fmin(double x, double y) nogil:
-        return x if x < y else y
-    cdef inline double fmax(double x, double y) nogil:
-        return x if x > y else y
-
 # Particle Tag information
 from cyarray.carray cimport BaseArray, aligned_malloc, aligned_free
 from .utils import ParticleTAGS

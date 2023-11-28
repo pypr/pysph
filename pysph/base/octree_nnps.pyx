@@ -9,13 +9,6 @@ from libc.stdlib cimport malloc, free
 cimport cython
 from cython.operator cimport dereference as deref, preincrement as inc
 
-IF UNAME_SYSNAME == "Windows":
-    cdef inline double fmin(double x, double y) nogil:
-        return x if x < y else y
-    cdef inline double fmax(double x, double y) nogil:
-        return x if x > y else y
-
-
 #############################################################################
 cdef class OctreeNNPS(NNPS):
     """Nearest neighbor search using Octree.

@@ -15,12 +15,6 @@ from cython.parallel import parallel, prange, threadid
 # EPS_MAX is maximum value of eps in tree building
 DEF EPS_MAX = 1e-3
 
-IF UNAME_SYSNAME == "Windows":
-    cdef inline double fmin(double x, double y) nogil:
-        return x if x < y else y
-    cdef inline double fmax(double x, double y) nogil:
-        return x if x > y else y
-
 ctypedef cOctreeNode* node_ptr
 ctypedef double* dbl_ptr
 

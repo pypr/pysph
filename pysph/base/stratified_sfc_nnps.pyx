@@ -33,13 +33,6 @@ cdef extern from *:
     #endif
     """
 
-IF UNAME_SYSNAME == "Windows":
-    cdef inline double fmin(double x, double y) nogil:
-        return x if x < y else y
-    cdef inline double fmax(double x, double y) nogil:
-        return x if x > y else y
-
-
 #############################################################################
 cdef class StratifiedSFCNNPS(NNPS):
 
