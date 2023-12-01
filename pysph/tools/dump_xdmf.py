@@ -133,7 +133,6 @@ def files2xdmf(absolute_files, outfilename, refer_relative_path,
     # folder, just obtain those from the first file.
     particles_info = {}
     n_particles = {}
-    stride = {}
     fname = absolute_files[0]
 
     print(f'Reading properties and strides from {fname}...', end='')
@@ -141,6 +140,7 @@ def files2xdmf(absolute_files, outfilename, refer_relative_path,
         for pname in data['particles'].keys():
             n_particles[pname] = []
             output_props = []
+            stride = {}
             for arrname, arr in data[f'particles/{pname}/arrays/'].items():
                 if arr.attrs['stored']:
                     output_props.append(arrname)
@@ -157,9 +157,9 @@ def files2xdmf(absolute_files, outfilename, refer_relative_path,
                     typ = 'Matrix'
                 attr_type[var_name] = typ
 
-                particles_info[pname] = {'output_props': output_props,
-                                         'stride': stride,
-                                         'attr_type': attr_type}
+            particles_info[pname] = dict(output_props=output_props,
+                                         stride=stride,
+                                         attr_type=attr_type)
     print('done')
 
     print(f'Reading number of particles and time')
