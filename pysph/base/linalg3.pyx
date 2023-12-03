@@ -4,15 +4,15 @@
 # Eigen decomposition code for symmetric 3x3 matrices, some code taken
 # from the public domain Java Matrix library JAMA
 
-from libc.math cimport sqrt, cos, acos, sin, atan2, M_PI
+from libc.math cimport sqrt, cos, acos, sin, atan2, fabs, M_PI
 from libc.string cimport memcpy
 
 from numpy.linalg import eigh
 cimport numpy
 import numpy
 
-cdef extern:
-    double fabs(double) nogil
+# cdef extern:
+#     double fabs(double) nogil
 
 # this is cython substitute for const values
 cdef enum:
