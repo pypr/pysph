@@ -1,7 +1,7 @@
 [build-system]
 requires = [
     "Beaker",
-    "Cython>=0.20",
+    "Cython<3.0",
     "compyle>=0.8",
     "cyarray",
     "mako",
