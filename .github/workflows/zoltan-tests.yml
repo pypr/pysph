@@ -55,7 +55,7 @@ jobs:
         id: month
         run: echo "month==$(date +'%m')" >> $GITHUB_OUTPUT
       - name: Deal with auto-generated code cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.pysph
