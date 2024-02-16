@@ -27,13 +27,13 @@ check_all_backends = pytest.mark.parametrize('backend',
 
 
 class TestDeviceHelper(object):
-    def setup(self):
+    def setup_method(self):
         self.pa = get_particle_array(name='f', x=[0.0, 1.0], m=1.0, rho=2.0)
 
     @check_all_backends
     def test_simple(self, backend):
         check_import(backend)
-        self.setup()
+        self.setup_method()
         # Given
         pa = self.pa
         h = DeviceHelper(pa, backend=backend)
@@ -51,7 +51,7 @@ class TestDeviceHelper(object):
     @check_all_backends
     def test_push_correctly_sets_values_with_args(self, backend):
         check_import(backend)
-        self.setup()
+        self.setup_method()
         # Given
         pa = self.pa
         h = DeviceHelper(pa, backend=backend)
@@ -74,7 +74,7 @@ class TestDeviceHelper(object):
     @check_all_backends
     def test_push_correctly_sets_values_with_no_args(self, backend):
         check_import(backend)
-        self.setup()
+        self.setup_method()
         # Given
         pa = self.pa
         h = DeviceHelper(pa, backend=backend)
@@ -97,7 +97,7 @@ class TestDeviceHelper(object):
     @check_all_backends
     def test_pull_correctly_sets_values_with_args(self, backend):
         check_import(backend)
-        self.setup()
+        self.setup_method()
         # Given
         pa = self.pa
         h = DeviceHelper(pa, backend=backend)
@@ -120,7 +120,7 @@ class TestDeviceHelper(object):
     @check_all_backends
     def test_pull_correctly_sets_values_with_no_args(self, backend):
         check_import(backend)
-        self.setup()
+        self.setup_method()
         # Given
         pa = self.pa
         h = DeviceHelper(pa, backend=backend)
@@ -143,7 +143,7 @@ class TestDeviceHelper(object):
     @check_all_backends
     def test_max_provides_maximum(self, backend):
         check_import(backend)
-        self.setup()
+        self.setup_method()
         # Given/When
         pa = self.pa
         h = DeviceHelper(pa, backend=backend)
@@ -154,7 +154,7 @@ class TestDeviceHelper(object):
     @check_all_backends
     def test_that_adding_removing_prop_to_array_updates_gpu(self, backend):
         check_import(backend)
-        self.setup()
+        self.setup_method()
         # Given
         pa = self.pa
         h = DeviceHelper(pa, backend=backend)
@@ -177,7 +177,7 @@ class TestDeviceHelper(object):
     @check_all_backends
     def test_resize_works(self, backend):
         check_import(backend)
-        self.setup()
+        self.setup_method()
         # Given
         pa = self.pa
         h = DeviceHelper(pa, backend=backend)
@@ -211,7 +211,7 @@ class TestDeviceHelper(object):
     @check_all_backends
     def test_get_number_of_particles(self, backend):
         check_import(backend)
-        self.setup()
+        self.setup_method()
         # Given
         pa = self.pa
         h = DeviceHelper(pa, backend=backend)
@@ -231,7 +231,7 @@ class TestDeviceHelper(object):
     @check_all_backends
     def test_align(self, backend):
         check_import(backend)
-        self.setup()
+        self.setup_method()
         # Given
         pa = self.pa
         pa.add_property('force', stride=3)
@@ -259,7 +259,7 @@ class TestDeviceHelper(object):
     @check_all_backends
     def test_align_particles(self, backend):
         check_import(backend)
-        self.setup()
+        self.setup_method()
         # Given
         pa = self.pa
         h = DeviceHelper(pa, backend=backend)
@@ -279,7 +279,7 @@ class TestDeviceHelper(object):
     @check_all_backends
     def test_remove_particles(self, backend):
         check_import(backend)
-        self.setup()
+        self.setup_method()
         # Given
         pa = self.pa
         h = DeviceHelper(pa, backend=backend)
@@ -300,7 +300,7 @@ class TestDeviceHelper(object):
     @check_all_backends
     def test_remove_tagged_particles(self, backend):
         check_import(backend)
-        self.setup()
+        self.setup_method()
         # Given
         pa = self.pa
         h = DeviceHelper(pa, backend=backend)
@@ -319,7 +319,7 @@ class TestDeviceHelper(object):
     @check_all_backends
     def test_add_particles(self, backend):
         check_import(backend)
-        self.setup()
+        self.setup_method()
         # Given
         pa = self.pa
         h = DeviceHelper(pa, backend=backend)
@@ -336,7 +336,7 @@ class TestDeviceHelper(object):
     @check_all_backends
     def test_extend(self, backend):
         check_import(backend)
-        self.setup()
+        self.setup_method()
         # Given
         pa = self.pa
         h = DeviceHelper(pa, backend=backend)
@@ -352,7 +352,7 @@ class TestDeviceHelper(object):
     @check_all_backends
     def test_append_parray(self, backend):
         check_import(backend)
-        self.setup()
+        self.setup_method()
         # Given
         pa1 = self.pa
         pa2 = get_particle_array(name='s', x=[0.0, 1.0], m=1.0, rho=2.0)
@@ -368,7 +368,7 @@ class TestDeviceHelper(object):
     @check_all_backends
     def test_empty_clone(self, backend):
         check_import(backend)
-        self.setup()
+        self.setup_method()
         # Given
         pa = get_particle_array(name='f', x=[0.0, 1.0, 2.0, 3.0],
                                 m=1.0, rho=2.0)
@@ -385,7 +385,7 @@ class TestDeviceHelper(object):
     @check_all_backends
     def test_extract_particles(self, backend):
         check_import(backend)
-        self.setup()
+        self.setup_method()
         # Given
         pa = get_particle_array(name='f', x=[0.0, 1.0, 2.0, 3.0],
                                 m=1.0, rho=2.0)
@@ -405,7 +405,7 @@ class TestDeviceHelper(object):
     def test_update_minmax_cl(self):
         backend = 'opencl'
         check_import(backend)
-        self.setup()
+        self.setup_method()
 
         # Given
         x = [0.0, -1.0, 2.0, 3.0]
