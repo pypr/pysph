@@ -207,7 +207,7 @@ class Interpolator(object):
 
     def __init__(self, particle_arrays, num_points=125000, kernel=None,
                  x=None, y=None, z=None, domain_manager=None,
-                 equations=None, method='shepard'):
+                 equations=None, method='shepard', use_min_h='False'):
         """
         The x, y, z coordinates need not be specified, and if they are not,
         the bounds of the interpolated domain is automatically computed and
@@ -236,6 +236,9 @@ class Interpolator(object):
         method : str
             String with the following allowed methods: 'shepard', 'sph',
             'order1'
+        use_min_h : bool
+            use minimum value of 'h' from the selected array. Useful when
+            arrays have adaptive resolution
         """
         self._set_particle_arrays(particle_arrays)
         bounds = get_bounding_box(self.particle_arrays)
@@ -253,6 +256,7 @@ class Interpolator(object):
         self.func_eval = None
         self.domain_manager = domain_manager
         self.method = method
+        self.use_min_h = use_min_h
         if method not in ['sph', 'shepard', 'order1']:
             raise RuntimeError('%s method is not implemented' % (method))
         if x is None and y is None and z is None:
@@ -407,8 +411,12 @@ class Interpolator(object):
         zr = z.ravel()
         self.x, self.y, self.z = x.squeeze(), y.squeeze(), z.squeeze()
 
-        hmax = self._get_max_h_in_arrays()
-        h = hmax*np.ones_like(xr)
+        _h0 = None
+        if self.use_min_h:
+            _h0 = self._get_min_h_in_arrays()
+        else:
+            _h0 = self._get_max_h_in_arrays()
+        h = _h0*np.ones_like(xr)
         pa = get_particle_array(
             name='interpolate',
             x=xr, y=yr, z=zr, h=h,
@@ -458,6 +466,12 @@ class Interpolator(object):
         self.func_eval = AccelerationEval(arrays, equations, self.kernel)
         compiler = SPHCompiler(self.func_eval, None)
         compiler.compile()
+
+    def _get_min_h_in_arrays(self):
+        hmax = 1000.0
+        for array in self.particle_arrays:
+            hmax = min(array.h.min(), hmax)
+        return hmax
 
     def _get_max_h_in_arrays(self):
         hmax = -1.0
