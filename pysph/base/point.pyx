@@ -234,8 +234,8 @@ cdef class IntPoint:
         return IntPoint_new(self.data.x, self.data.y, self.data.z)
 
     cpdef numpy.ndarray asarray(self):
-        cdef numpy.ndarray[ndim=1,dtype=numpy.int_t] arr = numpy.empty(3,
-                                                            dtype=numpy.int)
+        cdef numpy.ndarray[ndim=1,dtype=int] arr = numpy.empty(3,
+                                                            dtype=int)
         arr[0] = self.data.x
         arr[1] = self.data.y
         arr[2] = self.data.z
