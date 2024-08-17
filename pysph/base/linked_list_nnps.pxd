@@ -24,5 +24,5 @@ cdef class LinkedListNNPS(NNPS):
     cpdef long _get_number_of_cells(self) except -1
     cdef long _get_flattened_cell_index(self, cPoint pnt, double cell_size)
     cdef long _get_valid_cell_index(self, int cid_x, int cid_y, int cid_z,
-            int* ncells_per_dim, int dim, int n_cells) nogil
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
+            int* ncells_per_dim, int dim, int n_cells) noexcept nogil
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil

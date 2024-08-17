@@ -35,13 +35,13 @@ cdef class OctreeNNPS(NNPS):
 
     cpdef get_depth(self, int pa_index)
 
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil
 
     cpdef set_context(self, int src_index, int dst_index)
 
     cdef void _get_neighbors(self, double q_x, double q_y, double q_z, double q_h,
             double* src_x_ptr, double* src_y_ptr, double* src_z_ptr, double* src_h_ptr,
-            UIntArray nbrs, cOctreeNode* node) nogil
+            UIntArray nbrs, cOctreeNode* node) noexcept nogil
 
     cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
 

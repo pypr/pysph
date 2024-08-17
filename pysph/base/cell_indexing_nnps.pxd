@@ -33,22 +33,22 @@ cdef class CellIndexingNNPS(NNPS):
     ##########################################################################
 
     cdef inline u_int _get_key(self, u_int n, u_int i, u_int j,
-            u_int k, int pa_index) nogil
+            u_int k, int pa_index) noexcept nogil
 
-    cdef inline int _get_id(self, u_int key, int pa_index) nogil
+    cdef inline int _get_id(self, u_int key, int pa_index) noexcept nogil
 
-    cdef inline int _get_x(self, u_int key, int pa_index) nogil
+    cdef inline int _get_x(self, u_int key, int pa_index) noexcept nogil
 
-    cdef inline int _get_y(self, u_int key, int pa_index) nogil
+    cdef inline int _get_y(self, u_int key, int pa_index) noexcept nogil
 
-    cdef inline int _get_z(self, u_int key, int pa_index) nogil
+    cdef inline int _get_z(self, u_int key, int pa_index) noexcept nogil
 
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
-            int* x, int* y, int* z) nogil
+            int* x, int* y, int* z) noexcept nogil
 
     cpdef set_context(self, int src_index, int dst_index)
 
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil
 
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs, bint prealloc)
@@ -56,7 +56,7 @@ cdef class CellIndexingNNPS(NNPS):
     cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
 
     cdef void fill_array(self, NNPSParticleArrayWrapper pa_wrapper, int pa_index,
-            UIntArray indices, u_int* current_keys, key_to_idx_t* current_indices) nogil
+            UIntArray indices, u_int* current_keys, key_to_idx_t* current_indices) noexcept nogil
 
     cpdef _refresh(self)
 

@@ -27,7 +27,7 @@ cdef extern from "z_order.h":
         CompareSortWrapper() nogil except +
         CompareSortWrapper(uint32_t* current_pids, uint64_t* current_keys,
                 int length) nogil except +
-        inline void compare_sort() nogil
+        inline void compare_sort() noexcept nogil
 
 cdef class StratifiedSFCNNPS(NNPS):
     ############################################################################
@@ -86,7 +86,7 @@ cdef class StratifiedSFCNNPS(NNPS):
 
     cdef inline int _get_H(self, double h_q, double h_j)
 
-    cdef inline int get_idx(self, uint64_t key, uint64_t max_key, int* key_to_idx) nogil
+    cdef inline int get_idx(self, uint64_t key, uint64_t max_key, int* key_to_idx) noexcept nogil
 
     cdef void _fill_nbr_boxes(self)
 
@@ -98,12 +98,12 @@ cdef class StratifiedSFCNNPS(NNPS):
     cdef int _neighbor_boxes_asym(self, int i, int j, int k, int H,
             int* current_key_to_idx_level, uint64_t max_key,
             double current_cell_size, double* current_hmax_level,
-            vector[int]* nbr_boxes) nogil
+            vector[int]* nbr_boxes) noexcept nogil
 
     cdef int _neighbor_boxes_sym(self, int i, int j, int k, int H,
             int* current_key_to_idx_level, uint64_t max_key,
             double current_cell_size, double* current_hmax_level,
-            vector[int]* nbr_boxes) nogil
+            vector[int]* nbr_boxes) noexcept nogil
 
     cpdef double get_binning_size(self, int interval)
 
@@ -111,13 +111,13 @@ cdef class StratifiedSFCNNPS(NNPS):
 
     cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
 
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil
 
     cdef void fill_array(self, NNPSParticleArrayWrapper pa_wrapper,
             int pa_index, uint32_t* current_pids,
             uint64_t* current_keys, double* current_cells, int* current_num_cells)
 
-    cdef inline int _get_level(self, double h) nogil
+    cdef inline int _get_level(self, double h) noexcept nogil
 
     cpdef _refresh(self)
 

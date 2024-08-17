@@ -84,26 +84,26 @@ cdef class Octree:
     # Member functions
     ##########################################################################
 
-    cdef inline double _get_eps(self, double length, double* xmin) nogil
+    cdef inline double _get_eps(self, double length, double* xmin) noexcept nogil
 
     cdef inline void _calculate_domain(self, NNPSParticleArrayWrapper pa)
 
     cdef inline cOctreeNode* _new_node(self, double* xmin, double length,
             double hmax = *, int level = *, cOctreeNode* parent = *,
-            int num_particles = *, bint is_leaf = *) nogil
+            int num_particles = *, bint is_leaf = *) noexcept nogil
 
     cdef inline void _delete_tree(self, cOctreeNode* node)
 
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
             vector[u_int]* indices, double* xmin, double length,
-            cOctreeNode* node, int level) nogil
+            cOctreeNode* node, int level) noexcept nogil
 
     cdef int _c_build_tree_level1(self, NNPSParticleArrayWrapper pa,
-             double* xmin, double length, cOctreeNode* node, int num_threads) nogil    
+             double* xmin, double length, cOctreeNode* node, int num_threads) noexcept nogil    
     
     cdef int _c_build_tree_bfs(self, NNPSParticleArrayWrapper pa,
             u_int* p_indices, vector[cOctreeNode *]* level_nodes,
-            int level, int num_threads) nogil
+            int level, int num_threads) noexcept nogil
 
     cdef void _plot_tree(self, OctreeNode node, ax)
 
@@ -139,7 +139,7 @@ cdef class CompressedOctree(Octree):
 
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
             vector[u_int]* indices, double* xmin, double length,
-            cOctreeNode* node, int level) nogil
+            cOctreeNode* node, int level) noexcept nogil
     
     cdef int c_build_tree(self, NNPSParticleArrayWrapper pa_wrapper, bint test_parallel = *)
     

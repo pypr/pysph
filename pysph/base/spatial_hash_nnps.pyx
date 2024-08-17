@@ -79,7 +79,7 @@ cdef class SpatialHashNNPS(NNPS):
         self.dst = <NNPSParticleArrayWrapper> self.pa_wrappers[dst_index]
         self.src = <NNPSParticleArrayWrapper> self.pa_wrappers[src_index]
 
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil:
         """Low level, high-performance non-gil method to find neighbors.
         This requires that `set_context()` be called beforehand.  This method
         does not reset the neighbors array before it appends the
@@ -156,11 +156,11 @@ cdef class SpatialHashNNPS(NNPS):
     #### Private protocol ################################################
 
     cdef inline void _add_to_hashtable(self, int hash_id, unsigned int pid, double h,
-            int i, int j, int k) nogil:
+            int i, int j, int k) noexcept nogil:
         self.hashtable[hash_id].add(i,j,k,pid,h)
 
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
-            int* x, int* y, int* z) nogil:
+            int* x, int* y, int* z) noexcept nogil:
         cdef int length = 0
         cdef int p, q, r
         for p from -1<=p<2:
@@ -285,7 +285,7 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
         self.dst = <NNPSParticleArrayWrapper> self.pa_wrappers[dst_index]
         self.src = <NNPSParticleArrayWrapper> self.pa_wrappers[src_index]
 
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil:
         """Low level, high-performance non-gil method to find neighbors.
         This requires that `set_context()` be called beforehand.  This method
         does not reset the neighbors array before it appends the
@@ -369,10 +369,10 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
     #### Private protocol ################################################
 
     cdef inline void _add_to_hashtable(self, int hash_id, unsigned int pid, double h,
-            int i, int j, int k) nogil:
+            int i, int j, int k) noexcept nogil:
         self.hashtable[hash_id].add(i,j,k,pid,h)
 
-    cdef inline int _h_mask_approx(self, int* x, int* y, int* z) nogil:
+    cdef inline int _h_mask_approx(self, int* x, int* y, int* z) noexcept nogil:
         cdef int length = 0
         cdef int s, t, u
 
@@ -388,7 +388,7 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
 
         return length
 
-    cdef inline int _h_mask_exact(self, int* x, int* y, int* z) nogil:
+    cdef inline int _h_mask_exact(self, int* x, int* y, int* z) noexcept nogil:
         cdef int length = 0
         cdef int s, t, u
 
@@ -405,7 +405,7 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
 
     @cython.cdivision(True)
     cdef int _neighbor_boxes(self, int i, int j, int k,
-            int* x, int* y, int* z, double h) nogil:
+            int* x, int* y, int* z, double h) noexcept nogil:
         cdef int length = 0
         cdef int p
 

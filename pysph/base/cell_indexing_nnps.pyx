@@ -109,7 +109,7 @@ cdef class CellIndexingNNPS(NNPS):
         self.dst = <NNPSParticleArrayWrapper> self.pa_wrappers[dst_index]
         self.src = <NNPSParticleArrayWrapper> self.pa_wrappers[src_index]
 
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil:
         """Low level, high-performance non-gil method to find neighbors.
         This requires that `set_context()` be called beforehand.  This method
         does not reset the neighbors array before it appends the
@@ -231,7 +231,7 @@ cdef class CellIndexingNNPS(NNPS):
 
 
     cdef void fill_array(self, NNPSParticleArrayWrapper pa_wrapper, int pa_index,
-            UIntArray indices, u_int* current_keys, key_to_idx_t* current_indices) nogil:
+            UIntArray indices, u_int* current_keys, key_to_idx_t* current_indices) noexcept nogil:
         cdef double* x_ptr = pa_wrapper.x.data
         cdef double* y_ptr = pa_wrapper.y.data
         cdef double* z_ptr = pa_wrapper.z.data
@@ -295,30 +295,30 @@ cdef class CellIndexingNNPS(NNPS):
     #### Private protocol ################################################
 
     cdef inline u_int _get_key(self, u_int n, u_int i, u_int j,
-            u_int k, int pa_index) nogil:
+            u_int k, int pa_index) noexcept nogil:
         return  n + \
                 (1 << self.I[pa_index])*i + \
                 (1 << (self.I[pa_index] + self.J))*j + \
                 (1 << (self.I[pa_index] + self.J + self.K))*k
 
     @cython.cdivision(True)
-    cdef inline int _get_id(self, u_int key, int pa_index) nogil:
+    cdef inline int _get_id(self, u_int key, int pa_index) noexcept nogil:
         return key % (1 << self.I[pa_index])
 
     @cython.cdivision(True)
-    cdef inline int _get_x(self, u_int key, int pa_index) nogil:
+    cdef inline int _get_x(self, u_int key, int pa_index) noexcept nogil:
         return (key >> self.I[pa_index]) % (1 << self.J)
 
     @cython.cdivision(True)
-    cdef inline int _get_y(self, u_int key, int pa_index) nogil:
+    cdef inline int _get_y(self, u_int key, int pa_index) noexcept nogil:
         return (key >> (self.I[pa_index] + self.J)) % (1 << self.K)
 
     @cython.cdivision(True)
-    cdef inline int _get_z(self, u_int key, int pa_index) nogil:
+    cdef inline int _get_z(self, u_int key, int pa_index) noexcept nogil:
         return key >> (self.I[pa_index] + self.J + self.K)
 
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
-            int* x, int* y, int* z) nogil:
+            int* x, int* y, int* z) noexcept nogil:
         cdef int length = 0
         cdef int p, q, r
         for p from -1<=p<2:

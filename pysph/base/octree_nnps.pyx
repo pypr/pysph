@@ -65,7 +65,7 @@ cdef class OctreeNNPS(NNPS):
         self.dst = <NNPSParticleArrayWrapper> self.pa_wrappers[dst_index]
         self.src = <NNPSParticleArrayWrapper> self.pa_wrappers[src_index]
 
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil:
         """Low level, high-performance non-gil method to find neighbors.
         This requires that `set_context()` be called beforehand.  This method
         does not reset the neighbors array before it appends the
@@ -104,7 +104,7 @@ cdef class OctreeNNPS(NNPS):
     @cython.cdivision(True)
     cdef void _get_neighbors(self, double q_x, double q_y, double q_z, double q_h,
             double* src_x_ptr, double* src_y_ptr, double* src_z_ptr, double* src_h_ptr,
-            UIntArray nbrs, cOctreeNode* node) nogil:
+            UIntArray nbrs, cOctreeNode* node) noexcept nogil:
         """Find neighbors recursively"""
         cdef double x_centre = node.xmin[0] + node.length/2
         cdef double y_centre = node.xmin[1] + node.length/2

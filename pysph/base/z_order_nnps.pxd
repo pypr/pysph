@@ -63,11 +63,11 @@ cdef class ZOrderNNPS(NNPS):
 
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
             int* current_key_to_idx, int num_particles,
-            int* found_indices) nogil
+            int* found_indices) noexcept nogil
 
     cpdef set_context(self, int src_index, int dst_index)
 
-    cdef inline int get_idx(self, uint64_t key, int* key_to_idx) nogil
+    cdef inline int get_idx(self, uint64_t key, int* key_to_idx) noexcept nogil
 
     cpdef np.ndarray get_nbr_boxes(self, pa_index, cid)
 
@@ -77,7 +77,7 @@ cdef class ZOrderNNPS(NNPS):
 
     cpdef np.ndarray get_keys(self, pa_index)
 
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil
 
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs, bint prealloc)
@@ -105,7 +105,7 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
     # Member functions
     ##########################################################################
 
-    cdef inline int _h_mask_exact(self, int* x, int* y, int* z) nogil
+    cdef inline int _h_mask_exact(self, int* x, int* y, int* z) noexcept nogil
 
     cdef int _neighbor_boxes_func(self, int i, int j, int k,
             int* current_key_to_idx, uint32_t* current_cids,
@@ -115,12 +115,12 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
     cdef int _neighbor_boxes_asym(self, int i, int j, int k,
             int* current_key_to_idx, uint32_t* current_cids,
             double* current_hmax, int num_particles,
-            int* found_indices, double h) nogil
+            int* found_indices, double h) noexcept nogil
 
     cdef int _neighbor_boxes_sym(self, int i, int j, int k,
             int* current_key_to_idx, uint32_t* current_cids,
             double* current_hmax, int num_particles,
-            int* found_indices, double h) nogil
+            int* found_indices, double h) noexcept nogil
 
     cdef void _fill_nbr_boxes(self)
 

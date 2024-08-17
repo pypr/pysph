@@ -111,7 +111,7 @@ cdef class StratifiedHashNNPS(NNPS):
         self.src = <NNPSParticleArrayWrapper> self.pa_wrappers[src_index]
 
     @cython.cdivision(True)
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil:
         """Low level, high-performance non-gil method to find neighbors.
         This requires that `set_context()` be called beforehand.  This method
         does not reset the neighbors array before it appends the
@@ -214,15 +214,15 @@ cdef class StratifiedHashNNPS(NNPS):
     #### Private protocol ################################################
 
     @cython.cdivision(True)
-    cdef inline int _get_hash_id(self, double h) nogil:
+    cdef inline int _get_hash_id(self, double h) noexcept nogil:
         return <int> floor((self.radius_scale*h - self.hmin)/self.interval_size)
 
-    cdef inline double _get_h_max(self, double* current_cells, int hash_id) nogil:
+    cdef inline double _get_h_max(self, double* current_cells, int hash_id) noexcept nogil:
         return self.radius_scale*current_cells[hash_id]
 
     @cython.cdivision(True)
     cdef inline int _h_mask_exact(self, int* x, int* y, int* z,
-            int H) nogil:
+            int H) noexcept nogil:
         cdef int length = 0
         cdef int s, t, u
 
@@ -237,7 +237,7 @@ cdef class StratifiedHashNNPS(NNPS):
         return length
 
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
-            int* x, int* y, int* z, int H) nogil:
+            int* x, int* y, int* z, int H) noexcept nogil:
         cdef int length = 0
         cdef int p
 
@@ -265,7 +265,7 @@ cdef class StratifiedHashNNPS(NNPS):
         return length
 
     cdef inline void _set_h_max(self, double* current_cells, double* src_h_ptr,
-            int num_particles) nogil:
+            int num_particles) noexcept nogil:
         cdef double h
         cdef int i, idx
         for i from 0<=i<num_particles:

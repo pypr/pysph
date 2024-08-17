@@ -191,7 +191,7 @@ cdef class StratifiedSFCNNPS(NNPS):
             indices.c_append(current_pids[j])
 
     @cython.cdivision(True)
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil:
         """Low level, high-performance non-gil method to find neighbors.
         This requires that `set_context()` be called beforehand.  This method
         does not reset the neighbors array before it appends the
@@ -321,7 +321,7 @@ cdef class StratifiedSFCNNPS(NNPS):
         return keys
 
     @cython.cdivision(True)
-    cdef inline int _get_level(self, double h) nogil:
+    cdef inline int _get_level(self, double h) noexcept nogil:
         return self.num_levels - <int> min(self.num_levels,
                 ceil(log2((self.cell_size + EPS)/ self.radius_scale / h)))
 
@@ -329,7 +329,7 @@ cdef class StratifiedSFCNNPS(NNPS):
     cdef inline int _get_H(self, double h_q, double h_j):
         return <int> ceil(h_q / h_j)
 
-    cdef inline int get_idx(self, uint64_t key, uint64_t max_key, int* key_to_idx) nogil:
+    cdef inline int get_idx(self, uint64_t key, uint64_t max_key, int* key_to_idx) noexcept nogil:
         return -1 if key >= max_key else key_to_idx[key]
 
     cdef int _neighbor_boxes_func(self, int i, int j, int k, int H,
@@ -346,7 +346,7 @@ cdef class StratifiedSFCNNPS(NNPS):
     cdef int _neighbor_boxes_asym(self, int i, int j, int k, int H,
             int* current_key_to_idx_level, uint64_t max_key,
             double current_cell_size, double* current_hmax_level,
-            vector[int]* nbr_boxes) nogil:
+            vector[int]* nbr_boxes) noexcept nogil:
         cdef int length = 0
 
         cdef uint64_t key
@@ -380,7 +380,7 @@ cdef class StratifiedSFCNNPS(NNPS):
     cdef int _neighbor_boxes_sym(self, int i, int j, int k, int H,
             int* current_key_to_idx_level, uint64_t max_key,
             double current_cell_size, double* current_hmax_level,
-            vector[int]* nbr_boxes) nogil:
+            vector[int]* nbr_boxes) noexcept nogil:
         cdef int length = 0
 
         cdef uint64_t key

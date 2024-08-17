@@ -21,7 +21,7 @@ cdef extern from "<algorithm>" namespace "std" nogil:
 
 #############################################################################
 
-cdef inline int cmp_func(const void* a, const void* b) nogil:
+cdef inline int cmp_func(const void* a, const void* b) noexcept nogil:
     return (<uint64_t*>a)[0] - (<uint64_t*>b)[0]
 
 cdef class ZOrderNNPS(NNPS):
@@ -128,7 +128,7 @@ cdef class ZOrderNNPS(NNPS):
         self.dst = <NNPSParticleArrayWrapper> self.pa_wrappers[dst_index]
         self.src = <NNPSParticleArrayWrapper> self.pa_wrappers[src_index]
 
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil:
         """Low level, high-performance non-gil method to find neighbors.
         This requires that `set_context()` be called beforehand.  This method
         does not reset the neighbors array before it appends the
@@ -479,12 +479,12 @@ cdef class ZOrderNNPS(NNPS):
                 else:
                     current_lengths[cid] += 1
 
-    cdef inline int get_idx(self, uint64_t key, int* key_to_idx) nogil:
+    cdef inline int get_idx(self, uint64_t key, int* key_to_idx) noexcept nogil:
         return -1 if key >= self.max_key else key_to_idx[key]
 
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
             int* current_key_to_idx, int num_particles,
-            int* found_indices) nogil:
+            int* found_indices) noexcept nogil:
         cdef int length = 0
         cdef int p, q, r
         cdef uint64_t key
@@ -609,7 +609,7 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
                 free(self.hmax[i])
         free(self.hmax)
 
-    cdef inline int _h_mask_exact(self, int* x, int* y, int* z) nogil:
+    cdef inline int _h_mask_exact(self, int* x, int* y, int* z) noexcept nogil:
         cdef int length = 0
         cdef int s, t, u
 
@@ -640,7 +640,7 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
     cdef int _neighbor_boxes_asym(self, int i, int j, int k,
             int* current_key_to_idx, uint32_t* current_cids,
             double* current_hmax, int num_particles,
-            int* found_indices, double h) nogil:
+            int* found_indices, double h) noexcept nogil:
         cdef int length = 0
 
         cdef uint64_t key
@@ -674,7 +674,7 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
     cdef int _neighbor_boxes_sym(self, int i, int j, int k,
             int* current_key_to_idx, uint32_t* current_cids,
             double* current_hmax, int num_particles,
-            int* found_indices, double h) nogil:
+            int* found_indices, double h) noexcept nogil:
         cdef int length = 0
 
         cdef uint64_t key

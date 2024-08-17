@@ -20,17 +20,17 @@ cdef enum:
 
 cdef double EPS = numpy.finfo(float).eps
 
-cdef inline double MAX(double a, double b) nogil:
+cdef inline double MAX(double a, double b) noexcept nogil:
     return a if a>b else b
 
-cdef inline double SQR(double a) nogil:
+cdef inline double SQR(double a) noexcept nogil:
     return a*a
 
-cdef inline double hypot2(double x, double y) nogil:
+cdef inline double hypot2(double x, double y) noexcept nogil:
     return sqrt(x*x+y*y)
 
 
-cdef double det(double a[3][3]) nogil:
+cdef double det(double a[3][3]) noexcept nogil:
     '''Determinant of symmetrix matrix
     '''
     return (a[0][0]*a[1][1]*a[2][2] + 2*a[1][2]*a[0][2]*a[0][1] -
@@ -46,7 +46,7 @@ cpdef double py_det(double[:,:] m):
 # d:11,22,33; s:23,13,12
 # d:00,11,22; s:12,02,01
 
-cdef void get_eigenvalues(double a[3][3], double *result) nogil:
+cdef void get_eigenvalues(double a[3][3], double *result) noexcept nogil:
     '''Compute the eigenvalues of symmetric matrix a and return in
     result array.
     '''
@@ -143,7 +143,7 @@ cdef void get_eigenvec_from_val(double A[n][n], double *R, double *e):
             R[j*3+i] = res[j]
 
 
-cdef bint _nearly_diagonal(double A[n][n]) nogil:
+cdef bint _nearly_diagonal(double A[n][n]) noexcept nogil:
     return (
         (SQR(A[0][0]) + SQR(A[1][1]) + SQR(A[2][2])) >
         1e8*(SQR(A[0][1]) + SQR(A[0][2]) + SQR(A[1][2]))
@@ -194,7 +194,7 @@ def py_get_eigenvalvec(double[:,:] A):
 
 ##############################################################################
 
-cdef void transform(double A[3][3], double P[3][3], double res[3][3]) nogil:
+cdef void transform(double A[3][3], double P[3][3], double res[3][3]) noexcept nogil:
     '''Compute the transformation P.T*A*P and add it into res.
     '''
     cdef int i, j, k, l
@@ -205,7 +205,7 @@ cdef void transform(double A[3][3], double P[3][3], double res[3][3]) nogil:
                     res[i][j] += P[k][i]*A[k][l]*P[l][j] # P.T*A*P
 
 cdef void transform_diag(double *A, double P[3][3],
-                         double res[3][3]) nogil:
+                         double res[3][3]) noexcept nogil:
     '''Compute the transformation P.T*A*P and add it into res.
 
     A is diagonal and contains the diagonal entries alone.
@@ -217,7 +217,7 @@ cdef void transform_diag(double *A, double P[3][3],
                 res[i][j] += P[k][i]*A[k]*P[k][j] # P.T*A*P
 
 cdef void transform_diag_inv(double *A, double P[3][3],
-                             double res[3][3]) nogil:
+                             double res[3][3]) noexcept nogil:
     '''Compute the transformation P*A*P.T and set it into res.
     A is diagonal and contains just the diagonal entries.
     '''
@@ -257,7 +257,7 @@ def py_transform_diag_inv(double[:] A, double[:,:] P):
     return res
 
 
-cdef double * tred2(double V[n][n], double *d, double *e) nogil:
+cdef double * tred2(double V[n][n], double *d, double *e) noexcept nogil:
     '''Symmetric Householder reduction to tridiagonal form
 
     This is derived from the Algol procedures tred2 by
@@ -376,7 +376,7 @@ cdef double * tred2(double V[n][n], double *d, double *e) nogil:
     return d
 
 
-cdef void tql2(double V[n][n], double *d, double *e) nogil:
+cdef void tql2(double V[n][n], double *d, double *e) noexcept nogil:
     '''Symmetric tridiagonal QL algo for eigendecomposition
 
     This is derived from the Algol procedures tql2, by
@@ -492,14 +492,14 @@ cdef void tql2(double V[n][n], double *d, double *e) nogil:
                 V[j][k] = p
 
 
-cdef void zero_matrix_case(double V[n][n], double *d) nogil:
+cdef void zero_matrix_case(double V[n][n], double *d) noexcept nogil:
     cdef int i, j
     for i in range(3):
         d[i] = 0.0
         for j in range(3):
             V[i][j] = (i==j)
 
-cdef void eigen_decomposition(double A[n][n], double V[n][n], double *d) nogil:
+cdef void eigen_decomposition(double A[n][n], double V[n][n], double *d) noexcept nogil:
     '''Get eigenvalues and eigenvectors of matrix A.
     V is output eigenvectors and d are the eigenvalues.
     '''

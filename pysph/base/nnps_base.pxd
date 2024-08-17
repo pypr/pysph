@@ -30,11 +30,11 @@ cdef extern from 'limits.h':
 ctypedef unsigned int ZOLTAN_ID_TYPE
 ctypedef unsigned int* ZOLTAN_ID_PTR
 
-cdef inline double norm2(double x, double y, double z) nogil:
+cdef inline double norm2(double x, double y, double z) noexcept nogil:
     return x*x + y*y + z*z
 
 @cython.cdivision(True)
-cdef inline int real_to_int(double real_val, double step) nogil:
+cdef inline int real_to_int(double real_val, double step) noexcept nogil:
     """ Return the bin index to which the given position belongs.
 
     Parameters
@@ -54,7 +54,7 @@ cdef inline int real_to_int(double real_val, double step) nogil:
     return ret_val
 
 cdef inline void find_cell_id_raw(double x, double y, double z, double
-                           cell_size, int *ix, int *iy, int *iz) nogil:
+                           cell_size, int *ix, int *iy, int *iz) noexcept nogil:
     """ Find the cell index for the corresponding point
 
     Parameters
@@ -80,7 +80,7 @@ cdef inline void find_cell_id_raw(double x, double y, double z, double
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cdef inline long flatten_raw(int x, int y, int z, int* ncells_per_dim,
-        int dim) nogil:
+        int dim) noexcept nogil:
     """Return a flattened index for a cell
 
     The flattening is determined using the row-order indexing commonly
@@ -96,7 +96,7 @@ cdef inline long flatten_raw(int x, int y, int z, int* ncells_per_dim,
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef inline long flatten(cIntPoint cid, IntArray ncells_per_dim, int dim) nogil:
+cdef inline long flatten(cIntPoint cid, IntArray ncells_per_dim, int dim) noexcept nogil:
     """Return a flattened index for a cell
 
     The flattening is determined using the row-order indexing commonly
@@ -109,7 +109,7 @@ cdef inline long flatten(cIntPoint cid, IntArray ncells_per_dim, int dim) nogil:
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cdef inline long get_valid_cell_index(int cid_x, int cid_y, int cid_z,
-        int* ncells_per_dim, int dim, int n_cells) nogil:
+        int* ncells_per_dim, int dim, int n_cells) noexcept nogil:
     """Return the flattened index for a valid cell"""
     cdef long ncx = ncells_per_dim[0]
     cdef long ncy = ncells_per_dim[1]
@@ -268,13 +268,13 @@ cdef class NeighborCache:
     cdef public list _neighbor_arrays
     cdef int _last_avg_nbr_size
 
-    cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs) nogil
+    cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs) noexcept nogil
     cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs)
     cpdef find_all_neighbors(self)
     cpdef update(self)
 
     cdef void _update_last_avg_nbr_size(self)
-    cdef void _find_neighbors(self, long d_idx) nogil
+    cdef void _find_neighbors(self, long d_idx) noexcept nogil
 
 cdef class NNPSBase:
     ##########################################################################
@@ -305,7 +305,7 @@ cdef class NNPSBase:
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs, bint prealloc)
 
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil
 
     cpdef get_nearest_particles(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs)
@@ -336,15 +336,15 @@ cdef class NNPS(NNPSBase):
     cpdef _bin(self, int pa_index, UIntArray indices)
 
     cdef void _sort_neighbors(self, unsigned int* nbrs, size_t length,
-                              unsigned int *gids) nogil
+                              unsigned int *gids) noexcept nogil
 
     # compute the min and max for the particle coordinates
     cdef _compute_bounds(self)
 
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil
 
     cdef void get_nearest_neighbors(self, size_t d_idx,
-                                      UIntArray nbrs) nogil
+                                      UIntArray nbrs) noexcept nogil
 
     # Neighbor query function. Returns the list of neighbors for a
     # requested particle. The returned list is assumed to be of type

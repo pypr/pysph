@@ -87,7 +87,7 @@ cdef class LinkedListNNPS(NNPS):
 
     #### Public protocol ################################################
 
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil:
         """Low level, high-performance non-gil method to find neighbors.
         This requires that `set_context()` be called beforehand.  This method
         does not reset the neighbors array before it appends the
@@ -326,7 +326,7 @@ cdef class LinkedListNNPS(NNPS):
     @cython.boundscheck(False)
     @cython.wraparound(False)
     cdef long _get_valid_cell_index(self, int cid_x, int cid_y, int cid_z,
-            int* ncells_per_dim, int dim, int n_cells) nogil:
+            int* ncells_per_dim, int dim, int n_cells) noexcept nogil:
         return get_valid_cell_index(
             cid_x, cid_y, cid_z, ncells_per_dim, dim, n_cells
         )

@@ -58,7 +58,7 @@ cdef int Ghost = ParticleTAGS.Ghost
 ctypedef pair[unsigned int, unsigned int] id_gid_pair_t
 
 
-cdef inline bint _compare_gids(id_gid_pair_t x, id_gid_pair_t y) nogil:
+cdef inline bint _compare_gids(id_gid_pair_t x, id_gid_pair_t y) noexcept nogil:
     return y.second > x.second
 
 def py_flatten(IntPoint cid, IntArray ncells_per_dim, int dim):
@@ -1193,7 +1193,7 @@ cdef class NeighborCache:
 
     #### Public protocol ################################################
 
-    cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs) nogil:
+    cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs) noexcept nogil:
         if self._cached.data[d_idx] == 0:
             self._find_neighbors(d_idx)
         cdef size_t start, end, tid
@@ -1253,7 +1253,7 @@ cdef class NeighborCache:
         if total > 0 and np > 0:
             self._last_avg_nbr_size = int(total/np) + 1
 
-    cdef void _find_neighbors(self, long d_idx) nogil:
+    cdef void _find_neighbors(self, long d_idx) noexcept nogil:
         cdef int thread_id = threadid()
         self._pid_to_tid.data[d_idx] = thread_id
         self._start_stop.data[d_idx*2] = \
@@ -1402,7 +1402,7 @@ cdef class NNPSBase:
 
         self.find_nearest_neighbors(d_idx, nbrs)
 
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil:
         # Implement this in the subclass to actually do something useful.
         pass
 
@@ -1518,7 +1518,7 @@ cdef class NNPS(NNPSBase):
             for cache in self.cache:
                 cache.update()
 
-    cdef void get_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+    cdef void get_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil:
         if self.use_cache:
             self.current_cache.get_neighbors_raw(d_idx, nbrs)
         else:
@@ -1584,7 +1584,7 @@ cdef class NNPS(NNPSBase):
         self.xmax.set_data(np.asarray([xmax, ymax, zmax]))
 
     cdef void _sort_neighbors(self, unsigned int* nbrs, size_t length,
-                              unsigned int *gids) nogil:
+                              unsigned int *gids) noexcept nogil:
         if length == 0:
             return
         cdef id_gid_pair_t _entry

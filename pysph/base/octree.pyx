@@ -25,10 +25,10 @@ cdef extern from *:
     #define START_OMP_SINGLE_PRAGMA() _Pragma("omp single") {
     #define START_OMP_BARRIER_PRAGMA() _Pragma("omp barrier") {
     """
-    void START_OMP_PARALLEL_PRAGMA() nogil
-    void END_OMP_PRAGMA() nogil
-    void START_OMP_SINGLE_PRAGMA() nogil
-    void START_OMP_BARRIER_PRAGMA() nogil
+    void START_OMP_PARALLEL_PRAGMA() noexcept nogil
+    void END_OMP_PRAGMA() noexcept nogil
+    void START_OMP_SINGLE_PRAGMA() noexcept nogil
+    void START_OMP_BARRIER_PRAGMA() noexcept nogil
 
 ########################################################################
 
@@ -205,7 +205,7 @@ cdef class Octree:
     #### Private protocol ################################################
 
     @cython.cdivision(True)
-    cdef inline double _get_eps(self, double length, double* xmin) nogil:
+    cdef inline double _get_eps(self, double length, double* xmin) noexcept nogil:
         return (self.machine_eps/length)*fmax(length,
                 fmax(fmax(fabs(xmin[0]), fabs(xmin[1])), fabs(xmin[2])))
 
@@ -240,7 +240,7 @@ cdef class Octree:
 
     cdef inline cOctreeNode* _new_node(self, double* xmin, double length,
             double hmax = 0, int level = 0, cOctreeNode* parent = NULL,
-            int num_particles = 0, bint is_leaf = False) nogil:
+            int num_particles = 0, bint is_leaf = False) noexcept nogil:
         """Create a new cOctreeNode"""
         cdef cOctreeNode* node = <cOctreeNode*> malloc(sizeof(cOctreeNode))
 
@@ -282,7 +282,7 @@ cdef class Octree:
     @cython.cdivision(True)
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
             vector[u_int]* indices, double* xmin, double length,
-            cOctreeNode* node, int level) nogil:
+            cOctreeNode* node, int level) noexcept nogil:
         cdef double* src_x_ptr = pa.x.data
         cdef double* src_y_ptr = pa.y.data
         cdef double* src_z_ptr = pa.z.data
@@ -367,7 +367,7 @@ cdef class Octree:
     @cython.cdivision(True)
     @cython.boundscheck(False) 
     cdef int _c_build_tree_level1(self, NNPSParticleArrayWrapper pa, double* xmin, double length,
-            cOctreeNode* node, int num_threads) nogil:
+            cOctreeNode* node, int num_threads) noexcept nogil:
 
         cdef double* src_x_ptr = pa.x.data
         cdef double* src_y_ptr = pa.y.data
@@ -483,7 +483,7 @@ cdef class Octree:
     @cython.boundscheck(False) 
     cdef int _c_build_tree_bfs(self, NNPSParticleArrayWrapper pa, u_int* p_indices,
              vector[cOctreeNode *]* level_nodes,
-            int level, int num_threads) nogil:
+            int level, int num_threads) noexcept nogil:
         cdef double* src_x_ptr = pa.x.data
         cdef double* src_y_ptr = pa.y.data
         cdef double* src_z_ptr = pa.z.data
@@ -838,7 +838,7 @@ cdef class CompressedOctree(Octree):
     @cython.cdivision(True)
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
             vector[u_int]* indices, double* xmin, double length,
-            cOctreeNode* node, int level) nogil:
+            cOctreeNode* node, int level) noexcept nogil:
 
         cdef double* src_x_ptr = pa.x.data
         cdef double* src_y_ptr = pa.y.data
@@ -948,7 +948,7 @@ cdef class CompressedOctree(Octree):
     @cython.cdivision(True)
     @cython.boundscheck(False)
     cdef int _c_build_tree_level1(self, NNPSParticleArrayWrapper pa, double* xmin, double length,
-            cOctreeNode* node, int num_threads) nogil:
+            cOctreeNode* node, int num_threads) noexcept nogil:
 
         cdef double* src_x_ptr = pa.x.data
         cdef double* src_y_ptr = pa.y.data
@@ -1118,7 +1118,7 @@ cdef class CompressedOctree(Octree):
     @cython.cdivision(True)
     @cython.boundscheck(False)
     cdef int _c_build_tree_bfs(self, NNPSParticleArrayWrapper pa, u_int* p_indices,
-             vector[cOctreeNode *]* level_nodes, int level, int num_threads) nogil:
+             vector[cOctreeNode *]* level_nodes, int level, int num_threads) noexcept nogil:
 
         cdef double* src_x_ptr = pa.x.data
         cdef double* src_y_ptr = pa.y.data
