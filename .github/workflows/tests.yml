@@ -36,6 +36,20 @@ jobs:
           conda install -c conda-forge pocl pyopencl
           python -c 'import pyopencl as cl'
         if: ${{ runner.os != 'Windows' }}
+      - name: Setup compyle config on MacOS to use openmp enabled clang from homebrew
+        run: |
+          brew install libomp
+          mkdir -p ~/.compyle
+          touch ~/.compyle/config.py
+          echo "import os" >> ~/.compyle/config.py
+          echo "os.environ['CC'] = '$(brew --prefix llvm@15)/bin/clang'" >> ~/.compyle/config.py
+          echo "os.environ['CXX'] = '$(brew --prefix llvm@15)/bin/clang++'" >> ~/.compyle/config.py
+          export CPPFLAGS="-I$(brew --prefix libomp)/include -I$(brew --prefix llvm@15)/include -Xclang -fopenmp"
+          export LDFLAGS="-L$(brew --prefix libomp)/lib -L$(brew --prefix llvm@15)/lib -lomp"
+          python -c "import os; OMP_CFLAGS=os.environ.get('CPPFLAGS').split(' '); print(f'{OMP_CFLAGS=}')" >> ~/.compyle/config.py
+          python -c "import os; OMP_LINK=os.environ.get('LDFLAGS').split(' '); print(f'{OMP_LINK=}')" >> ~/.compyle/config.py
+          cat ~/.compyle/config.py
+        if: ${{ runner.os == 'macOS' }}
       - name: Install dependencies
         run: |
           conda info

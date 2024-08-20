@@ -127,7 +127,7 @@ def _get_openmp_flags():
         return ['/openmp'], []
     elif sys.platform == 'darwin':
         if (os.environ.get('CC') is not None and
-           os.environ.get('CXX') is not None):
+            os.environ.get('CXX') is not None):
             return ['-fopenmp'], ['-fopenmp']
         else:
             return ['-Xpreprocessor', '-fopenmp'], ['-lomp']
