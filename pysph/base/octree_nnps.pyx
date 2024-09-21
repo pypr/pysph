@@ -124,7 +124,7 @@ cdef class OctreeNNPS(NNPS):
             return
 
         if node.is_leaf:
-            for i from 0<=i<node.num_particles:
+            for i in range(node.num_particles):
                 k = self.current_pids[node.start_index + i]
                 hj2 = self.radius_scale2*src_h_ptr[k]*src_h_ptr[k]
                 xij2 = norm2(
@@ -136,7 +136,7 @@ cdef class OctreeNNPS(NNPS):
                     nbrs.c_append(k)
             return
 
-        for i from 0<=i<8:
+        for i in range(8):
             if node.children[i] == NULL:
                 continue
             self._get_neighbors(q_x, q_y, q_z, q_h,
@@ -149,12 +149,12 @@ cdef class OctreeNNPS(NNPS):
         cdef u_int* current_pids = (<Octree>self.tree[pa_index]).pids
 
         cdef int i
-        for i from 0<=i<num_particles:
+        for i in range(num_particles):
             indices.c_append(<long>current_pids[i])
 
     cpdef _refresh(self):
         cdef int i
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             (<Octree>self.tree[i]).c_build_tree(self.pa_wrappers[i], self.tree[i].test_parallel)
         self.current_tree = (<Octree>self.tree[self.src_index]).root
         self.current_pids = (<Octree>self.tree[self.src_index]).pids
@@ -221,7 +221,7 @@ cdef class CompressedOctreeNNPS(OctreeNNPS):
 
     cpdef _refresh(self):
         cdef int i
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             (<CompressedOctree>self.tree[i]).c_build_tree(self.pa_wrappers[i],
                                                           self.tree[i].test_parallel)
         self.current_tree = (<CompressedOctree>self.tree[self.src_index]).root
