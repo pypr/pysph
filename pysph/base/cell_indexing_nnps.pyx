@@ -52,7 +52,7 @@ cdef class CellIndexingNNPS(NNPS):
         cdef NNPSParticleArrayWrapper pa_wrapper
         cdef int i, num_particles
 
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             pa_wrapper = <NNPSParticleArrayWrapper> self.pa_wrappers[i]
             num_particles = pa_wrapper.get_number_of_particles()
 
@@ -80,7 +80,7 @@ cdef class CellIndexingNNPS(NNPS):
 
     def __dealloc__(self):
         cdef int i
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             free(self.keys[i])
             del self.key_indices[i]
         free(self.keys)
@@ -152,16 +152,16 @@ cdef class CellIndexingNNPS(NNPS):
 
         cdef map[u_int, pair[u_int, u_int]].iterator it
 
-        cdef int x_boxes[27]
-        cdef int y_boxes[27]
-        cdef int z_boxes[27]
+        cdef int [27]x_boxes
+        cdef int [27]y_boxes
+        cdef int [27]z_boxes
         cdef int num_boxes = self._neighbor_boxes(c_x, c_y, c_z,
                 x_boxes, y_boxes, z_boxes)
 
         cdef pair[u_int, u_int] candidate
 
         cdef u_int n, idx
-        for i from 0<=i<num_boxes:
+        for i in range(num_boxes):
             it = self.current_indices.find(self._get_key(0, x_boxes[i], y_boxes[i],
                 z_boxes[i], self.src_index))
             if it == self.current_indices.end():
@@ -170,7 +170,7 @@ cdef class CellIndexingNNPS(NNPS):
             n = candidate.first
             candidate_length = candidate.second
 
-            for j from 0<=j<candidate_length:
+            for j in range(candidate_length):
                 idx = self._get_id(self.current_keys[n+j], self.src_index)
 
                 hj2 = self.radius_scale2*src_h_ptr[idx]*src_h_ptr[idx]
@@ -226,7 +226,7 @@ cdef class CellIndexingNNPS(NNPS):
         cdef u_int* current_keys = self.keys[pa_index]
 
         cdef int j
-        for j from 0<=j<num_particles:
+        for j in range(num_particles):
             indices.c_append(<long>self._get_id(current_keys[j], pa_index))
 
 
@@ -240,7 +240,7 @@ cdef class CellIndexingNNPS(NNPS):
 
         cdef int i, n
         cdef int c_x, c_y, c_z
-        for i from 0<=i<indices.length:
+        for i in range(indices.length):
             n = indices.data[i]
             find_cell_id_raw(
                     x_ptr[i] - xmin[0],
@@ -267,7 +267,7 @@ cdef class CellIndexingNNPS(NNPS):
 
         cdef u_int length = 0
 
-        for i from 0<i<indices.length:
+        for i in range(1, indices.length):
             id_x = self._get_x(current_keys[i], pa_index)
             id_y = self._get_y(current_keys[i], pa_index)
             id_z = self._get_z(current_keys[i], pa_index)
@@ -321,9 +321,9 @@ cdef class CellIndexingNNPS(NNPS):
             int* x, int* y, int* z) noexcept nogil:
         cdef int length = 0
         cdef int p, q, r
-        for p from -1<=p<2:
-            for q from -1<=q<2:
-                for r from -1<=r<2:
+        for p in range(-1, 2):
+            for q in range(-1, 2):
+                for r in range(-1, 2):
                     if i+r>=0 and j+q>=0 and k+p>=0:
                         x[length] = i+r
                         y[length] = j+q
@@ -343,7 +343,7 @@ cdef class CellIndexingNNPS(NNPS):
         self.J = <u_int> (1 + log2(ceil((xmax[0] - xmin[0])/self.cell_size)))
         self.K = <u_int> (1 + log2(ceil((xmax[1] - xmin[1])/self.cell_size)))
 
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             free(self.keys[i])
             del self.key_indices[i]
 
