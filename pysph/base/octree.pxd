@@ -77,8 +77,8 @@ cdef class Octree:
     cdef public bint test_parallel
     cdef double machine_eps
 
-    cdef double xmin[3]
-    cdef double xmax[3]
+    cdef double [3]xmin
+    cdef double [3]xmax
 
     ##########################################################################
     # Member functions
