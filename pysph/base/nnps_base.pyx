@@ -522,7 +522,7 @@ cdef class CPUDomainManager(DomainManagerBase):
 
         # mirror domain values
         cdef double xmin = self.xmin, xmax = self.xmax
-        cdef double ymin = self.ymin, ymax = self.ymax,
+        cdef double ymin = self.ymin, ymax = self.ymax
         cdef double zmin = self.zmin, zmax = self.zmax
 
         # mirror boundary condition flags
@@ -768,7 +768,7 @@ cdef class CPUDomainManager(DomainManagerBase):
 
         # periodic domain values
         cdef double xmin = self.xmin, xmax = self.xmax
-        cdef double ymin = self.ymin, ymax = self.ymax,
+        cdef double ymin = self.ymin, ymax = self.ymax
         cdef double zmin = self.zmin, zmax = self.zmax
 
         cdef double xtranslate = self.xtranslate
