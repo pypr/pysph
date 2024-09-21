@@ -24,7 +24,7 @@ cdef extern from "spatial_hash.h":
     cdef cppclass HashTable:
         long long int table_size
 
-        HashTable(long long int) nogil except +
+        HashTable(long long int) except + nogil 
         void add(int, int, int, int, double) noexcept nogil
         HashEntry* get(int, int, int) noexcept nogil
         int number_of_particles() noexcept nogil
