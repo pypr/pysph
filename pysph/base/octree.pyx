@@ -30,6 +30,13 @@ cdef extern from *:
     void START_OMP_SINGLE_PRAGMA() noexcept nogil
     void START_OMP_BARRIER_PRAGMA() noexcept nogil
 
+try:
+    from .omp_threads import get_number_of_threads
+    from .omp_threads import set_number_of_threads
+except ImportError:
+    from .no_omp_threads import get_number_of_threads
+    from .no_omp_threads import set_number_of_threads
+
 ########################################################################
 
 cdef class OctreeNode:

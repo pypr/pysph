@@ -1,6 +1,5 @@
 from pysph.base.nnps_base import get_number_of_threads, py_flatten, \
         py_unflatten, py_get_valid_cell_index
-
 from pysph.base.nnps_base import NNPSParticleArrayWrapper, CPUDomainManager, \
         DomainManager, Cell, NeighborCache, NNPSBase, NNPS
 from pysph.base.linked_list_nnps import LinkedListNNPS

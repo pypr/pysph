@@ -136,8 +136,6 @@ cdef cIntPoint find_cell_id(cPoint pnt, double cell_size)
 
 cpdef UIntArray arange_uint(int start, int stop=*)
 
-cpdef int get_number_of_threads()
-
 # Basic particle array wrapper used for NNPS
 cdef class NNPSParticleArrayWrapper:
     cdef public DoubleArray x,y,z,h

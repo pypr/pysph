@@ -30,23 +30,6 @@ from compyle.array import get_backend, Array
 from compyle.parallel import Elementwise
 from compyle.types import annotate
 
-
-IF OPENMP:
-    cimport openmp
-    cpdef int get_number_of_threads():
-        cdef int i, n
-        with nogil, parallel():
-            for i in prange(1):
-                n = openmp.omp_get_num_threads()
-        return n
-    cpdef set_number_of_threads(int n):
-        openmp.omp_set_num_threads(n)
-ELSE:
-    cpdef int get_number_of_threads():
-        return 1
-    cpdef set_number_of_threads(int n):
-        print("OpenMP not available, cannot set number of threads.")
-
 # Particle Tag information
 from cyarray.carray cimport BaseArray, aligned_malloc, aligned_free
 from .utils import ParticleTAGS
@@ -57,6 +40,12 @@ cdef int Ghost = ParticleTAGS.Ghost
 
 ctypedef pair[unsigned int, unsigned int] id_gid_pair_t
 
+try:
+    from .omp_threads import get_number_of_threads
+    from .omp_threads import set_number_of_threads
+except ImportError:
+    from .no_omp_threads import get_number_of_threads
+    from .no_omp_threads import set_number_of_threads
 
 cdef inline bint _compare_gids(id_gid_pair_t x, id_gid_pair_t y) noexcept nogil:
     return y.second > x.second

@@ -335,7 +335,30 @@ def get_basic_extensions():
     include_dirs += base_includes
     openmp_compile_args, openmp_link_args, openmp_env = get_openmp_flags()
 
-    ext_modules = [
+    ext_modules = []
+    if openmp_env:
+        ext_modules.append(
+            Extension(
+                name="pysph.base.omp_threads",
+                sources=["pysph/base/omp_threads.pyx"],
+                include_dirs=include_dirs,
+                extra_compile_args=extra_compile_args + openmp_compile_args,
+                extra_link_args=openmp_link_args,
+                language="c++",
+                define_macros=MACROS,
+            )
+        )
+
+    ext_modules.extend([
+        Extension(
+            name="pysph.base.no_omp_threads",
+            sources=["pysph/base/no_omp_threads.pyx"],
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args,
+            language="c++",
+            define_macros=MACROS,
+        ),
+
         Extension(
             name="pysph.base.particle_array",
             sources=["pysph/base/particle_array.pyx"],
@@ -511,8 +534,7 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args,
             define_macros=MACROS,
         ),
-
-    ]
+    ])
 
     # OpenCL related modules
     ext_modules.extend((
