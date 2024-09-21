@@ -12,7 +12,7 @@ cdef extern from "spatial_hash.h":
         vector[unsigned int] *get_indices() noexcept nogil
 
     cdef cppclass HashTable:
-        HashTable(long long int) nogil except +
+        HashTable(long long int) except + nogil 
         void add(int, int, int, int, double) noexcept nogil
         HashEntry* get(int, int, int) noexcept nogil
 

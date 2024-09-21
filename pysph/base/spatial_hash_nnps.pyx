@@ -47,14 +47,14 @@ cdef class SpatialHashNNPS(NNPS):
         self.hashtable = <HashTable**> malloc(narrays*sizeof(HashTable*))
 
         cdef int i
-        for i from 0<=i<narrays:
+        for i in range(narrays):
             self.hashtable[i] = new HashTable(table_size)
 
         self.current_hash = NULL
 
     def __dealloc__(self):
         cdef int i
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             del self.hashtable[i]
         free(self.hashtable)
 
@@ -120,9 +120,9 @@ cdef class SpatialHashNNPS(NNPS):
                 )
         cdef int candidate_size = 0
 
-        cdef int x_boxes[27]
-        cdef int y_boxes[27]
-        cdef int z_boxes[27]
+        cdef int [27]x_boxes
+        cdef int [27]y_boxes
+        cdef int [27]z_boxes
         cdef int num_boxes = self._neighbor_boxes(c_x, c_y, c_z,
                 x_boxes, y_boxes, z_boxes)
 
@@ -130,13 +130,13 @@ cdef class SpatialHashNNPS(NNPS):
         cdef double hi2 = self.radius_scale2*h*h
         cdef double hj2 = 0
 
-        for i from 0<=i<num_boxes:
+        for i in range(num_boxes):
             candidate_cell = self.current_hash.get(x_boxes[i], y_boxes[i], z_boxes[i])
             if candidate_cell == NULL:
                 continue
             candidates = candidate_cell.get_indices()
             candidate_size = candidates.size()
-            for j from 0<=j<candidate_size:
+            for j in range(candidate_size):
                 k = (candidates[0])[j]
                 hj2 = self.radius_scale2*src_h_ptr[k]*src_h_ptr[k]
                 xij2 = norm2(
@@ -163,9 +163,9 @@ cdef class SpatialHashNNPS(NNPS):
             int* x, int* y, int* z) noexcept nogil:
         cdef int length = 0
         cdef int p, q, r
-        for p from -1<=p<2:
-            for q from -1<=q<2:
-                for r from -1<=r<2:
+        for p in range(-1, 2):
+            for q in range(-1, 2):
+                for r in range(-1, 2):
                     if i+p>=0 and j+q>=0 and k+r>=0:
                         x[length] = i+p
                         y[length] = j+q
@@ -175,7 +175,7 @@ cdef class SpatialHashNNPS(NNPS):
 
     cpdef _refresh(self):
         cdef int i
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             del self.hashtable[i]
             self.hashtable[i] = new HashTable(self.table_size)
         self.current_hash = self.hashtable[self.src_index]
@@ -195,7 +195,7 @@ cdef class SpatialHashNNPS(NNPS):
         cdef unsigned int i
         cdef unsigned int idx
 
-        for i from 0<=i<num_indices:
+        for i in range(num_indices):
             idx = indices.data[i]
             find_cell_id_raw(
                     src_x_ptr[idx] - xmin[0],
@@ -253,14 +253,14 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
         self.hashtable = <HashTable**> malloc(narrays*sizeof(HashTable*))
 
         cdef int i
-        for i from 0<=i<narrays:
+        for i in range(narrays):
             self.hashtable[i] = new HashTable(table_size)
 
         self.current_hash = NULL
 
     def __dealloc__(self):
         cdef int i
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             del self.hashtable[i]
         free(self.hashtable)
 
@@ -339,13 +339,13 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
         cdef double hi2 = self.radius_scale2*h*h
         cdef double hj2 = 0
 
-        for i from 0<=i<num_boxes:
+        for i in range(num_boxes):
             candidate_cell = self.current_hash.get(x_boxes[i], y_boxes[i], z_boxes[i])
             if candidate_cell == NULL:
                 continue
             candidates = candidate_cell.get_indices()
             candidate_size = candidates.size()
-            for j from 0<=j<candidate_size:
+            for j in range(candidate_size):
                 k = (candidates[0])[j]
                 hj2 = self.radius_scale2*src_h_ptr[k]*src_h_ptr[k]
                 xij2 = norm2(
@@ -376,9 +376,9 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
         cdef int length = 0
         cdef int s, t, u
 
-        for s from -self.H<=s<=self.H:
-            for t from -self.H<=t<=self.H:
-                for u from -self.H<=u<=self.H:
+        for s in range(-self.H, self.H+1):
+            for t in range(-self.H, self.H+1):
+                for u in range(-self.H, self.H+1):
                     if norm2(self.h_sub*s, self.h_sub*t, self.h_sub*u) \
                         <= self.cell_size*self.cell_size:
                             x[length] = s
@@ -392,9 +392,9 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
         cdef int length = 0
         cdef int s, t, u
 
-        for s from -self.H<=s<=self.H:
-            for t from -self.H<=t<=self.H:
-                for u from -self.H<=u<=self.H:
+        for s in range(-self.H, self.H+1):
+            for t in range(-self.H, self.H+1):
+                for u in range(-self.H, self.H+1):
 
                     x[length] = s
                     y[length] = t
@@ -426,7 +426,7 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
         else:
             mask_len = self._h_mask_exact(x_mask, y_mask, z_mask)
 
-        for p from 0<=p<mask_len:
+        for p in range(mask_len):
             x_temp = i + x_mask[p]
             y_temp = j + y_mask[p]
             z_temp = k + z_mask[p]
@@ -454,7 +454,7 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
 
     cpdef _refresh(self):
         cdef int i
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             del self.hashtable[i]
             self.hashtable[i] = new HashTable(self.table_size)
         self.current_hash = self.hashtable[self.src_index]
@@ -477,7 +477,7 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
 
         self.h_sub = self.cell_size/self.H
 
-        for i from 0<=i<num_indices:
+        for i in range(num_indices):
             idx = indices.data[i]
             find_cell_id_raw(
                     src_x_ptr[idx] - xmin[0],
