@@ -37,7 +37,7 @@ class TestSerialReduceArray(TestCase):
         x = np.array([1.0, 2.0])
         expect = x
         result = dummy_reduce_array(x, 'min')
-        self.assertTrue(np.alltrue(result == expect))
+        self.assertTrue(np.all(result == expect))
 
 
 if __name__ == '__main__':
