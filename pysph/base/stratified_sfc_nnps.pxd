@@ -21,12 +21,12 @@ cdef extern from 'math.h':
 cdef extern from "z_order.h":
     ctypedef unsigned int uint32_t
     ctypedef unsigned long long uint64_t
-    inline uint64_t get_key(uint64_t i, uint64_t j, uint64_t k) nogil
+    uint64_t get_key(uint64_t i, uint64_t j, uint64_t k) nogil
 
     cdef cppclass CompareSortWrapper:
-        CompareSortWrapper() nogil except +
+        CompareSortWrapper() except + 
         CompareSortWrapper(uint32_t* current_pids, uint64_t* current_keys,
-                int length) nogil except +
+                int length) except + nogil 
         inline void compare_sort() noexcept nogil
 
 cdef class StratifiedSFCNNPS(NNPS):
