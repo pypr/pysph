@@ -66,7 +66,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.cids = []
         self.cid_to_idx = []
 
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
             num_particles = pa_wrapper.get_number_of_particles()
 
@@ -180,7 +180,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.max_cid = []
         self.sorted = False
 
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
             num_particles = pa_wrapper.get_number_of_particles()
 
