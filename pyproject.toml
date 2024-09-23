@@ -5,7 +5,7 @@ requires = [
     "compyle>=0.8",
     "cyarray",
     "mako",
-    "oldest-supported-numpy",
+    "numpy>=2.0,<3",
     "pytools",
     "setuptools>=42.0.0",
     "wheel>=0.29.0",
