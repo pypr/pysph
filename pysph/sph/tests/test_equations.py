@@ -61,8 +61,8 @@ class TestBasicCodeBlock(TestBase):
         self.assertEqual(ctx.s_idx, 0)
         self.assertEqual(ctx.d_idx, 0)
         x = numpy.zeros(2, dtype=float)
-        self.assertTrue(numpy.alltrue(ctx.d_x == x))
-        self.assertTrue(numpy.alltrue(ctx.s_x == x))
+        self.assertTrue(numpy.all(ctx.d_x == x))
+        self.assertTrue(numpy.all(ctx.s_x == x))
 
     def test_that_code_block_is_callable(self):
         code = '''
