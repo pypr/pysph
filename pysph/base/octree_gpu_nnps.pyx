@@ -1,4 +1,7 @@
-#cython: embedsignature=True
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
+# distutils: define_macros=NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
+
 import numpy as np
 cimport numpy as np
 from pysph.base.tree.point_tree import PointTree

@@ -1,4 +1,5 @@
 #cython: boundscheck=False
+# distutils: define_macros=NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
 
 #
 # Eigen decomposition code for symmetric 3x3 matrices, some code taken
