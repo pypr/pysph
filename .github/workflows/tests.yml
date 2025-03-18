@@ -30,11 +30,12 @@ jobs:
         with:
           auto-update-conda: true
           python-version: ${{ matrix.python-version }}
-          channels: conda-forge
+          channels: defaults, conda-forge
+          channel-priority: flexible
       - name: Install dependencies on Linux/MacOS
         run: |
           conda info
-          conda install -c conda-forge pocl pyopencl
+          conda install pocl pyopencl
           python -c 'import pyopencl as cl'
         if: ${{ runner.os != 'Windows' }}
       - name: Setup compyle config on MacOS to use openmp enabled clang from homebrew
@@ -54,7 +55,7 @@ jobs:
       - name: Install dependencies
         run: |
           conda info
-          conda install -c conda-forge numpy cython h5py
+          conda install numpy cython h5py
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install https://github.com/pypr/cyarray/zipball/master
           python -m pip install https://github.com/pypr/compyle/zipball/master
