@@ -66,14 +66,14 @@ jobs:
       # Thanks https://stackoverflow.com/a/60942437
       - name: Get month to use as cache key.
         id: month
-        run: echo "month==$(date +'%m')" >> $GITHUB_OUTPUT
+        run: echo "month=$(date +'%m')" >> $GITHUB_OUTPUT
       - name: Deal with auto-generated code cache
         uses: actions/cache@v4
         with:
           path: |
             ~/.pysph
             ~/.compyle
-          key: ${{ runner.os }}-${{ steps.month.outputs.month }}
+          key: ${{ runner.os }}-${{ steps.month.outputs.month }}-${{ matrix.python-version }}
       - name: Run tests
         run: |
           python -m pytest -v -m 'not slow or slow'
