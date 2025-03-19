@@ -1,11 +1,11 @@
 [build-system]
 requires = [
     "Beaker",
-    "Cython<3.0",
+    "Cython>=0.20",
     "compyle>=0.8",
     "cyarray",
     "mako",
-    "oldest-supported-numpy",
+    "numpy>=2.0,<3",
     "pytools",
     "setuptools>=42.0.0",
     "wheel>=0.29.0",

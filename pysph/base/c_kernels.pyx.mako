@@ -1,7 +1,7 @@
 # cython: embedsignature=True, language_level=3
 # distutils: language=c++
 <%
-from compyle.api import CythonGenerator
+from compyle.api import CythonGenerator, use_config
 from kernels import (
     CubicSpline, WendlandQuintic, Gaussian, QuinticSpline, SuperGaussian,
     WendlandQuinticC4, WendlandQuinticC6, WendlandQuinticC2_1D,
@@ -12,7 +12,8 @@ CLASSES = (
     WendlandQuinticC4, WendlandQuinticC6, WendlandQuinticC2_1D,
     WendlandQuinticC4_1D, WendlandQuinticC6_1D
 )
-generator = CythonGenerator(python_methods=True)
+with use_config(use_openmp=True):
+    generator = CythonGenerator(python_methods=True)
 %>
 
 from libc.math cimport *

@@ -1,4 +1,8 @@
+# cython: language_level=3, embedsignature=True
+# distutils: define_macros=NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
+
 from pysph.base.particle_array import ParticleArray
+
 from pysph.base import nnps
 from pysph.tools.geometry import remove_repeated_points
 import numpy as np

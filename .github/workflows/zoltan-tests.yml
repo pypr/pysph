@@ -40,12 +40,12 @@ jobs:
       - name: Install dependencies
         run: |
           conda info
-          conda install -c conda-forge numpy 'cython<3.0'
+          conda install -c conda-forge numpy cython
           python -m pip install --upgrade pip setuptools wheel
-          python -m pip install mpi4py
+          python -m pip install "mpi4py<4.0"
           python -m pip install https://github.com/pypr/cyarray/zipball/master
-          python -m pip install --no-build-isolation https://github.com/pypr/pyzoltan/zipball/master
           python -m pip install https://github.com/pypr/compyle/zipball/master
+          python -m pip install --no-build-isolation https://github.com/pypr/pyzoltan/zipball/master
           python -m pip install -r requirements.txt
           python -m pip install -r requirements-test.txt
           python setup.py develop
@@ -53,14 +53,14 @@ jobs:
       # Thanks https://stackoverflow.com/a/60942437
       - name: Get month to use as cache key.
         id: month
-        run: echo "month==$(date +'%m')" >> $GITHUB_OUTPUT
+        run: echo "month=$(date +'%m')" >> $GITHUB_OUTPUT
       - name: Deal with auto-generated code cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.pysph
             ~/.compyle
-          key: zoltan-${{ steps.month.outputs.month }}
+          key: zoltan-${{ runner.os }}-${{ steps.month.outputs.month }}-${{ matrix.python-version }}
       - name: Run tests
         run: |
           python -m pytest -v -m 'slow or parallel'

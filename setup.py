@@ -152,6 +152,7 @@ def get_openmp_flags():
     import shutil
     import tempfile
     test_code = dedent("""
+    # cython: language_level=3, distutils: language=c++
     from cython.parallel import parallel, prange, threadid
     cimport openmp
     def n_threads():
@@ -334,13 +335,35 @@ def get_basic_extensions():
     include_dirs += base_includes
     openmp_compile_args, openmp_link_args, openmp_env = get_openmp_flags()
 
-    ext_modules = [
+    ext_modules = []
+    if openmp_env:
+        ext_modules.append(
+            Extension(
+                name="pysph.base.omp_threads",
+                sources=["pysph/base/omp_threads.pyx"],
+                include_dirs=include_dirs,
+                extra_compile_args=extra_compile_args + openmp_compile_args,
+                extra_link_args=openmp_link_args,
+                language="c++",
+                define_macros=MACROS,
+            )
+        )
+
+    ext_modules.extend([
+        Extension(
+            name="pysph.base.no_omp_threads",
+            sources=["pysph/base/no_omp_threads.pyx"],
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args,
+            language="c++",
+            define_macros=MACROS,
+        ),
+
         Extension(
             name="pysph.base.particle_array",
             sources=["pysph/base/particle_array.pyx"],
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args,
-            language="c++",
             define_macros=MACROS,
         ),
 
@@ -349,7 +372,6 @@ def get_basic_extensions():
             sources=["pysph/base/point.pyx"],
             extra_compile_args=extra_compile_args,
             include_dirs=include_dirs,
-            language="c++",
             define_macros=MACROS,
         ),
 
@@ -364,7 +386,6 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++",
             define_macros=MACROS,
         ),
 
@@ -379,7 +400,6 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++",
             define_macros=MACROS,
         ),
 
@@ -393,7 +413,6 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++",
             define_macros=MACROS,
         ),
 
@@ -407,7 +426,6 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++",
             define_macros=MACROS,
         ),
 
@@ -421,7 +439,6 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++",
             define_macros=MACROS,
         ),
 
@@ -436,7 +453,6 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++",
             define_macros=MACROS,
         ),
 
@@ -450,7 +466,6 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++",
             define_macros=MACROS,
         ),
 
@@ -464,7 +479,6 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++",
             define_macros=MACROS,
         ),
 
@@ -478,7 +492,6 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++",
             define_macros=MACROS,
         ),
 
@@ -492,7 +505,6 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++",
             define_macros=MACROS,
         ),
 
@@ -502,7 +514,6 @@ def get_basic_extensions():
             sources=["pysph/base/c_kernels.pyx"],
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args,
-            language="c++",
             define_macros=MACROS,
         ),
 
@@ -512,7 +523,6 @@ def get_basic_extensions():
             sources=["pysph/base/linalg3.pyx"],
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args,
-            language="c++",
             define_macros=MACROS,
         ),
 
@@ -522,11 +532,9 @@ def get_basic_extensions():
             sources=["pysph/tools/mesh_tools.pyx"],
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args,
-            language="c++",
             define_macros=MACROS,
         ),
-
-    ]
+    ])
 
     # OpenCL related modules
     ext_modules.extend((
@@ -541,7 +549,6 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++",
             define_macros=MACROS,
         ),
 
@@ -555,7 +562,6 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++",
             define_macros=MACROS,
         ),
         Extension(
@@ -568,7 +574,6 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++",
             define_macros=MACROS,
         ),
         Extension(
@@ -581,7 +586,6 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++",
             define_macros=MACROS,
         ))
     )
@@ -635,7 +639,6 @@ def get_parallel_extensions():
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args + extra_compile_args,
             cython_compile_time_env=cython_compile_time_env,
-            language="c++",
             define_macros=MACROS,
         ),
     ]
@@ -681,7 +684,7 @@ def setup_package():
 
     # The requirements.
     install_requires = [
-        'numpy', 'mako', 'cyarray', 'compyle>=0.8', 'Cython<3.0',
+        'numpy', 'mako', 'cyarray', 'compyle>=0.8', 'Cython>=0.20',
         'setuptools>=42.0.0', 'pytools', 'Beaker'
     ]
     tests_require = ['pytest>=3.0', 'h5py', 'vtk']
@@ -723,7 +726,6 @@ def setup_package():
         ext_modules = cythonize(
             ext_modules, compile_time_env=compile_env,
             include_path=list(include_path),
-            language="c++",
             compiler_directives=COMPILER_DIRECTIVES,
         )
 

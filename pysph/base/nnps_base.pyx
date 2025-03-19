@@ -1,5 +1,7 @@
 # cython: language_level=3, embedsignature=True
 # distutils: language=c++
+# distutils: define_macros=NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
+
 # Library imports.
 import numpy as np
 cimport numpy as np
@@ -30,23 +32,6 @@ from compyle.array import get_backend, Array
 from compyle.parallel import Elementwise
 from compyle.types import annotate
 
-
-IF OPENMP:
-    cimport openmp
-    cpdef int get_number_of_threads():
-        cdef int i, n
-        with nogil, parallel():
-            for i in prange(1):
-                n = openmp.omp_get_num_threads()
-        return n
-    cpdef set_number_of_threads(int n):
-        openmp.omp_set_num_threads(n)
-ELSE:
-    cpdef int get_number_of_threads():
-        return 1
-    cpdef set_number_of_threads(int n):
-        print("OpenMP not available, cannot set number of threads.")
-
 # Particle Tag information
 from cyarray.carray cimport BaseArray, aligned_malloc, aligned_free
 from .utils import ParticleTAGS
@@ -57,8 +42,14 @@ cdef int Ghost = ParticleTAGS.Ghost
 
 ctypedef pair[unsigned int, unsigned int] id_gid_pair_t
 
+try:
+    from .omp_threads import get_number_of_threads
+    from .omp_threads import set_number_of_threads
+except ImportError:
+    from .no_omp_threads import get_number_of_threads
+    from .no_omp_threads import set_number_of_threads
 
-cdef inline bint _compare_gids(id_gid_pair_t x, id_gid_pair_t y) nogil:
+cdef inline bint _compare_gids(id_gid_pair_t x, id_gid_pair_t y) noexcept nogil:
     return y.second > x.second
 
 def py_flatten(IntPoint cid, IntArray ncells_per_dim, int dim):
@@ -533,7 +524,7 @@ cdef class CPUDomainManager(DomainManagerBase):
 
         # mirror domain values
         cdef double xmin = self.xmin, xmax = self.xmax
-        cdef double ymin = self.ymin, ymax = self.ymax,
+        cdef double ymin = self.ymin, ymax = self.ymax
         cdef double zmin = self.zmin, zmax = self.zmax
 
         # mirror boundary condition flags
@@ -779,7 +770,7 @@ cdef class CPUDomainManager(DomainManagerBase):
 
         # periodic domain values
         cdef double xmin = self.xmin, xmax = self.xmax
-        cdef double ymin = self.ymin, ymax = self.ymax,
+        cdef double ymin = self.ymin, ymax = self.ymax
         cdef double zmin = self.zmin, zmax = self.zmax
 
         cdef double xtranslate = self.xtranslate
@@ -1193,7 +1184,7 @@ cdef class NeighborCache:
 
     #### Public protocol ################################################
 
-    cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs) nogil:
+    cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs) noexcept nogil:
         if self._cached.data[d_idx] == 0:
             self._find_neighbors(d_idx)
         cdef size_t start, end, tid
@@ -1253,7 +1244,7 @@ cdef class NeighborCache:
         if total > 0 and np > 0:
             self._last_avg_nbr_size = int(total/np) + 1
 
-    cdef void _find_neighbors(self, long d_idx) nogil:
+    cdef void _find_neighbors(self, long d_idx) noexcept nogil:
         cdef int thread_id = threadid()
         self._pid_to_tid.data[d_idx] = thread_id
         self._start_stop.data[d_idx*2] = \
@@ -1402,7 +1393,7 @@ cdef class NNPSBase:
 
         self.find_nearest_neighbors(d_idx, nbrs)
 
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil:
         # Implement this in the subclass to actually do something useful.
         pass
 
@@ -1518,7 +1509,7 @@ cdef class NNPS(NNPSBase):
             for cache in self.cache:
                 cache.update()
 
-    cdef void get_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+    cdef void get_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil:
         if self.use_cache:
             self.current_cache.get_neighbors_raw(d_idx, nbrs)
         else:
@@ -1584,7 +1575,7 @@ cdef class NNPS(NNPSBase):
         self.xmax.set_data(np.asarray([xmax, ymax, zmax]))
 
     cdef void _sort_neighbors(self, unsigned int* nbrs, size_t length,
-                              unsigned int *gids) nogil:
+                              unsigned int *gids) noexcept nogil:
         if length == 0:
             return
         cdef id_gid_pair_t _entry

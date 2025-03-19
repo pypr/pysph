@@ -1,4 +1,5 @@
 #cython: boundscheck=False
+# distutils: define_macros=NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
 
 #
 # Eigen decomposition code for symmetric 3x3 matrices, some code taken
@@ -20,17 +21,17 @@ cdef enum:
 
 cdef double EPS = numpy.finfo(float).eps
 
-cdef inline double MAX(double a, double b) nogil:
+cdef inline double MAX(double a, double b) noexcept nogil:
     return a if a>b else b
 
-cdef inline double SQR(double a) nogil:
+cdef inline double SQR(double a) noexcept nogil:
     return a*a
 
-cdef inline double hypot2(double x, double y) nogil:
+cdef inline double hypot2(double x, double y) noexcept nogil:
     return sqrt(x*x+y*y)
 
 
-cdef double det(double a[3][3]) nogil:
+cdef double det(double [3][3]a) noexcept nogil:
     '''Determinant of symmetrix matrix
     '''
     return (a[0][0]*a[1][1]*a[2][2] + 2*a[1][2]*a[0][2]*a[0][1] -
@@ -46,12 +47,12 @@ cpdef double py_det(double[:,:] m):
 # d:11,22,33; s:23,13,12
 # d:00,11,22; s:12,02,01
 
-cdef void get_eigenvalues(double a[3][3], double *result) nogil:
+cdef void get_eigenvalues(double [3][3]a, double *result) noexcept nogil:
     '''Compute the eigenvalues of symmetric matrix a and return in
     result array.
     '''
     cdef double m = (a[0][0]+ a[1][1]+a[2][2])/3.0
-    cdef double K[3][3]
+    cdef double [3][3]K
     memcpy(&K[0][0], &a[0][0], sizeof(double)*9)
     K[0][0], K[1][1], K[2][2] = a[0][0] - m, a[1][1] - m, a[2][2] - m
     cdef double q = det(K)*0.5
@@ -89,7 +90,7 @@ cpdef py_get_eigenvalues(double[:,:] m):
 
 
 ##############################################################################
-cdef void get_eigenvector_np(double A[n][n], double r, double *res):
+cdef void get_eigenvector_np(double [n][n]A, double r, double *res):
     ''' eigenvector of symmetric matrix for given eigenvalue `r` using numpy
     '''
     cdef numpy.ndarray[ndim=2, dtype=numpy.float64_t] mat=numpy.empty((3,3)), evec
@@ -109,7 +110,7 @@ cdef void get_eigenvector_np(double A[n][n], double r, double *res):
     for i in range(3):
         res[i] = evec[idx,i]
 
-cdef void get_eigenvector(double A[n][n], double r, double *res):
+cdef void get_eigenvector(double [n][n]A, double r, double *res):
     ''' get eigenvector of symmetric 3x3 matrix for given eigenvalue `r`
 
     uses a fast method to get eigenvectors with a fallback to using numpy
@@ -134,22 +135,22 @@ cpdef py_get_eigenvector(double[:,:] A, double r):
     get_eigenvector(<double(*)[n]>&A[0,0], r, &_d[0])
     return d
 
-cdef void get_eigenvec_from_val(double A[n][n], double *R, double *e):
+cdef void get_eigenvec_from_val(double [n][n]A, double *R, double *e):
     cdef int i, j
-    cdef double res[3]
+    cdef double [3]res
     for i in range(3):
         get_eigenvector(A, e[i], &res[0])
         for j in range(3):
             R[j*3+i] = res[j]
 
 
-cdef bint _nearly_diagonal(double A[n][n]) nogil:
+cdef bint _nearly_diagonal(double [n][n]A) noexcept nogil:
     return (
         (SQR(A[0][0]) + SQR(A[1][1]) + SQR(A[2][2])) >
         1e8*(SQR(A[0][1]) + SQR(A[0][2]) + SQR(A[1][2]))
     )
 
-cdef void get_eigenvalvec(double A[n][n], double *R, double *e):
+cdef void get_eigenvalvec(double [n][n]A, double *R, double *e):
     '''Get the eigenvalues and eigenvectors of symmetric 3x3 matrix.
 
     A is the input 3x3 matrix.
@@ -194,7 +195,7 @@ def py_get_eigenvalvec(double[:,:] A):
 
 ##############################################################################
 
-cdef void transform(double A[3][3], double P[3][3], double res[3][3]) nogil:
+cdef void transform(double [3][3]A, double [3][3]P, double [3][3]res) noexcept nogil:
     '''Compute the transformation P.T*A*P and add it into res.
     '''
     cdef int i, j, k, l
@@ -204,8 +205,8 @@ cdef void transform(double A[3][3], double P[3][3], double res[3][3]) nogil:
                 for l in range(3):
                     res[i][j] += P[k][i]*A[k][l]*P[l][j] # P.T*A*P
 
-cdef void transform_diag(double *A, double P[3][3],
-                         double res[3][3]) nogil:
+cdef void transform_diag(double *A, double [3][3]P,
+                         double [3][3]res) noexcept nogil:
     '''Compute the transformation P.T*A*P and add it into res.
 
     A is diagonal and contains the diagonal entries alone.
@@ -216,8 +217,8 @@ cdef void transform_diag(double *A, double P[3][3],
             for k in range(3):
                 res[i][j] += P[k][i]*A[k]*P[k][j] # P.T*A*P
 
-cdef void transform_diag_inv(double *A, double P[3][3],
-                             double res[3][3]) nogil:
+cdef void transform_diag_inv(double *A, double [3][3]P,
+                             double [3][3]res) noexcept nogil:
     '''Compute the transformation P*A*P.T and set it into res.
     A is diagonal and contains just the diagonal entries.
     '''
@@ -257,7 +258,7 @@ def py_transform_diag_inv(double[:] A, double[:,:] P):
     return res
 
 
-cdef double * tred2(double V[n][n], double *d, double *e) nogil:
+cdef double * tred2(double [n][n]V, double *d, double *e) noexcept nogil:
     '''Symmetric Householder reduction to tridiagonal form
 
     This is derived from the Algol procedures tred2 by
@@ -376,7 +377,7 @@ cdef double * tred2(double V[n][n], double *d, double *e) nogil:
     return d
 
 
-cdef void tql2(double V[n][n], double *d, double *e) nogil:
+cdef void tql2(double [n][n]V, double *d, double *e) noexcept nogil:
     '''Symmetric tridiagonal QL algo for eigendecomposition
 
     This is derived from the Algol procedures tql2, by
@@ -492,18 +493,18 @@ cdef void tql2(double V[n][n], double *d, double *e) nogil:
                 V[j][k] = p
 
 
-cdef void zero_matrix_case(double V[n][n], double *d) nogil:
+cdef void zero_matrix_case(double [n][n]V, double *d) noexcept nogil:
     cdef int i, j
     for i in range(3):
         d[i] = 0.0
         for j in range(3):
             V[i][j] = (i==j)
 
-cdef void eigen_decomposition(double A[n][n], double V[n][n], double *d) nogil:
+cdef void eigen_decomposition(double [n][n]A, double [n][n]V, double *d) noexcept nogil:
     '''Get eigenvalues and eigenvectors of matrix A.
     V is output eigenvectors and d are the eigenvalues.
     '''
-    cdef double e[n]
+    cdef double [n]e
     cdef int i, j
     # Scale the matrix, as if the matrix is tiny, floating point errors
     # creep up leading to zero division errors in tql2.  This is

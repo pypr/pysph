@@ -1,5 +1,6 @@
 # cython: language_level=3, embedsignature=True
 # distutils: language=c++
+# distutils: define_macros=NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
 
 # malloc and friends
 from libc.stdlib cimport malloc, free
@@ -52,7 +53,7 @@ cdef class CellIndexingNNPS(NNPS):
         cdef NNPSParticleArrayWrapper pa_wrapper
         cdef int i, num_particles
 
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             pa_wrapper = <NNPSParticleArrayWrapper> self.pa_wrappers[i]
             num_particles = pa_wrapper.get_number_of_particles()
 
@@ -80,7 +81,7 @@ cdef class CellIndexingNNPS(NNPS):
 
     def __dealloc__(self):
         cdef int i
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             free(self.keys[i])
             del self.key_indices[i]
         free(self.keys)
@@ -109,7 +110,7 @@ cdef class CellIndexingNNPS(NNPS):
         self.dst = <NNPSParticleArrayWrapper> self.pa_wrappers[dst_index]
         self.src = <NNPSParticleArrayWrapper> self.pa_wrappers[src_index]
 
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil:
         """Low level, high-performance non-gil method to find neighbors.
         This requires that `set_context()` be called beforehand.  This method
         does not reset the neighbors array before it appends the
@@ -152,16 +153,16 @@ cdef class CellIndexingNNPS(NNPS):
 
         cdef map[u_int, pair[u_int, u_int]].iterator it
 
-        cdef int x_boxes[27]
-        cdef int y_boxes[27]
-        cdef int z_boxes[27]
+        cdef int [27]x_boxes
+        cdef int [27]y_boxes
+        cdef int [27]z_boxes
         cdef int num_boxes = self._neighbor_boxes(c_x, c_y, c_z,
                 x_boxes, y_boxes, z_boxes)
 
         cdef pair[u_int, u_int] candidate
 
         cdef u_int n, idx
-        for i from 0<=i<num_boxes:
+        for i in range(num_boxes):
             it = self.current_indices.find(self._get_key(0, x_boxes[i], y_boxes[i],
                 z_boxes[i], self.src_index))
             if it == self.current_indices.end():
@@ -170,7 +171,7 @@ cdef class CellIndexingNNPS(NNPS):
             n = candidate.first
             candidate_length = candidate.second
 
-            for j from 0<=j<candidate_length:
+            for j in range(candidate_length):
                 idx = self._get_id(self.current_keys[n+j], self.src_index)
 
                 hj2 = self.radius_scale2*src_h_ptr[idx]*src_h_ptr[idx]
@@ -226,12 +227,12 @@ cdef class CellIndexingNNPS(NNPS):
         cdef u_int* current_keys = self.keys[pa_index]
 
         cdef int j
-        for j from 0<=j<num_particles:
+        for j in range(num_particles):
             indices.c_append(<long>self._get_id(current_keys[j], pa_index))
 
 
     cdef void fill_array(self, NNPSParticleArrayWrapper pa_wrapper, int pa_index,
-            UIntArray indices, u_int* current_keys, key_to_idx_t* current_indices) nogil:
+            UIntArray indices, u_int* current_keys, key_to_idx_t* current_indices) noexcept nogil:
         cdef double* x_ptr = pa_wrapper.x.data
         cdef double* y_ptr = pa_wrapper.y.data
         cdef double* z_ptr = pa_wrapper.z.data
@@ -240,7 +241,7 @@ cdef class CellIndexingNNPS(NNPS):
 
         cdef int i, n
         cdef int c_x, c_y, c_z
-        for i from 0<=i<indices.length:
+        for i in range(indices.length):
             n = indices.data[i]
             find_cell_id_raw(
                     x_ptr[i] - xmin[0],
@@ -267,7 +268,7 @@ cdef class CellIndexingNNPS(NNPS):
 
         cdef u_int length = 0
 
-        for i from 0<i<indices.length:
+        for i in range(1, indices.length):
             id_x = self._get_x(current_keys[i], pa_index)
             id_y = self._get_y(current_keys[i], pa_index)
             id_z = self._get_z(current_keys[i], pa_index)
@@ -295,35 +296,35 @@ cdef class CellIndexingNNPS(NNPS):
     #### Private protocol ################################################
 
     cdef inline u_int _get_key(self, u_int n, u_int i, u_int j,
-            u_int k, int pa_index) nogil:
+            u_int k, int pa_index) noexcept nogil:
         return  n + \
                 (1 << self.I[pa_index])*i + \
                 (1 << (self.I[pa_index] + self.J))*j + \
                 (1 << (self.I[pa_index] + self.J + self.K))*k
 
     @cython.cdivision(True)
-    cdef inline int _get_id(self, u_int key, int pa_index) nogil:
+    cdef inline int _get_id(self, u_int key, int pa_index) noexcept nogil:
         return key % (1 << self.I[pa_index])
 
     @cython.cdivision(True)
-    cdef inline int _get_x(self, u_int key, int pa_index) nogil:
+    cdef inline int _get_x(self, u_int key, int pa_index) noexcept nogil:
         return (key >> self.I[pa_index]) % (1 << self.J)
 
     @cython.cdivision(True)
-    cdef inline int _get_y(self, u_int key, int pa_index) nogil:
+    cdef inline int _get_y(self, u_int key, int pa_index) noexcept nogil:
         return (key >> (self.I[pa_index] + self.J)) % (1 << self.K)
 
     @cython.cdivision(True)
-    cdef inline int _get_z(self, u_int key, int pa_index) nogil:
+    cdef inline int _get_z(self, u_int key, int pa_index) noexcept nogil:
         return key >> (self.I[pa_index] + self.J + self.K)
 
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
-            int* x, int* y, int* z) nogil:
+            int* x, int* y, int* z) noexcept nogil:
         cdef int length = 0
         cdef int p, q, r
-        for p from -1<=p<2:
-            for q from -1<=q<2:
-                for r from -1<=r<2:
+        for p in range(-1, 2):
+            for q in range(-1, 2):
+                for r in range(-1, 2):
                     if i+r>=0 and j+q>=0 and k+p>=0:
                         x[length] = i+r
                         y[length] = j+q
@@ -343,7 +344,7 @@ cdef class CellIndexingNNPS(NNPS):
         self.J = <u_int> (1 + log2(ceil((xmax[0] - xmin[0])/self.cell_size)))
         self.K = <u_int> (1 + log2(ceil((xmax[1] - xmin[1])/self.cell_size)))
 
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             free(self.keys[i])
             del self.key_indices[i]
 

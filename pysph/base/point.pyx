@@ -1,4 +1,6 @@
-#cython: embedsignature=True
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
+# distutils: define_macros=NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
 
 """A handy set of classes/functions for 3D points.
 """
@@ -27,23 +29,27 @@ cdef class Point:
     # Declared in the .pxd file.
     #cdef public double x, y, z
 
-    property x:
-        def __get__(Point self):
-            return self.data.x
-        def __set__(Point self, double x):
-            self.data.x = x
+    @property
+    def x(Point self):
+        return self.data.x
+    @x.setter
+    def x(Point self, double x):
+        self.data.x = x
 
-    property y:
-        def __get__(Point self):
-            return self.data.y
-        def __set__(Point self, double y):
-            self.data.y = y
+    @property
+    def y(Point self):
+        return self.data.y
+    @y.setter
+    def y(Point self, double y):
+        self.data.y = y
 
-    property z:
-        def __get__(Point self):
-            return self.data.z
-        def __set__(Point self, double z):
-            self.data.z = z
+
+    @property
+    def z(Point self):
+        return self.data.z
+    @z.setter
+    def z(Point self, double z):
+        self.data.z = z
 
     ######################################################################
     # `object` interface.
@@ -191,17 +197,15 @@ cdef class Point:
 
 cdef class IntPoint:
 
-    property x:
-        def __get__(self):
-            return self.data.x
-
-    property y:
-        def __get__(self):
-            return self.data.y
-
-    property z:
-        def __get__(self):
-            return self.data.z
+    @property
+    def x(self):
+        return self.data.x
+    @property
+    def y(self):
+        return self.data.y
+    @property
+    def z(self):
+        return self.data.z
 
     def __init__(self, int x=0, int y=0, int z=0):
         self.data.x = x
@@ -234,8 +238,8 @@ cdef class IntPoint:
         return IntPoint_new(self.data.x, self.data.y, self.data.z)
 
     cpdef numpy.ndarray asarray(self):
-        cdef numpy.ndarray[ndim=1,dtype=numpy.int_t] arr = numpy.empty(3,
-                                                            dtype=numpy.int)
+        cdef numpy.ndarray[ndim=1,dtype=int] arr = numpy.empty(3,
+                                                            dtype=int)
         arr[0] = self.data.x
         arr[1] = self.data.y
         arr[2] = self.data.z

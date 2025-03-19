@@ -1,4 +1,6 @@
-#cython: embedsignature=True
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
+# distutils: define_macros=NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
 
 # malloc and friends
 from libc.stdlib cimport malloc, free
@@ -56,11 +58,11 @@ cdef class StratifiedHashNNPS(NNPS):
         self.cell_sizes = <double**> malloc(narrays*sizeof(double*))
 
         cdef int i, j
-        for i from 0<=i<narrays:
+        for i in range(narrays):
             self.hashtable[i] = <HashTable**> malloc(self.num_levels*sizeof(HashTable*))
             self.cell_sizes[i] = <double*> malloc(self.num_levels*sizeof(double))
             current_hash = self.hashtable[i]
-            for j from 0<=j<self.num_levels:
+            for j in range(self.num_levels):
                 current_hash[j] = NULL
 
         self.current_hash = NULL
@@ -69,9 +71,9 @@ cdef class StratifiedHashNNPS(NNPS):
     def __dealloc__(self):
         cdef HashTable** current_hash
         cdef int i, j
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             current_hash = self.hashtable[i]
-            for j from 0<=j<self.num_levels:
+            for j in range(self.num_levels):
                 if current_hash[j] != NULL:
                     del current_hash[j]
             free(self.hashtable[i])
@@ -111,7 +113,7 @@ cdef class StratifiedHashNNPS(NNPS):
         self.src = <NNPSParticleArrayWrapper> self.pa_wrappers[src_index]
 
     @cython.cdivision(True)
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil:
         """Low level, high-performance non-gil method to find neighbors.
         This requires that `set_context()` be called beforehand.  This method
         does not reset the neighbors array before it appends the
@@ -158,7 +160,7 @@ cdef class StratifiedHashNNPS(NNPS):
 
         cdef double hmax_level
 
-        for i from 0<=i<self.num_levels:
+        for i in range(self.num_levels):
             hash_level = self.current_hash[i]
             if hash_level.number_of_particles() == 0:
                 continue
@@ -184,13 +186,13 @@ cdef class StratifiedHashNNPS(NNPS):
             num_boxes = self._neighbor_boxes(c_x, c_y, c_z,
                     x_boxes, y_boxes, z_boxes, H)
 
-            for j from 0<=j<num_boxes:
+            for j in range(num_boxes):
                 candidate_cell = hash_level.get(x_boxes[j], y_boxes[j], z_boxes[j])
                 if candidate_cell == NULL:
                     continue
                 candidates = candidate_cell.get_indices()
                 candidate_size = candidates.size()
-                for k from 0<=k<candidate_size:
+                for k in range(candidate_size):
                     n = (candidates[0])[k]
                     hj2 = self.radius_scale2*src_h_ptr[n]*src_h_ptr[n]
                     xij2 = norm2(
@@ -214,21 +216,21 @@ cdef class StratifiedHashNNPS(NNPS):
     #### Private protocol ################################################
 
     @cython.cdivision(True)
-    cdef inline int _get_hash_id(self, double h) nogil:
+    cdef inline int _get_hash_id(self, double h) noexcept nogil:
         return <int> floor((self.radius_scale*h - self.hmin)/self.interval_size)
 
-    cdef inline double _get_h_max(self, double* current_cells, int hash_id) nogil:
+    cdef inline double _get_h_max(self, double* current_cells, int hash_id) noexcept nogil:
         return self.radius_scale*current_cells[hash_id]
 
     @cython.cdivision(True)
     cdef inline int _h_mask_exact(self, int* x, int* y, int* z,
-            int H) nogil:
+            int H) noexcept nogil:
         cdef int length = 0
         cdef int s, t, u
 
-        for s from -H<=s<=H:
-            for t from -H<=t<=H:
-                for u from -H<=u<=H:
+        for s in range(-H, H+1):
+            for t in range(-H, H+1):
+                for u in range(-H, H+1):
                     x[length] = s
                     y[length] = t
                     z[length] = u
@@ -237,7 +239,7 @@ cdef class StratifiedHashNNPS(NNPS):
         return length
 
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
-            int* x, int* y, int* z, int H) nogil:
+            int* x, int* y, int* z, int H) noexcept nogil:
         cdef int length = 0
         cdef int p
 
@@ -249,7 +251,7 @@ cdef class StratifiedHashNNPS(NNPS):
 
         mask_len = self._h_mask_exact(x_mask, y_mask, z_mask, H)
 
-        for p from 0<=p<mask_len:
+        for p in range(mask_len):
             if (i + x_mask[p] >= 0 and
                 j + y_mask[p] >= 0 and
                 k + z_mask[p] >= 0):
@@ -265,10 +267,10 @@ cdef class StratifiedHashNNPS(NNPS):
         return length
 
     cdef inline void _set_h_max(self, double* current_cells, double* src_h_ptr,
-            int num_particles) nogil:
+            int num_particles) noexcept nogil:
         cdef double h
         cdef int i, idx
-        for i from 0<=i<num_particles:
+        for i in range(num_particles):
             h = src_h_ptr[i]
             idx = self._get_hash_id(h)
             current_cells[idx] = fmax(h, current_cells[idx])
@@ -278,10 +280,10 @@ cdef class StratifiedHashNNPS(NNPS):
         self.interval_size = (self.cell_size - self.hmin)/self.num_levels + EPS
         cdef HashTable** current_hash
         cdef int i, j
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             current_hash = self.hashtable[i]
             current_cells = self.cell_sizes[i]
-            for j from 0<=j<self.num_levels:
+            for j in range(self.num_levels):
                 if current_hash[j] != NULL:
                     del current_hash[j]
                 current_hash[j] = new HashTable(self.table_size)
@@ -309,7 +311,7 @@ cdef class StratifiedHashNNPS(NNPS):
         self._set_h_max(current_cells, src_h_ptr, pa_wrapper.get_number_of_particles())
         cdef HashTable** current_hash = self.hashtable[pa_index]
 
-        for i from 0<=i<indices.length:
+        for i in range(indices.length):
             idx = indices.data[i]
             hash_id = self._get_hash_id(src_h_ptr[idx])
             cell_size = self._get_h_max(current_cells, hash_id)/self.H

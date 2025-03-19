@@ -1,4 +1,7 @@
 from __future__ import division
+
+import math
+
 import numpy as np
 import copy
 from pysph.base.nnps import LinkedListNNPS
@@ -52,7 +55,7 @@ def matrix_exp(matrix):
     n = 1
     condition = True
     while condition:
-        adding = matrix_power(matrix, n) / (1.0 * np.math.factorial(n))
+        adding = matrix_power(matrix, n) / (1.0 * math.factorial(n))
         result += adding
         residue = np.sqrt(np.sum(np.square(adding)) /
                           np.sum(np.square(result)))

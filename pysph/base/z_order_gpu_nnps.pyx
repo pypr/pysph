@@ -1,4 +1,6 @@
-#cython: embedsignature=True
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
+# distutils: define_macros=NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
 
 # malloc and friends
 from libc.stdlib cimport malloc, free
@@ -66,7 +68,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.cids = []
         self.cid_to_idx = []
 
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
             num_particles = pa_wrapper.get_number_of_particles()
 
@@ -180,7 +182,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.max_cid = []
         self.sorted = False
 
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
             num_particles = pa_wrapper.get_number_of_particles()
 

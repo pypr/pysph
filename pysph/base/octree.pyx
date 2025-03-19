@@ -1,4 +1,6 @@
-#cython: embedsignature=True
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
+# distutils: define_macros=NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
 
 from .nnps_base cimport *
 
@@ -25,10 +27,17 @@ cdef extern from *:
     #define START_OMP_SINGLE_PRAGMA() _Pragma("omp single") {
     #define START_OMP_BARRIER_PRAGMA() _Pragma("omp barrier") {
     """
-    void START_OMP_PARALLEL_PRAGMA() nogil
-    void END_OMP_PRAGMA() nogil
-    void START_OMP_SINGLE_PRAGMA() nogil
-    void START_OMP_BARRIER_PRAGMA() nogil
+    void START_OMP_PARALLEL_PRAGMA() noexcept nogil
+    void END_OMP_PRAGMA() noexcept nogil
+    void START_OMP_SINGLE_PRAGMA() noexcept nogil
+    void START_OMP_BARRIER_PRAGMA() noexcept nogil
+
+try:
+    from .omp_threads import get_number_of_threads
+    from .omp_threads import set_number_of_threads
+except ImportError:
+    from .no_omp_threads import get_number_of_threads
+    from .no_omp_threads import set_number_of_threads
 
 ########################################################################
 
@@ -55,7 +64,7 @@ cdef class OctreeNode:
         equal_length = (self.length == other.length)
 
         cdef int i
-        for i from 0<=i<3:
+        for i in range(3):
             if self.xmin[i] != other.xmin[i]:
                 equal_xmin = False
 
@@ -133,7 +142,7 @@ cdef class OctreeNode:
         cdef int i
         cdef list py_children = [None for i in range(8)]
         cdef OctreeNode py_node
-        for i from 0<=i<8:
+        for i in range(8):
             if self._node.children[i] != NULL:
                 py_node = OctreeNode()
                 py_node.wrap_node(self._node.children[i])
@@ -157,29 +166,29 @@ cdef class OctreeNode:
         cdef double x, y, z
         cdef list ax_points = [0,0]
 
-        for i from 0<=i<2:
-            for j from 0<=j<2:
+        for i in range(2):
+            for j in range(2):
                 x = self.xmin[0] + i*self.length
                 y = self.xmin[1] + j*self.length
-                for k from 0<=k<2:
+                for k in range(2):
                     ax_points[k] = self.xmin[2] + k*self.length
 
                 ax.plot([x,x], [y,y], zs=ax_points[:], color=color)
 
-        for i from 0<=i<2:
-            for k from 0<=k<2:
+        for i in range(2):
+            for k in range(2):
                 x = self.xmin[0] + i*self.length
                 z = self.xmin[2] + k*self.length
-                for j from 0<=j<2:
+                for j in range(2):
                     ax_points[j] = self.xmin[1] + j*self.length
 
                 ax.plot([x,x], ax_points[:], zs=[z,z], color=color)
 
-        for j from 0<=j<2:
-            for k from 0<=k<2:
+        for j in range(2):
+            for k in range(2):
                 y = self.xmin[1] + j*self.length
                 z = self.xmin[2] + k*self.length
-                for i from 0<=i<2:
+                for i in range(2):
                     ax_points[i] = self.xmin[0] + i*self.length
 
                 ax.plot(ax_points[:], [y,y], zs=[z,z], color=color)
@@ -205,7 +214,7 @@ cdef class Octree:
     #### Private protocol ################################################
 
     @cython.cdivision(True)
-    cdef inline double _get_eps(self, double length, double* xmin) nogil:
+    cdef inline double _get_eps(self, double length, double* xmin) noexcept nogil:
         return (self.machine_eps/length)*fmax(length,
                 fmax(fmax(fabs(xmin[0]), fabs(xmin[1])), fabs(xmin[2])))
 
@@ -240,7 +249,7 @@ cdef class Octree:
 
     cdef inline cOctreeNode* _new_node(self, double* xmin, double length,
             double hmax = 0, int level = 0, cOctreeNode* parent = NULL,
-            int num_particles = 0, bint is_leaf = False) nogil:
+            int num_particles = 0, bint is_leaf = False) noexcept nogil:
         """Create a new cOctreeNode"""
         cdef cOctreeNode* node = <cOctreeNode*> malloc(sizeof(cOctreeNode))
 
@@ -259,7 +268,7 @@ cdef class Octree:
 
         cdef int i
 
-        for i from 0<=i<8:
+        for i in range(8):
             node.children[i] = NULL
 
         return node
@@ -269,12 +278,12 @@ cdef class Octree:
         cdef int i
         cdef cOctreeNode* temp[8]
 
-        for i from 0<=i<8:
+        for i in range(8):
             temp[i] = node.children[i]
 
         free(node)
 
-        for i from 0<=i<8:
+        for i in range(8):
             if temp[i] == NULL:
                 continue
             self._delete_tree(temp[i])
@@ -282,7 +291,7 @@ cdef class Octree:
     @cython.cdivision(True)
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
             vector[u_int]* indices, double* xmin, double length,
-            cOctreeNode* node, int level) nogil:
+            cOctreeNode* node, int level) noexcept nogil:
         cdef double* src_x_ptr = pa.x.data
         cdef double* src_y_ptr = pa.y.data
         cdef double* src_z_ptr = pa.z.data
@@ -296,7 +305,7 @@ cdef class Octree:
         cdef int i, j, k
         cdef u_int p, q
 
-        for i from 0<=i<8:
+        for i in range(8):
             hmax_children[i] = 0
 
         cdef int oct_id
@@ -315,10 +324,10 @@ cdef class Octree:
             return 1
 
         cdef vector[u_int]* new_indices[8]
-        for i from 0<=i<8:
+        for i in range(8):
             new_indices[i] = new vector[u_int]()
 
-        for p from 0<=p<indices.size():
+        for p in range(indices.size()):
             q = deref(indices)[p]
 
             find_cell_id_raw(
@@ -338,9 +347,9 @@ cdef class Octree:
 
         del indices
 
-        for i from 0<=i<2:
-            for j from 0<=j<2:
-                for k from 0<=k<2:
+        for i in range(2):
+            for j in range(2):
+                for k in range(2):
 
                     oct_id = k+2*j+4*i
 
@@ -367,7 +376,7 @@ cdef class Octree:
     @cython.cdivision(True)
     @cython.boundscheck(False) 
     cdef int _c_build_tree_level1(self, NNPSParticleArrayWrapper pa, double* xmin, double length,
-            cOctreeNode* node, int num_threads) nogil:
+            cOctreeNode* node, int num_threads) noexcept nogil:
 
         cdef double* src_x_ptr = pa.x.data
         cdef double* src_y_ptr = pa.y.data
@@ -379,7 +388,7 @@ cdef class Octree:
         cdef cOctreeNode* new_node
         cdef int i, j, k, c, tid, oct_cid, oct_id, count_thread, n, p
         cdef u_int  q
-        for i from 0<=i<8:
+        for i in range(8):
             hmax_children[i] = 0
 
         # This is required to fix floating point errors. One such case
@@ -388,7 +397,7 @@ cdef class Octree:
         n =  node.num_particles
 
         if (n < self.leaf_max_particles) or (eps > EPS_MAX):
-            for i from 0<=i<n:
+            for i in range(n):
                 self.pids[i] = i
             node.is_leaf = True
             return 1
@@ -401,7 +410,7 @@ cdef class Octree:
         cdef vector[vector[double]] threads_hmax = vector[vector[double]](num_threads)
         cdef vector[int] count = vector[int](8)
 
-        for i from 0<=i<num_threads:
+        for i in range(num_threads):
             cumulative_map[i] = vector[int](8)
             threads_hmax[i] = vector[double](8)
 
@@ -423,8 +432,8 @@ cdef class Octree:
                 cumulative_map[tid][oct_id] += 1
                 threads_hmax[tid][oct_id] = fmax(threads_hmax[tid][oct_id], src_h_ptr[p])
 
-        for oct_id from 0<=oct_id<8:
-            for tid from 0<=tid<num_threads:
+        for oct_id in range(8):
+            for tid in range(num_threads):
                 count_thread = cumulative_map[tid][oct_id]
                 cumulative_map[tid][oct_id] = count[oct_id]
                 count[oct_id] += count_thread
@@ -434,9 +443,9 @@ cdef class Octree:
         cdef vector[cOctreeNode *]* next_level_nodes = new vector[node_ptr]()
 
         c = 0
-        for i from 0<=i<2:
-            for j from 0<=j<2:
-                for k from 0<=k<2:
+        for i in range(2):
+            for j in range(2):
+                for k in range(2):
 
                     oct_id = k+2*j+4*i
 
@@ -483,7 +492,7 @@ cdef class Octree:
     @cython.boundscheck(False) 
     cdef int _c_build_tree_bfs(self, NNPSParticleArrayWrapper pa, u_int* p_indices,
              vector[cOctreeNode *]* level_nodes,
-            int level, int num_threads) nogil:
+            int level, int num_threads) noexcept nogil:
         cdef double* src_x_ptr = pa.x.data
         cdef double* src_y_ptr = pa.y.data
         cdef double* src_z_ptr = pa.z.data
@@ -501,14 +510,14 @@ cdef class Octree:
         cdef vector[vector[node_ptr]] old_nodes = vector[vector[node_ptr]](num_threads)
         cdef vector[vector[node_ptr]] new_nodes = vector[vector[node_ptr]](num_threads)
 
-        for i from 0<=i<num_threads:
+        for i in range(num_threads):
             old_nodes[i] = vector[node_ptr]()
             new_nodes[i] = vector[node_ptr]()
 
         cdef vector[int] count = vector[int](num_threads+2)
         d = 0
         num_nodes = level_nodes.size()
-        for i from 0<=i<num_nodes:
+        for i in range(num_nodes):
             count[d] = count[d] + 1
             old_nodes[d].push_back(deref(level_nodes)[i])
             d = (d + 1)%num_threads
@@ -529,12 +538,12 @@ cdef class Octree:
             tid = threadid()
 
             while(count[num_threads] > 0):
-                for i from 0<=i<8:
+                for i in range(8):
                     new_indices[i] = vector[u_int]()
                 children = 0
 
-                for n from 0<=n<old_nodes[tid].size():
-                    for i from 0<=i<8:
+                for n in range(old_nodes[tid].size()):
+                    for i in range(8):
                         new_indices[i].clear()
                         hmax_children[i] = 0
                     node = old_nodes[tid][n]
@@ -546,7 +555,7 @@ cdef class Octree:
                     xmin[1] = node.xmin[1]
                     xmin[2] = node.xmin[2]
 
-                    for p from start<=p<(start + num_p):
+                    for p in range(start, start + num_p):
                         q = p_indices[p]
                         find_cell_id_raw(
                             src_x_ptr[q] - xmin[0],
@@ -564,9 +573,9 @@ cdef class Octree:
                     length_padded = (length/2)*(1 + 2*eps)
 
 
-                    for i from 0<=i<2:
-                        for j from 0<=j<2:
-                            for k from 0<=k<2:
+                    for i in range(2):
+                        for j in range(2):
+                            for k in range(2):
                                 oct_id = k+2*j+4*i
 
                                 if new_indices[oct_id].empty():
@@ -584,7 +593,7 @@ cdef class Octree:
 
                                 # Change the position of the indices in p_indices
                                 # according to which child they belong to
-                                for l from 0<=l<num_p:
+                                for l in range(num_p):
                                     p_indices[start+l] = new_indices[oct_id][l]
                                 start = start + new_indices[oct_id].size()
 
@@ -607,13 +616,13 @@ cdef class Octree:
                 START_OMP_SINGLE_PRAGMA()
                 count[num_threads + 1] = count[num_threads + 1] + 1
                 count[num_threads] = 0
-                for sid from 0<=sid<num_threads:
+                for sid in range(num_threads):
                     count[num_threads]  = count[num_threads] + count[sid]
                 d =  int(count[num_threads]/num_threads)
                 r = count[num_threads]%num_threads
-                for sid from 0<=sid<r:
+                for sid in range(r):
                     count[sid] = d + 1
-                for sid from r<=sid<num_threads:
+                for sid in range(r, num_threads):
                     count[sid] = d
                 END_OMP_PRAGMA()
 
@@ -625,8 +634,8 @@ cdef class Octree:
                 START_OMP_SINGLE_PRAGMA()
                 d = 0
                 r = 0
-                for sid from 0<=sid<num_threads:
-                    for jid from 0<=jid<new_nodes[sid].size():
+                for sid in range(num_threads):
+                    for jid in range(new_nodes[sid].size()):
                         old_nodes[d][r] = new_nodes[sid][jid]
                         r += 1
                         if (r == count[d]):
@@ -659,7 +668,7 @@ cdef class Octree:
             return
 
         cdef int i
-        for i from 0<=i<8:
+        for i in range(8):
             if node.children[i] != NULL:
                 self._c_get_leaf_cells(node.children[i])
 
@@ -701,7 +710,7 @@ cdef class Octree:
         # Use the serial method
         else:
             self._next_pid = 0
-            for i from 0<=i<num_particles:
+            for i in range(num_particles):
                 indices_ptr.push_back(i)
             self.depth = self._c_build_tree(pa_wrapper, indices_ptr, self.root.xmin,
                 self.root.length, self.root, 0)
@@ -792,7 +801,7 @@ cdef class Octree:
         self.c_get_leaf_cells()
         cdef int i
         cdef list py_leaf_cells = [OctreeNode() for i in range(self.leaf_cells.size())]
-        for i from 0<=i<self.leaf_cells.size():
+        for i in range(self.leaf_cells.size()):
             (<OctreeNode>py_leaf_cells[i]).wrap_node(deref(self.leaf_cells)[i])
         return py_leaf_cells
 
@@ -838,7 +847,7 @@ cdef class CompressedOctree(Octree):
     @cython.cdivision(True)
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
             vector[u_int]* indices, double* xmin, double length,
-            cOctreeNode* node, int level) nogil:
+            cOctreeNode* node, int level) noexcept nogil:
 
         cdef double* src_x_ptr = pa.x.data
         cdef double* src_y_ptr = pa.y.data
@@ -856,9 +865,9 @@ cdef class CompressedOctree(Octree):
         cdef int i, j, k
         cdef u_int p, q
 
-        for i from 0<=i<8:
+        for i in range(8):
             hmax_children[i] = 0
-            for j from 0<=j<3:
+            for j in range(3):
                 xmin_new[i][j] = self.dbl_max
                 xmax_new[i][j] = -self.dbl_max
 
@@ -874,13 +883,13 @@ cdef class CompressedOctree(Octree):
             return 1
 
         cdef vector[u_int]* new_indices[8]
-        for i from 0<=i<8:
+        for i in range(8):
             new_indices[i] = new vector[u_int]()
 
         cdef double* xmin_current
         cdef double* xmax_current
 
-        for p from 0<=p<indices.size():
+        for p in range(indices.size()):
             q = deref(indices)[p]
 
             find_cell_id_raw(
@@ -913,7 +922,7 @@ cdef class CompressedOctree(Octree):
 
         del indices
 
-        for i from 0<=i<8:
+        for i in range(8):
             if new_indices[i].empty():
                 del new_indices[i]
                 continue
@@ -948,7 +957,7 @@ cdef class CompressedOctree(Octree):
     @cython.cdivision(True)
     @cython.boundscheck(False)
     cdef int _c_build_tree_level1(self, NNPSParticleArrayWrapper pa, double* xmin, double length,
-            cOctreeNode* node, int num_threads) nogil:
+            cOctreeNode* node, int num_threads) noexcept nogil:
 
         cdef double* src_x_ptr = pa.x.data
         cdef double* src_y_ptr = pa.y.data
@@ -962,9 +971,9 @@ cdef class CompressedOctree(Octree):
         cdef int i, j, k, c, tid, oct_cid, oct_id, count_thread, n, p
         cdef u_int  q
 
-        for i from 0<=i<8:
+        for i in range(8):
             hmax_children[i] = 0
-            for j from 0<=j<3:
+            for j in range(3):
                 xmin_new[i][j] = self.dbl_max
                 xmax_new[i][j] = -self.dbl_max
 
@@ -973,7 +982,7 @@ cdef class CompressedOctree(Octree):
         n =  node.num_particles
 
         if (n < self.leaf_max_particles):
-            for i from 0<=i<n:
+            for i in range(n):
                 self.pids[i] = i
             node.is_leaf = True
             return 1
@@ -995,7 +1004,7 @@ cdef class CompressedOctree(Octree):
 
         cdef vector[int] count = vector[int](8)
 
-        for i from 0<=i<num_threads:
+        for i in range(num_threads):
             cumulative_map[i] = vector[int](8)
             threads_hmax[i] = vector[double](8)
 
@@ -1007,7 +1016,7 @@ cdef class CompressedOctree(Octree):
             threads_ymax[i] = vector[double](8)
             threads_zmax[i] = vector[double](8)
 
-            for j from 0<=j<8:
+            for j in range(8):
                 threads_xmin[i][j] = self.dbl_max
                 threads_ymin[i][j] = self.dbl_max
                 threads_zmin[i][j] = self.dbl_max
@@ -1042,8 +1051,8 @@ cdef class CompressedOctree(Octree):
                 threads_ymax[tid][oct_id] = fmax(threads_ymax[tid][oct_id], src_y_ptr[p])
                 threads_zmax[tid][oct_id] = fmax(threads_zmax[tid][oct_id], src_z_ptr[p])
 
-        for oct_id from 0<=oct_id<8:
-            for tid from 0<=tid<num_threads:
+        for oct_id in range(8):
+            for tid in range(num_threads):
                 count_thread = cumulative_map[tid][oct_id]
                 cumulative_map[tid][oct_id] = count[oct_id]
                 count[oct_id] += count_thread
@@ -1063,7 +1072,7 @@ cdef class CompressedOctree(Octree):
         cdef double* xmin_current
         cdef double* xmax_current
         c = 0
-        for oct_id from 0<=oct_id<8:
+        for oct_id in range(8):
             if (count[oct_id] == 0):
                 continue
 
@@ -1118,7 +1127,7 @@ cdef class CompressedOctree(Octree):
     @cython.cdivision(True)
     @cython.boundscheck(False)
     cdef int _c_build_tree_bfs(self, NNPSParticleArrayWrapper pa, u_int* p_indices,
-             vector[cOctreeNode *]* level_nodes, int level, int num_threads) nogil:
+             vector[cOctreeNode *]* level_nodes, int level, int num_threads) noexcept nogil:
 
         cdef double* src_x_ptr = pa.x.data
         cdef double* src_y_ptr = pa.y.data
@@ -1140,14 +1149,14 @@ cdef class CompressedOctree(Octree):
         cdef vector[vector[node_ptr]] old_nodes = vector[vector[node_ptr]](num_threads)
         cdef vector[vector[node_ptr]] new_nodes = vector[vector[node_ptr]](num_threads)
 
-        for i from 0<=i<num_threads:
+        for i in range(num_threads):
             old_nodes[i] = vector[node_ptr]()
             new_nodes[i] = vector[node_ptr]()
 
         cdef vector[int] count = vector[int](num_threads+2)
         d = 0
         num_nodes = level_nodes.size()
-        for i from 0<=i<num_nodes:
+        for i in range(num_nodes):
             count[d] = count[d] + 1
             old_nodes[d].push_back(deref(level_nodes)[i])
             d = (d + 1)%num_threads
@@ -1163,22 +1172,22 @@ cdef class CompressedOctree(Octree):
             xmin_new = vector[dbl_ptr](8)
             xmax_new = vector[dbl_ptr](8)
 
-            for i from 0<=i<8:
+            for i in range(8):
                 xmin_new[i] = <double *> malloc(3 * sizeof(double))
                 xmax_new[i] = <double *> malloc(3 * sizeof(double))
 
             tid = threadid()
 
             while(count[num_threads]>0):
-                for i from 0<=i<8:
+                for i in range(8):
                     new_indices[i] = vector[u_int]()
                 children = 0
 
-                for n from 0<=n<old_nodes[tid].size():
-                    for i from 0<=i<8:
+                for n in range(old_nodes[tid].size()):
+                    for i in range(8):
                         new_indices[i].clear()
                         hmax_children[i] = 0
-                        for j from 0<=j<3:
+                        for j in range(3):
                             xmin_new[i][j] = self.dbl_max
                             xmax_new[i][j] = -self.dbl_max
 
@@ -1191,7 +1200,7 @@ cdef class CompressedOctree(Octree):
                     xmin[1] = node.xmin[1]
                     xmin[2] = node.xmin[2]
 
-                    for p from start<=p<(start + num_p):
+                    for p in range(start, start + num_p):
                         q = p_indices[p]
                         find_cell_id_raw(
                             src_x_ptr[q] - xmin[0],
@@ -1217,7 +1226,7 @@ cdef class CompressedOctree(Octree):
                         xmax_current[1] = fmax(xmax_current[1], src_y_ptr[q])
                         xmax_current[2] = fmax(xmax_current[2], src_z_ptr[q])
 
-                    for oct_id from 0<=oct_id<8:
+                    for oct_id in range(8):
                         if new_indices[oct_id].empty():
                             continue
 
@@ -1245,7 +1254,7 @@ cdef class CompressedOctree(Octree):
 
                         # Change the position of the indices in p_indices
                         # according to which child they belong to
-                        for l from 0<=l<num_p:
+                        for l in range(num_p):
                             p_indices[start+l] = new_indices[oct_id][l]
                         start = start + new_indices[oct_id].size()
 
@@ -1266,13 +1275,13 @@ cdef class CompressedOctree(Octree):
                 START_OMP_SINGLE_PRAGMA()
                 count[num_threads + 1] = count[num_threads + 1] + 1
                 count[num_threads] = 0
-                for sid from 0<=sid<num_threads:
+                for sid in range(num_threads):
                     count[num_threads]  = count[num_threads] + count[sid]
                 d =  int(count[num_threads]/num_threads)
                 r = count[num_threads]%num_threads
-                for sid from 0<=sid<r:
+                for sid in range(r):
                     count[sid] = d + 1
-                for sid from r<=sid<num_threads:
+                for sid in range(r, num_threads):
                     count[sid] = d
                 END_OMP_PRAGMA()
 
@@ -1284,8 +1293,8 @@ cdef class CompressedOctree(Octree):
                 START_OMP_SINGLE_PRAGMA()
                 d = 0
                 r = 0
-                for sid from 0<=sid<num_threads:
-                    for jid from 0<=jid<new_nodes[sid].size():
+                for sid in range(num_threads):
+                    for jid in range(new_nodes[sid].size()):
                         old_nodes[d][r] = new_nodes[sid][jid]
                         r += 1
                         if (r == count[d]):
@@ -1296,7 +1305,7 @@ cdef class CompressedOctree(Octree):
                 new_nodes[tid].clear()
 
             free(xmin)
-            for i from 0<=i<8:
+            for i in range(8):
                 free(xmin_new[i])
                 free(xmax_new[i])
 
@@ -1339,7 +1348,7 @@ cdef class CompressedOctree(Octree):
         # Use the serial method
         else:
             self._next_pid = 0
-            for i from 0<=i<num_particles:
+            for i in range(num_particles):
                 indices_ptr.push_back(i)
             self.depth = self._c_build_tree(pa_wrapper, indices_ptr, self.root.xmin,
                 self.root.length, self.root, 0)

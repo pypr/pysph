@@ -1,4 +1,6 @@
-#cython: embedsignature=True
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
+# distutils: define_macros=NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
 
 from .nnps_base cimport *
 from .octree cimport Octree, CompressedOctree, cOctreeNode
@@ -65,7 +67,7 @@ cdef class OctreeNNPS(NNPS):
         self.dst = <NNPSParticleArrayWrapper> self.pa_wrappers[dst_index]
         self.src = <NNPSParticleArrayWrapper> self.pa_wrappers[src_index]
 
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) noexcept nogil:
         """Low level, high-performance non-gil method to find neighbors.
         This requires that `set_context()` be called beforehand.  This method
         does not reset the neighbors array before it appends the
@@ -104,7 +106,7 @@ cdef class OctreeNNPS(NNPS):
     @cython.cdivision(True)
     cdef void _get_neighbors(self, double q_x, double q_y, double q_z, double q_h,
             double* src_x_ptr, double* src_y_ptr, double* src_z_ptr, double* src_h_ptr,
-            UIntArray nbrs, cOctreeNode* node) nogil:
+            UIntArray nbrs, cOctreeNode* node) noexcept nogil:
         """Find neighbors recursively"""
         cdef double x_centre = node.xmin[0] + node.length/2
         cdef double y_centre = node.xmin[1] + node.length/2
@@ -124,7 +126,7 @@ cdef class OctreeNNPS(NNPS):
             return
 
         if node.is_leaf:
-            for i from 0<=i<node.num_particles:
+            for i in range(node.num_particles):
                 k = self.current_pids[node.start_index + i]
                 hj2 = self.radius_scale2*src_h_ptr[k]*src_h_ptr[k]
                 xij2 = norm2(
@@ -136,7 +138,7 @@ cdef class OctreeNNPS(NNPS):
                     nbrs.c_append(k)
             return
 
-        for i from 0<=i<8:
+        for i in range(8):
             if node.children[i] == NULL:
                 continue
             self._get_neighbors(q_x, q_y, q_z, q_h,
@@ -149,12 +151,12 @@ cdef class OctreeNNPS(NNPS):
         cdef u_int* current_pids = (<Octree>self.tree[pa_index]).pids
 
         cdef int i
-        for i from 0<=i<num_particles:
+        for i in range(num_particles):
             indices.c_append(<long>current_pids[i])
 
     cpdef _refresh(self):
         cdef int i
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             (<Octree>self.tree[i]).c_build_tree(self.pa_wrappers[i], self.tree[i].test_parallel)
         self.current_tree = (<Octree>self.tree[self.src_index]).root
         self.current_pids = (<Octree>self.tree[self.src_index]).pids
@@ -221,7 +223,7 @@ cdef class CompressedOctreeNNPS(OctreeNNPS):
 
     cpdef _refresh(self):
         cdef int i
-        for i from 0<=i<self.narrays:
+        for i in range(self.narrays):
             (<CompressedOctree>self.tree[i]).c_build_tree(self.pa_wrappers[i],
                                                           self.tree[i].test_parallel)
         self.current_tree = (<CompressedOctree>self.tree[self.src_index]).root

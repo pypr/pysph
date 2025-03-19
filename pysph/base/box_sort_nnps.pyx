@@ -1,4 +1,7 @@
-# cython: language_level=3, language=c++, embedsignature=True
+# cython: language_level=3, embedsignature=True
+# distutils: language=c++
+# distutils: define_macros=NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
+
 # Library imports.
 import numpy as np
 cimport numpy as np
@@ -42,7 +45,7 @@ cdef class BoxSortNNPS(LinkedListNNPS):
     @cython.boundscheck(False)
     @cython.wraparound(False)
     cdef inline long _get_valid_cell_index(self, int cid_x, int cid_y, int cid_z,
-            int* ncells_per_dim, int dim, int n_cells) nogil:
+            int* ncells_per_dim, int dim, int n_cells) noexcept nogil:
         """Return the flattened index for a valid cell"""
         cdef long ncx = ncells_per_dim[0]
         cdef long ncy = ncells_per_dim[1]
