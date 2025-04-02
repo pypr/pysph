@@ -35,8 +35,10 @@ def clear_cache():
     print("Clearing cache in\n", cc, "\n", pc)
     confirm = input('Are you sure? (y/N) ')
     if confirm in ['y', 'Y']:
-        shutil.rmtree(cc)
-        shutil.rmtree(pc)
+        if cc.exists():
+            shutil.rmtree(cc)
+        if pc.exists():
+            shutil.rmtree(pc)
 
 
 def main(argv=None):
