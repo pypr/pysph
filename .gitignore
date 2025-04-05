@@ -4,6 +4,7 @@
 *.cpp
 *~
 *.so
+*.so.dSYM
 *.orig
 *.npz
 *.log
@@ -15,5 +16,6 @@ PySPH.egg-info/
 build/
 dist/
 .tox/
+.pytest_cache/
 *.out
 *_output
