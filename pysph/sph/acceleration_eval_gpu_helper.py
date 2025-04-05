@@ -71,12 +71,12 @@ While the implementation is a bit complex, the details a bit hairy, the general
 idea is very simple.
 
 '''
+import ast
 from functools import partial
 import inspect
 import logging
 import os
 import re
-import sys
 from textwrap import wrap
 
 import numpy as np
@@ -91,8 +91,10 @@ from pysph.sph.acceleration_nnps_helper import generate_body, \
 from compyle.ext_module import get_platform_dir, get_md5
 from compyle.config import get_config
 from compyle.profile import profile_ctx
-from compyle.translator import (CStructHelper, CUDAConverter, OpenCLConverter,
-                                ocl_detect_type, ocl_detect_pointer_base_type)
+from compyle.translator import (
+    CStructHelper, CUDAConverter, OpenCLConverter, literal_to_float,
+    ocl_detect_type, ocl_detect_pointer_base_type
+)
 
 from .equation import get_predefined_types, KnownType
 from .acceleration_eval_cython_helper import (
@@ -102,6 +104,26 @@ from .acceleration_eval_cython_helper import (
 logger = logging.getLogger(__name__)
 
 getfullargspec = inspect.getfullargspec
+
+
+class Double2Float(ast.NodeTransformer):
+    def __init__(self, use_double=False):
+        super().__init__()
+        self._use_double = use_double
+
+    def visit_Num(self, node):
+        s = literal_to_float(node.n, self._use_double)
+        return ast.Constant(value=s)
+
+
+def handle_precomp_literals(code, use_double=False):
+    tree = ast.parse(code)
+    transformed_tree = Double2Float(use_double).visit(tree)
+    # The code below is a hack, since things like 0.5f are invalid Python, the
+    # Double2Float transformer injects a string which we remove from the
+    # unparsed source below.
+    src = ast.unparse(transformed_tree).replace("'", "")
+    return src
 
 
 def get_converter(backend):
@@ -422,6 +444,7 @@ def convert_to_float_if_needed(code):
 class AccelerationEvalGPUHelper(object):
     def __init__(self, acceleration_eval):
         self.object = acceleration_eval
+        self._use_double = get_config().use_double
         self.backend = acceleration_eval.backend
         self.all_array_names = get_all_array_names(
             self.object.particle_arrays
@@ -603,8 +626,7 @@ class AccelerationEvalGPUHelper(object):
             from pyopencl._cluda import CLUDA_PREAMBLE
         elif self.backend == 'cuda':
             from pycuda._cluda import CLUDA_PREAMBLE
-        double_support = get_config().use_double
-        cluda = Template(CLUDA_PREAMBLE).render(double_support=double_support)
+        cluda = Template(CLUDA_PREAMBLE).render(double_support=self._use_double)
         main = "\n".join([cluda, main])
         return main
 
@@ -819,7 +841,8 @@ class AccelerationEvalGPUHelper(object):
             elif isinstance(value, float):
                 declare = 'double '
                 decl.append('{declare}{var} = {value};'.format(
-                    declare=declare, var=var, value=value
+                    declare=declare, var=var,
+                    value=literal_to_float(value, self._use_double)
                 ))
             elif isinstance(value, (list, tuple)):
                 decl.append(
@@ -930,7 +953,10 @@ class AccelerationEvalGPUHelper(object):
             pre = []
             for p, cb in eq_group.precomputed.items():
                 src = cb.code.strip().splitlines()
-                pre.extend([' ' * 4 + x + ';' for x in src])
+                pre.extend(
+                    [' ' * 4 + handle_precomp_literals(x, self._use_double) + ';' 
+                     for x in src]
+                )
             if len(pre) > 0:
                 pre.append('')
             code.extend(pre)
@@ -1002,7 +1028,10 @@ class AccelerationEvalGPUHelper(object):
         pre = []
         for p, cb in eq_group.precomputed.items():
             src = cb.code.strip().splitlines()
-            pre.extend([' ' * 4 + x + ';' for x in src])
+            pre.extend(
+               [' ' * 4 + handle_precomp_literals(x, self._use_double) + ';'
+                for x in src]
+            )
         if len(pre) > 0:
             pre.append('')
         loop_code.extend(pre)
