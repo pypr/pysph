@@ -295,6 +295,38 @@ class TestInterpolator(unittest.TestCase):
         expect = np.sin(ip.x * np.pi)
         np.testing.assert_allclose(p, expect, rtol=5e-3)
 
+    def test_should_work_with_method_splash(self):
+        # Given
+        pa = self._make_2d_grid()
+
+        # When.
+        ip = Interpolator(
+            [pa], domain_manager=self._domain, method='splash'
+        )
+        x, y = np.random.random((2, 5, 5))
+        ip.set_interpolation_points(x=x, y=y)
+        p = ip.interpolate('p')
+
+        # Then.
+        expect = np.sin(ip.x * np.pi)
+        np.testing.assert_allclose(p, expect, rtol=5e-3)
+
+    def test_should_work_with_method_splash_norm(self):
+        # Given
+        pa = self._make_2d_grid()
+
+        # When.
+        ip = Interpolator(
+            [pa], domain_manager=self._domain, method='splash_norm'
+        )
+        x, y = np.random.random((2, 5, 5))
+        ip.set_interpolation_points(x=x, y=y)
+        p = ip.interpolate('p')
+
+        # Then.
+        expect = np.sin(ip.x * np.pi)
+        np.testing.assert_allclose(p, expect, rtol=5e-3)
+
     def test_gradient_calculation_2d(self):
         # Given
         pa = self._make_2d_grid()
@@ -339,6 +371,33 @@ class TestInterpolator(unittest.TestCase):
         # Then.
         self.assertRaises(RuntimeError, ip.interpolate, 'p', 1)
 
+    def test_gradient_with_splash(self):
+        # Given
+        pa = self._make_2d_grid()
+
+        # When.
+        ip = Interpolator(
+            [pa], domain_manager=self._domain, method='splash'
+        )
+        x, y = np.random.random((2, 5, 5))
+        ip.set_interpolation_points(x=x, y=y)
+
+        # Then.
+        self.assertRaises(RuntimeError, ip.interpolate, 'p', 1)
+
+    def test_gradient_with_splash_norm(self):
+        # Given
+        pa = self._make_2d_grid()
+
+        # When.
+        ip = Interpolator(
+            [pa], domain_manager=self._domain, method='splash_norm'
+        )
+        x, y = np.random.random((2, 5, 5))
+        ip.set_interpolation_points(x=x, y=y)
+
+        # Then.
+        self.assertRaises(RuntimeError, ip.interpolate, 'p', 1)
 
 if __name__ == '__main__':
     unittest.main()

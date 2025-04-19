@@ -12,7 +12,6 @@ from pysph.tools.dump_xdmf import main as dump_xdmf
 
 
 class TestDumpXDMF(unittest.TestCase):
-
     def test_dump_xdmf(self, npoints=10, random_seed=0):
         vtk = importorskip('vtk')
         np.random.seed(random_seed)
@@ -30,7 +29,7 @@ class TestDumpXDMF(unittest.TestCase):
 
         try:
             # Generate XDMF for dumped hdf5 file.
-            dump_xdmf([hdf5file, '--outdir', tmp_dir])
+            dump_xdmf([hdf5file, '--combine-particle-arrays', '--outdir', tmp_dir])
 
             # Retrieve data by reading xdmf file
             xdmffile = Path(hdf5file).with_suffix('.xdmf')
