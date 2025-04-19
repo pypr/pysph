@@ -1,6 +1,5 @@
 # Standard library imports
 from functools import reduce
-interpolator_methods = ['shepard', 'sph', 'order1', 'splash', 'splash_norm']
 # Library imports.
 import numpy as np
 
@@ -228,6 +227,7 @@ class Interpolator(object):
     or given set of particles.  This is particularly handy for visualization.
 
     """
+    METHODS = ['shepard', 'sph', 'order1', 'splash', 'splash_norm']
 
     def __init__(self, particle_arrays, num_points=125000, kernel=None,
                  x=None, y=None, z=None, domain_manager=None,
@@ -277,7 +277,7 @@ class Interpolator(object):
         self.func_eval = None
         self.domain_manager = domain_manager
         self.method = method
-        if method not in interpolator_methods:
+        if method not in self.METHODS:
             raise RuntimeError('%s method is not implemented' % (method))
         if x is None and y is None and z is None:
             self.set_domain(bounds, shape)

@@ -41,7 +41,6 @@ from pysph.solver.utils import remove_irrelevant_files, _sort_key  # noqa: E402
 from pysph.tools.interpolator import (
         get_bounding_box, get_nx_ny_nz, Interpolator)  # noqa: E402
 from pysph.base import kernels
-from pysph.tools.interpolator import interpolator_methods
 import logging  # noqa: E402
 logger = logging.getLogger()
 
@@ -156,7 +155,7 @@ class InterpolatorView(HasTraits):
     kernels_list = List([name for name, obj in inspect.getmembers(kernels)
                          if inspect.isclass(obj)])
 
-    methods_list = List(interpolator_methods)
+    methods_list = List(Interpolator.METHODS)
 
     scene = Instance(MlabSceneModel)
 
