@@ -311,6 +311,10 @@ cdef class AccelerationEval:
         ## ---------------------
         ## ---- Subgroups start
         % if group.has_subgroups:
+        % if group.pre:
+        with profile_ctx("AccelerationEval.${group.name}.pre"):
+            ${indent(helper.get_pre_call(group), indent_lvl + 1)}
+        % endif
         % for sg_idx, sub_group in enumerate(group.data):
         ${indent("# Doing subgroup " + str(sg_idx), indent_lvl)}
         % if sub_group.condition is not None:
@@ -328,6 +332,23 @@ cdef class AccelerationEval:
         % endfor # (for sg_idx, sub_group in enumerate(group.data))
         ## ---- Subgroups done
         ## ---------------------
+        #######################################################################
+        ## Update NNPS locally if needed
+        #######################################################################
+        % if group.update_nnps:
+        # Updating NNPS.
+        with profile_ctx("Integrator.update_domain"):
+            nnps.update_domain()
+        with profile_ctx("nnps.update"):
+            nnps.update()
+        % endif
+        #######################################################################
+        ## Call any `post` functions
+        #######################################################################
+        % if group.post:
+        with profile_ctx("AccelerationEval.${group.name}.post"):
+            ${indent(helper.get_post_call(group), indent_lvl + 1)}
+        % endif
         % else:  # No subgroups
         ${indent(do_group(helper, group, indent_lvl), indent_lvl)}
         % endif  # (if group.has_subgroups)

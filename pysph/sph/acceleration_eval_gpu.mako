@@ -103,6 +103,15 @@ ${helper.get_header()}
 ## Handle sub-groups.
 #######################################################################
 % if group.has_subgroups:
+#######################################################################
+## Call any `pre` functions
+#######################################################################
+% if group.pre:
+<% helper.call_pre(group) %>
+% endif
+#######################################################################
+## Loop over sub-groups
+#######################################################################
 % for sg_idx, sub_group in enumerate(group.data):
 // Subgroup ${sg_idx}
 % if sub_group.condition is not None:
@@ -110,6 +119,18 @@ ${helper.get_header()}
 % endif
 ${do_group(helper, g_idx, sg_idx, sub_group)}
 % endfor ## sg_idx
+#######################################################################
+## Update NNPS locally if needed
+#######################################################################
+% if group.update_nnps:
+<% helper.call_update_nnps(group) %>
+% endif
+#######################################################################
+## Call any `post` functions
+#######################################################################
+% if group.post:
+<% helper.call_post(group) %>
+% endif
 % else:
 ${do_group(helper, g_idx, -1, group)}
 % endif ## has_subgroups
