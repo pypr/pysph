@@ -530,6 +530,35 @@ class TestAccelerationEval1D(unittest.TestCase):
         expect = np.asarray([7., 9., 11., 11., 11., 11., 11., 11., 9., 7.])
         self.assertListEqual(list(pa.u), list(expect))
 
+    def test_should_call_pre_post_functions_in_outer_group_of_nested_group(self):
+        # Given
+        pa = self.pa
+
+        def pre():
+            pa.m += 1.0
+
+        def post():
+            pa.u += 1.0
+
+        equations = [
+            Group(equations=[
+                Group(
+                    equations=[
+                        SimpleEquation(dest='fluid', sources=['fluid'])
+                    ],
+                )],
+                pre=pre, post=post
+            )
+        ]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.asarray([7., 9., 11., 11., 11., 11., 11., 11., 9., 7.])
+        self.assertListEqual(list(pa.u), list(expect))
+
     def test_should_honor_start_stop_idx_in_group(self):
         # Given
         pa = self.pa
@@ -1021,6 +1050,39 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         # Then
         expect = np.asarray([7., 9., 11., 11., 11., 11., 11., 11., 9., 7.])
         self.assertListEqual(list(pa.u), list(expect))
+
+
+    def test_should_call_pre_post_functions_in_mother_group_of_nested_group_on_gpu(self):
+        # Given
+        pa = self.pa
+
+        def pre():
+            pa.m += 1.0
+            pa.gpu.push('m')
+
+        def post():
+            pa.gpu.pull('u')
+            pa.u += 1.0
+
+        equations = [
+            Group(
+                equations = [
+                    Group(
+                        equations=[
+                            SimpleEquation(dest='fluid', sources=['fluid'])
+                        ],
+                )], pre=pre, post=post
+            )
+        ]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.asarray([7., 9., 11., 11., 11., 11., 11., 11., 9., 7.])
+        self.assertListEqual(list(pa.u), list(expect))
+
 
     def test_should_honor_start_stop_idx_in_group_on_gpu(self):
         # Given
