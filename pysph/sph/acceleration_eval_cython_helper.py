@@ -165,10 +165,12 @@ class AccelerationEvalCythonHelper(object):
         depends = ["pysph.base.nnps_base"]
         # Add pysph/base directory to inc_dirs for including spatial_hash.h
         # for SpatialHashNNPS
+        cython_inc = [dirname(dirname(dirname(realpath(__file__))))]
         extra_inc_dirs = [join(dirname(dirname(realpath(__file__))), 'base')]
         self._ext_mod = ExtModule(
             code, verbose=False, root=root, depends=depends,
-            extra_inc_dirs=extra_inc_dirs
+            extra_inc_dirs=extra_inc_dirs, 
+            cython_inc_dirs=cython_inc
         )
         self._module = self._ext_mod.load()
         return self._module
