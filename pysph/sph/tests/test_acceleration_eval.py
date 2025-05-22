@@ -530,7 +530,7 @@ class TestAccelerationEval1D(unittest.TestCase):
         expect = np.asarray([7., 9., 11., 11., 11., 11., 11., 11., 9., 7.])
         self.assertListEqual(list(pa.u), list(expect))
 
-    def test_should_call_pre_post_functions_in_outer_group_of_nested_group(self):
+    def test_should_call_pre_post_in_mother_group_with_cython(self):
         # Given
         pa = self.pa
 
@@ -1052,7 +1052,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         self.assertListEqual(list(pa.u), list(expect))
 
 
-    def test_should_call_pre_post_functions_in_mother_group_of_nested_group_on_gpu(self):
+    def test_should_call_pre_post_in_mother_group_on_gpu(self):
         # Given
         pa = self.pa
 
