@@ -473,7 +473,7 @@ to do this every time.
 
 
 ^^^^^^^^^^^^^
-OpenMP on OSX
+OpenMP on MacOS
 ^^^^^^^^^^^^^
 
 The default clang compiler available on MacOS uses an LLVM backend and does
@@ -482,8 +482,20 @@ installing the OpenMP support for clang. This can be done with brew_ using::
 
   $ brew install libomp
 
-Once that is done, it should "just work". If you get strange errors, try
-setting the ``MACOSX_DEPLOYMENT_TARGET`` as shown above.
+`LLVM <https://formulae.brew.sh/formula/llvm>`_ can also be installed using
+brew_, likewise. Once this is done, you can use the following
+`compyle config <https://compyle.readthedocs.io/en/latest/installation.html#config>`_::
+
+    import os
+    os.environ['CC'] = '/opt/homebrew/opt/llvm@15/bin/clang'
+    os.environ['CXX'] = '/opt/homebrew/opt/llvm@15/bin/clang++'
+    OMP_CFLAGS=['-I/opt/homebrew/opt/libomp/include', '-I/opt/homebrew/opt/llvm@15/include', '-Xclang', '-fopenmp']
+    OMP_LINK=['-L/opt/homebrew/opt/libomp/lib', '-L/opt/homebrew/opt/llvm@15/lib', '-lomp']
+
+The above config assumes that you have installed `llvm@15`. You can change the
+config according to the version at the time of installing. If you get strange
+errors, you can also try setting the ``MACOSX_DEPLOYMENT_TARGET`` as shown
+above.
 
 Another option is to install GCC for MacOS available on brew_ using ::
 
