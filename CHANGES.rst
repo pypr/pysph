@@ -1,3 +1,9 @@
+1.0b3
+-----
+
+* Release date: still under development.
+
+
 1.0b2
 -----
 
@@ -14,7 +20,7 @@ Navaneet, Prabhu Ramachandran.
   * Added splash interpolation method
   * Fixed the viewer so it persists its shape, add play/pause/next/prev buttons.
   * Add ability to change the interpolation scheme to the UI.
-  * Add a ``dump_xdmf`` option to dump XDMF VTK files for visualization with other tools.
+  * Add a ``dump_xdmf`` option to dump XDMF files for visualization with other tools.
   * Add a name kwarg to ``Group`` for use while profiling.
   * Improve existing gas dynamics schemes and add new ones like magma2.
 

@@ -737,7 +737,7 @@ def setup_package():
           "framework",
           long_description=open('README.rst').read(),
           url='http://github.com/pypr/pysph',
-          license="BSD",
+          license="BSD-3-Clause",
           keywords="SPH simulation computational fluid dynamics",
           packages=find_packages(),
           package_data={
@@ -765,7 +765,6 @@ def setup_package():
             Environment :: Console
             Intended Audience :: Developers
             Intended Audience :: Science/Research
-            License :: OSI Approved :: BSD License
             Natural Language :: English
             Operating System :: MacOS :: MacOS X
             Operating System :: Microsoft :: Windows
