@@ -143,11 +143,6 @@ Up-to-date details on how to install PySPH on Linux/OS X and Windows are
 available from
 `here <http://pysph.readthedocs.org/en/latest/installation.html>`_.
 
-If you wish to see a working build/test script please see our `shippable.yml
-<https://github.com/pypr/pysph/blob/main/shippable.yml>`_. For
-Windows platforms see the `appveyor.yml
-<https://github.com/pypr/pysph/blob/main/appveyor.yml>`_.
-
 Running the examples
 --------------------
 

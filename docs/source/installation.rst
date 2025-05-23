@@ -267,9 +267,7 @@ be used as::
 
 where the ``$INSTALL_PREFIX`` is where the library and includes will be
 installed (remember, this script is in the PyZoltan repository and not in
-PySPH). You may edit and tweak the build to suit your installation. However,
-this script is what we use to build Zoltan on our continuous integration
-servers on Travis-CI_ and Shippable_.
+PySPH). You may edit and tweak the build to suit your installation. 
 
 After Zoltan is build, set the environment variable ``ZOLTAN`` to point to the
 ``$INSTALL_PREFIX`` that you used above::
@@ -384,16 +382,6 @@ You should be set now and should skip to :ref:`downloading-pysph` and
 On recent versions of Ubuntu (16.10 and 18.04) there may be problems with
 Mayavi viewer, and ``pysph view`` may not work correctly. To see how to
 resolve these, please look at :ref:`viewer-issues`.
-
-
-.. note::
-
-    If you wish to see a working build/test script please see our
-    `shippable.yml
-    <https://github.com/pypr/pysph/tree/main/shippable.yml>`_.
-
-.. _Shippable: http://shippable.com
-.. _Travis-CI: http://travis-ci.org
 
 .. _installing-deps-ubuntu-1804:
 
