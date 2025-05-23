@@ -312,7 +312,7 @@ ZOLTAN, see here, :ref:`pip-cache-issues`.
         $ export ZOLTAN_LIBRARY=/usr/lib
 
 
-    Similarly, for Ubuntu, see :ref:`installing-deps-ubuntu-1804`.
+    Similarly, for Ubuntu, see :ref:`installing-deps-ubuntu`.
 
     By the way, you may also set these in the configuration file described in
     :ref:`config-file`.
@@ -383,13 +383,13 @@ On recent versions of Ubuntu (16.10 and 18.04) there may be problems with
 Mayavi viewer, and ``pysph view`` may not work correctly. To see how to
 resolve these, please look at :ref:`viewer-issues`.
 
-.. _installing-deps-ubuntu-1804:
+.. _installing-deps-ubuntu:
 
 --------------------------------------------
-Installing the dependencies on Ubuntu 18.04
+Installing the dependencies on Ubuntu
 --------------------------------------------
 
-On Ubuntu 18.04 it should be relatively simple to install PySPH with ZOLTAN as
+On Ubuntu LTS it should be relatively simple to install PySPH with ZOLTAN as
 follows::
 
   # For OpenMP
