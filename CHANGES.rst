@@ -1,7 +1,27 @@
 1.0b2
 -----
 
-* Release date: Still under development.
+Around 26 pull requests were merged. Thanks to the following who contributed
+to this release (in alphabetical order): Abhinav Muta, Antonio Valentino,
+Navaneet, Prabhu Ramachandran.
+
+* Release date: 23 May, 2025.
+
+* Enhancements:
+
+  * Support NumPy2 and Cython 3.
+  * Fix compatibility with Python 3.11, 3.12.
+  * Added splash interpolation method
+  * Fixed the viewer so it persists its shape, add play/pause/next/prev buttons.
+  * Add ability to change the interpolation scheme to the UI.
+  * Add a ``dump_xdmf`` option to dump XDMF VTK files for visualization with other tools.
+  * Add a name kwarg to ``Group`` for use while profiling.
+  * Improve existing gas dynamics schemes and add new ones like magma2.
+
+* Bug fixes:
+
+  * Fixed a bug where the parent group of a sub group's pre and post methods were ignored.
+  * Various miscellaneous fixes.
 
 
 1.0b1
@@ -185,6 +205,7 @@ nilsmeyerkit, Rahul Govind, Sanka Suraj.
 .. _h5py: http://www.h5py.org
 .. _PyVisfile: http://github.com/inducer/pyvisfile
 .. _Mayavi: http://code.enthought.com/projects/mayavi/
+.. _mpi4py: https://mpi4py.github.io/
 
 1.0a3
 ------
