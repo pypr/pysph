@@ -72,9 +72,9 @@ The brief overview of :py:class:`InletOutletManager` subclass::
 
 To explain the inlet outlet manager in detail, let us consider the mirror
 boundary implemented using IOM class in `simple_inlet_outlet.py
-<https://github.com/pypr/pysph/blob/master/pysph/sph/bc/mirror/simple_inlet_outlet.py>`_
+<https://github.com/pypr/pysph/blob/main/pysph/sph/bc/mirror/simple_inlet_outlet.py>`_
 for `EDACScheme
-<https://github.com/pypr/pysph/blob/master/pysph/sph/wc/edac.py>`_::
+<https://github.com/pypr/pysph/blob/main/pysph/sph/wc/edac.py>`_::
 
 
     class EDACScheme(Scheme):
@@ -165,7 +165,7 @@ Additionally, in the :py:class:`Application` instance:
 
 The IOM enables the management of the above steps easy to handle. An example
 showing the usage of IOM is the `flow_past_cylinder_2d.py
-<https://github.com/pypr/pysph/tree/master/pysph/examples/flow_past_cylinder_2d.py>`_.
+<https://github.com/pypr/pysph/tree/main/pysph/examples/flow_past_cylinder_2d.py>`_.
 
 .. note::
 

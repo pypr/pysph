@@ -143,7 +143,7 @@ def _write_readme_requrements(path):
                 meshio
                 cyarray
                 compyle
-                https://github.com/pypr/pysph/zipball/master
+                https://github.com/pypr/pysph/zipball/main
                 ''')
             )
 

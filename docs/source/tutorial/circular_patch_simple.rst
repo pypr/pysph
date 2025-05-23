@@ -24,7 +24,7 @@ with increasing complexity.
 
 The first example we consider is a "patch" test for SPH formulations for
 incompressible fluids in `elliptical_drop_simple.py
-<https://github.com/pypr/pysph/tree/master/pysph/examples/elliptical_drop_simple.py>`_.
+<https://github.com/pypr/pysph/tree/main/pysph/examples/elliptical_drop_simple.py>`_.
 This problem simulates the evolution of a 2D circular patch of fluid under the
 influence of an initial velocity field given by:
 
@@ -42,7 +42,7 @@ Imports
 ~~~~~~~~~~~~~
 
 Taking a look at the example (see `elliptical_drop_simple.py
-<https://github.com/pypr/pysph/tree/master/pysph/examples/elliptical_drop_simple.py>`_),
+<https://github.com/pypr/pysph/tree/main/pysph/examples/elliptical_drop_simple.py>`_),
 the first several lines are imports of various modules:
 
 .. code-block:: python
@@ -398,7 +398,7 @@ The viewer will always look for a ``mayavi_config.py`` script inside the
 output directory to setup the visualization parameters. This file can be
 created by overriding the :py:class:`pysph.solver.application.Application`
 object's ``customize_output`` method. See the `dam break 3d
-<https://github.com/pypr/pysph/blob/master/pysph/examples/dam_break_3d.py>`_
+<https://github.com/pypr/pysph/blob/main/pysph/examples/dam_break_3d.py>`_
 example to see this being used. Of course, this file can also be created
 manually.
 
@@ -555,7 +555,7 @@ of the results. Many pysph examples also include post processing code in the
 example. This makes it easy to reproduce results and also easily compare
 different schemes. A complete version of the elliptical drop example is
 available at `elliptical_drop.py
-<https://github.com/pypr/pysph/tree/master/pysph/examples/elliptical_drop.py>`_.
+<https://github.com/pypr/pysph/tree/main/pysph/examples/elliptical_drop.py>`_.
 
 There are a few things that this example does a bit differently:
 
@@ -604,7 +604,7 @@ documentation to see these. The order of invocation of the various methods is
 also documented there.
 
 There are several `examples
-<https://github.com/pypr/pysph/tree/master/pysph/examples/>`_ that
+<https://github.com/pypr/pysph/tree/main/pysph/examples/>`_ that
 ship with PySPH, explore these to get a better idea of what is possible.
 
 

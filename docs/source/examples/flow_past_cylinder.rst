@@ -21,7 +21,7 @@ right. In order to perform the simulation five particle arrays, ``solid``,
 and ``outlet`` are solved according to the equations provided by the Inlet
 Outlet Manager (IOM). The example source can be seen at
 `flow_past_cylinder_2d.py
-<https://github.com/pypr/pysph/tree/master/pysph/examples/flow_past_cylinder_2d.py>`_.
+<https://github.com/pypr/pysph/tree/main/pysph/examples/flow_past_cylinder_2d.py>`_.
 
 
 This example demonstrates:

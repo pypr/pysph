@@ -53,7 +53,7 @@ can download the sources either using the tarball/ZIP or from git, see
 The above will install the latest released version of PySPH, you can install
 the development version using::
 
-    $ pip install https://github.com/pypr/pysph/zipball/master
+    $ pip install https://github.com/pypr/pysph/zipball/main
 
 If you wish to track the development of the package, clone the repository (as
 described in :ref:`downloading-pysph` and do the following::
@@ -181,7 +181,7 @@ The core dependencies are:
   - pytest_ for running the unit tests.
 
 The project's `requirements.txt
-<https://github.com/pypr/pysph/tree/master/requirements.txt>`_ lists all the
+<https://github.com/pypr/pysph/tree/main/requirements.txt>`_ lists all the
 required core dependencies.
 
 These packages can be installed from your Python distribution's package
@@ -259,7 +259,7 @@ Building and linking PyZoltan on OSX/Linux
 If you want to use PySPH in parallel you will need to install PyZoltan_.
 PyZoltan requires the Zoltan library to be available. We've provided a simple
 `Zoltan build script
-<https://github.com/pypr/pyzoltan/blob/master/build_zoltan.sh>`_ in the
+<https://github.com/pypr/pyzoltan/blob/main/build_zoltan.sh>`_ in the
 PyZoltan_ repository. This works on Linux and OS X but not on Windows. It can
 be used as::
 
@@ -267,9 +267,7 @@ be used as::
 
 where the ``$INSTALL_PREFIX`` is where the library and includes will be
 installed (remember, this script is in the PyZoltan repository and not in
-PySPH). You may edit and tweak the build to suit your installation. However,
-this script is what we use to build Zoltan on our continuous integration
-servers on Travis-CI_ and Shippable_.
+PySPH). You may edit and tweak the build to suit your installation. 
 
 After Zoltan is build, set the environment variable ``ZOLTAN`` to point to the
 ``$INSTALL_PREFIX`` that you used above::
@@ -314,7 +312,7 @@ ZOLTAN, see here, :ref:`pip-cache-issues`.
         $ export ZOLTAN_LIBRARY=/usr/lib
 
 
-    Similarly, for Ubuntu, see :ref:`installing-deps-ubuntu-1804`.
+    Similarly, for Ubuntu, see :ref:`installing-deps-ubuntu`.
 
     By the way, you may also set these in the configuration file described in
     :ref:`config-file`.
@@ -385,23 +383,13 @@ On recent versions of Ubuntu (16.10 and 18.04) there may be problems with
 Mayavi viewer, and ``pysph view`` may not work correctly. To see how to
 resolve these, please look at :ref:`viewer-issues`.
 
-
-.. note::
-
-    If you wish to see a working build/test script please see our
-    `shippable.yml
-    <https://github.com/pypr/pysph/tree/master/shippable.yml>`_.
-
-.. _Shippable: http://shippable.com
-.. _Travis-CI: http://travis-ci.org
-
-.. _installing-deps-ubuntu-1804:
+.. _installing-deps-ubuntu:
 
 --------------------------------------------
-Installing the dependencies on Ubuntu 18.04
+Installing the dependencies on Ubuntu
 --------------------------------------------
 
-On Ubuntu 18.04 it should be relatively simple to install PySPH with ZOLTAN as
+On Ubuntu LTS it should be relatively simple to install PySPH with ZOLTAN as
 follows::
 
   # For OpenMP
@@ -485,7 +473,7 @@ to do this every time.
 
 
 ^^^^^^^^^^^^^
-OpenMP on OSX
+OpenMP on MacOS
 ^^^^^^^^^^^^^
 
 The default clang compiler available on MacOS uses an LLVM backend and does
@@ -494,8 +482,20 @@ installing the OpenMP support for clang. This can be done with brew_ using::
 
   $ brew install libomp
 
-Once that is done, it should "just work". If you get strange errors, try
-setting the ``MACOSX_DEPLOYMENT_TARGET`` as shown above.
+`LLVM <https://formulae.brew.sh/formula/llvm>`_ can also be installed using
+brew_, likewise. Once this is done, you can use the following
+`compyle config <https://compyle.readthedocs.io/en/latest/installation.html#config>`_::
+
+    import os
+    os.environ['CC'] = '/opt/homebrew/opt/llvm@15/bin/clang'
+    os.environ['CXX'] = '/opt/homebrew/opt/llvm@15/bin/clang++'
+    OMP_CFLAGS=['-I/opt/homebrew/opt/libomp/include', '-I/opt/homebrew/opt/llvm@15/include', '-Xclang', '-fopenmp']
+    OMP_LINK=['-L/opt/homebrew/opt/libomp/lib', '-L/opt/homebrew/opt/llvm@15/lib', '-lomp']
+
+The above config assumes that you have installed `llvm@15`. You can change the
+config according to the version at the time of installing. If you get strange
+errors, you can also try setting the ``MACOSX_DEPLOYMENT_TARGET`` as shown
+above.
 
 Another option is to install GCC for MacOS available on brew_ using ::
 
@@ -864,7 +864,7 @@ If you are going to be using PySPH with MPI support you will likely need to do::
 
 You can install the development version using::
 
-    $ pip install https://github.com/pypr/pysph/zipball/master
+    $ pip install https://github.com/pypr/pysph/zipball/main
 
 If you downloaded PySPH using git_ or used a tarball you can do::
 

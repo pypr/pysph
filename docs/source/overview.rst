@@ -49,7 +49,7 @@ Features
   - Seamless multi-core support with OpenMP.
   - Seamless GPU support with PyOpenCL_.
   - Seamless parallel integration using Zoltan_.
-  - `BSD license <https://github.com/pypr/pysph/tree/master/LICENSE.txt>`_.
+  - `BSD license <https://github.com/pypr/pysph/tree/main/LICENSE.txt>`_.
 
 -----------------
 SPH formulations
