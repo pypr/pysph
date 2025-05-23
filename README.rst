@@ -144,9 +144,9 @@ available from
 `here <http://pysph.readthedocs.org/en/latest/installation.html>`_.
 
 If you wish to see a working build/test script please see our `shippable.yml
-<https://github.com/pypr/pysph/blob/master/shippable.yml>`_. For
+<https://github.com/pypr/pysph/blob/main/shippable.yml>`_. For
 Windows platforms see the `appveyor.yml
-<https://github.com/pypr/pysph/blob/master/appveyor.yml>`_.
+<https://github.com/pypr/pysph/blob/main/appveyor.yml>`_.
 
 Running the examples
 --------------------
@@ -182,7 +182,7 @@ as::
 This runs the 3D dam-break problem which is also a SPHERIC benchmark
 `Test 2 <https://wiki.manchester.ac.uk/spheric/index.php/Test2>`_
 
-.. figure:: https://github.com/pypr/pysph/raw/master/docs/Images/db3d.png
+.. figure:: https://github.com/pypr/pysph/raw/main/docs/Images/db3d.png
    :width: 550px
    :alt: Three-dimensional dam-break example
 
@@ -195,7 +195,7 @@ Adami et al. The output directory ``cavity_output`` will also contain
 streamlines and other post-processed results after the simulation completes.
 For example the streamlines look like the following image:
 
-.. figure:: https://github.com/pypr/pysph/raw/master/docs/Images/ldc-streamlines.png
+.. figure:: https://github.com/pypr/pysph/raw/main/docs/Images/ldc-streamlines.png
    :width: 550px
    :alt: Lid-driven-cavity example
 
@@ -206,7 +206,7 @@ examples from the ``pysph.examples.solid_mech`` package::
 
 Which runs the problem of the collision of two elastic rings:
 
-.. figure:: https://github.com/pypr/pysph/raw/master/docs/Images/rings-collision.png
+.. figure:: https://github.com/pypr/pysph/raw/main/docs/Images/rings-collision.png
    :width: 550px
    :alt: Collision of two steel rings
 

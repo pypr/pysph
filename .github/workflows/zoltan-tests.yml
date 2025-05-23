@@ -43,9 +43,9 @@ jobs:
           conda install -c conda-forge numpy cython
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install "mpi4py<4.0"
-          python -m pip install https://github.com/pypr/cyarray/zipball/master
-          python -m pip install https://github.com/pypr/compyle/zipball/master
-          python -m pip install --no-build-isolation https://github.com/pypr/pyzoltan/zipball/master
+          python -m pip install https://github.com/pypr/cyarray/zipball/main
+          python -m pip install https://github.com/pypr/compyle/zipball/main
+          python -m pip install --no-build-isolation https://github.com/pypr/pyzoltan/zipball/main
           python -m pip install -r requirements.txt
           python -m pip install -r requirements-test.txt
           python -m pip install --no-build-isolation -v -e .

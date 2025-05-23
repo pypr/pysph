@@ -53,7 +53,7 @@ can download the sources either using the tarball/ZIP or from git, see
 The above will install the latest released version of PySPH, you can install
 the development version using::
 
-    $ pip install https://github.com/pypr/pysph/zipball/master
+    $ pip install https://github.com/pypr/pysph/zipball/main
 
 If you wish to track the development of the package, clone the repository (as
 described in :ref:`downloading-pysph` and do the following::
@@ -181,7 +181,7 @@ The core dependencies are:
   - pytest_ for running the unit tests.
 
 The project's `requirements.txt
-<https://github.com/pypr/pysph/tree/master/requirements.txt>`_ lists all the
+<https://github.com/pypr/pysph/tree/main/requirements.txt>`_ lists all the
 required core dependencies.
 
 These packages can be installed from your Python distribution's package
@@ -259,7 +259,7 @@ Building and linking PyZoltan on OSX/Linux
 If you want to use PySPH in parallel you will need to install PyZoltan_.
 PyZoltan requires the Zoltan library to be available. We've provided a simple
 `Zoltan build script
-<https://github.com/pypr/pyzoltan/blob/master/build_zoltan.sh>`_ in the
+<https://github.com/pypr/pyzoltan/blob/main/build_zoltan.sh>`_ in the
 PyZoltan_ repository. This works on Linux and OS X but not on Windows. It can
 be used as::
 
@@ -390,7 +390,7 @@ resolve these, please look at :ref:`viewer-issues`.
 
     If you wish to see a working build/test script please see our
     `shippable.yml
-    <https://github.com/pypr/pysph/tree/master/shippable.yml>`_.
+    <https://github.com/pypr/pysph/tree/main/shippable.yml>`_.
 
 .. _Shippable: http://shippable.com
 .. _Travis-CI: http://travis-ci.org
@@ -864,7 +864,7 @@ If you are going to be using PySPH with MPI support you will likely need to do::
 
 You can install the development version using::
 
-    $ pip install https://github.com/pypr/pysph/zipball/master
+    $ pip install https://github.com/pypr/pysph/zipball/main
 
 If you downloaded PySPH using git_ or used a tarball you can do::
 

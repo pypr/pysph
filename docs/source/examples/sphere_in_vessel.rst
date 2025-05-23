@@ -14,7 +14,7 @@ There are many command line options that this example provides, check them out w
   $ python sphere_in_vessel.py -h
 
 The example source can be seen at `sphere_in_vessel.py
-<https://github.com/pypr/pysph/tree/master/pysph/examples/rigid_body/sphere_in_vessel_akinci.py>`_.
+<https://github.com/pypr/pysph/tree/main/pysph/examples/rigid_body/sphere_in_vessel_akinci.py>`_.
 
 
 This example demonstrates:

@@ -13,7 +13,7 @@ There are many command line options that this example provides, check them out w
    $ pysph run taylor_green -h
 
 The example source can be seen at `taylor_green.py
-<https://github.com/pypr/pysph/tree/master/pysph/examples/taylor_green.py>`_.
+<https://github.com/pypr/pysph/tree/main/pysph/examples/taylor_green.py>`_.
 
 
 This example demonstrates several useful features:
