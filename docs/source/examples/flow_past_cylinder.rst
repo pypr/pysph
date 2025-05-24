@@ -239,7 +239,7 @@ force is evaluated by solving the following equations
                     ], real=True),
         ]
 
-The equations are solved on the output saved as *.npz files. In the
+The equations are solved on the output saved as \*.npz files. In the
 equation ``SolidWallNoSlipBCReverse`` we are just reversing the sign of the
 velocity difference unlike the usual equation where :math:`u - u_g` is used.
 The total force is evaluated by multiplying the acceleration with the mass of

@@ -134,6 +134,7 @@ for `EDACScheme
                     equations.append(grp)
 
             return equations
+
 .. py:currentmodule:: pysph.sph.wc.edac
 
 - The additional properties can be added in the function ``add_io_properties``

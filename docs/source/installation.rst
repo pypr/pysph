@@ -304,8 +304,8 @@ ZOLTAN, see here, :ref:`pip-cache-issues`.
 
     For example, if you are on `Arch <https://archlinux.org/>`_ or an
     Arch-based distro, this can be accomplished using
-    `zoltan <https://aur.archlinux.org/packages/zoltan>`_ or
-    `trilinos <https://aur.archlinux.org/packages/trilinos>`_ from AUR. Then,
+    `zoltan(aur) <https://aur.archlinux.org/packages/zoltan>`_ or
+    `trilinos(aur) <https://aur.archlinux.org/packages/trilinos>`_. Then,
     the environment variables should set as::
 
         $ export ZOLTAN_INCLUDE=/usr/include
@@ -472,9 +472,9 @@ in your default environment (``.bashrc`` for bash shells) so you do not have
 to do this every time.
 
 
-^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^
 OpenMP on MacOS
-^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^
 
 The default clang compiler available on MacOS uses an LLVM backend and does
 not support OpenMP_. There are two ways to support OpenMP. The first involves
