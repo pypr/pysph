@@ -78,7 +78,7 @@ Implicit Incompressible SPH
    :undoc-members:
 
 Hopkins' ‘Traditional’ SPH (TSPH)
---------------
+---------------------------------
 
 .. automodule:: pysph.sph.gas_dynamics.tsph
    :members: TSPHScheme, SummationDensity, IdealGasEOS, VelocityGradDivC1,
@@ -87,11 +87,11 @@ Hopkins' ‘Traditional’ SPH (TSPH)
    :member-order: bysource
 
 Hopkins' ‘Modern’ SPH (PSPH)
---------------
+----------------------------
 
 .. automodule:: pysph.sph.gas_dynamics.psph
    :members: PSPHScheme, PSPHSummationDensityAndPressure, GradientKinsfolkC1,
-             VelocityGradDivC1, LimiterAndAlphas, WallBoundary,
+             LimiterAndAlphas, WallBoundary,
              UpdateGhostProps, MomentumAndEnergy
    :undoc-members:
    :member-order: bysource
@@ -103,7 +103,7 @@ MAGMA2
    :members: IncreaseSmoothingLength, UpdateSmoothingLength,
              SummationDensityMPMStyle, IdealGasEOS, AuxiliaryGradient,
              CorrectionMatrix, FirstGradient, SecondGradient,
-             EntropyBasedDissipationTrigger, WallBoundary, UpdateGhostProps
+             EntropyBasedDissipationTrigger, WallBoundary, 
              MomentumAndEnergyMI1, MomentumAndEnergyMI2,
              MomentumAndEnergyStdGrad, EvaluateTildeMu,
              SettleByArtificialPressure
