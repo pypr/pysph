@@ -484,7 +484,7 @@ installing the OpenMP support for clang. This can be done with brew_ using::
 
 `LLVM <https://formulae.brew.sh/formula/llvm>`_ can also be installed using
 brew_, likewise. Once this is done, you can use the following
-`compyle config <https://compyle.readthedocs.io/en/latest/installation.html#config>`_::
+`compyle config <https://compyle.readthedocs.io/en/main/installation.html#config>`_::
 
     import os
     os.environ['CC'] = '/opt/homebrew/opt/llvm@15/bin/clang'

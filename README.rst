@@ -21,8 +21,8 @@ The latest documentation for PySPH is available at
     :target: https://github.com/pypr/pysph/actions/workflows/tests.yml
 .. |MPI Build Status| image:: https://github.com/pypr/pysph/actions/workflows/zoltan-tests.yml/badge.svg
     :target: https://github.com/pypr/pysph/actions/workflows/zoltan-tests.yml
-.. |Documentation Status| image:: https://readthedocs.org/projects/pysph/badge/?version=latest
-    :target: https://pysph.readthedocs.io/en/latest/?badge=latest
+.. |Documentation Status| image:: https://readthedocs.org/projects/pysph/badge/?version=main
+    :target: https://pysph.readthedocs.io/en/main/?badge=main
     :alt: Documentation Status
 
 
