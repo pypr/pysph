@@ -1066,6 +1066,11 @@ class QuinticSpline(object):
              \sigma_5  = \ & \frac{7}{478\pi h^2}, \ & \textrm{for dim=2}, \\
              \sigma_5  = \ & \frac{1}{120\pi h^3}, & \textrm{for dim=3}. \\
 
+    .. note:: 
+             The 1D coefficient was corrected from :math:'1/60' to \\
+             :math:'1/120' (see issue #421). Normalization requires integration \\
+             over the full domain :math:'[−3h, 3h]'. 
+
     """
 
     def __init__(self, dim=2):
