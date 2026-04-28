@@ -17,11 +17,8 @@ from pysph.sph.gas_dynamics.tsph import TSPHScheme
 from pysph.sph.gas_dynamics.magma2 import MAGMA2Scheme
 from pysph.examples.gas_dynamics.riemann_2d_config import R2DConfig
 
-# current case from the al possible unique cases
-case = 3
-
 # config for current case
-config = R2DConfig(case)
+config = None
 gamma = 1.4
 gamma1 = gamma - 1
 kernel_factor = 1.5
@@ -31,11 +28,15 @@ dim = 2
 
 class Riemann2D(Application):
     def initialize(self):
-        # square domain
         self.dt = dt
-        self.tf = config.endtime
 
     def add_user_options(self, group):
+        group.add_argument(
+            "--case", action="store", type=int,
+            dest="case", default=3,
+            choices=[2, 3, 4, 5, 6, 8, 12],
+            help="Riemann 2D case number, one of 2, 3, 4, 5, 6, 8, 12"
+        )
         group.add_argument(
             "--dscheme", choices=["constant_mass", "constant_volume"],
             dest="dscheme", default="constant_volume",
@@ -48,6 +49,9 @@ class Riemann2D(Application):
         )
 
     def consume_user_options(self):
+        global config
+        config = R2DConfig(self.options.case)
+        self.tf = config.endtime
         self.nx = self.options.nparticles
         self.ny = self.nx
         self.dx = (config.xmax - config.xmin) / self.nx
