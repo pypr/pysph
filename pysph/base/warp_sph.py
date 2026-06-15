@@ -428,6 +428,56 @@ if wp is not None:
 
 
     @wp.kernel
+    def _euler_step_f64(
+            x: wp.array(dtype=wp.float64),
+            y: wp.array(dtype=wp.float64),
+            z: wp.array(dtype=wp.float64),
+            u: wp.array(dtype=wp.float64),
+            v: wp.array(dtype=wp.float64),
+            w: wp.array(dtype=wp.float64),
+            au: wp.array(dtype=wp.float64),
+            av: wp.array(dtype=wp.float64),
+            aw: wp.array(dtype=wp.float64),
+            dt: wp.float64,
+            dim: wp.int32,
+    ):
+        i = wp.tid()
+        u[i] = u[i] + dt * au[i]
+        v[i] = v[i] + dt * av[i]
+        w[i] = w[i] + dt * aw[i]
+        x[i] = x[i] + dt * u[i]
+        if dim > wp.int32(1):
+            y[i] = y[i] + dt * v[i]
+        if dim > wp.int32(2):
+            z[i] = z[i] + dt * w[i]
+
+
+    @wp.kernel
+    def _euler_step_f32(
+            x: wp.array(dtype=wp.float32),
+            y: wp.array(dtype=wp.float32),
+            z: wp.array(dtype=wp.float32),
+            u: wp.array(dtype=wp.float32),
+            v: wp.array(dtype=wp.float32),
+            w: wp.array(dtype=wp.float32),
+            au: wp.array(dtype=wp.float32),
+            av: wp.array(dtype=wp.float32),
+            aw: wp.array(dtype=wp.float32),
+            dt: wp.float32,
+            dim: wp.int32,
+    ):
+        i = wp.tid()
+        u[i] = u[i] + dt * au[i]
+        v[i] = v[i] + dt * av[i]
+        w[i] = w[i] + dt * aw[i]
+        x[i] = x[i] + dt * u[i]
+        if dim > wp.int32(1):
+            y[i] = y[i] + dt * v[i]
+        if dim > wp.int32(2):
+            z[i] = z[i] + dt * w[i]
+
+
+    @wp.kernel
     def _summation_density_f32(
             s_x: wp.array(dtype=wp.float32),
             s_y: wp.array(dtype=wp.float32),
@@ -522,14 +572,15 @@ def compute_summation_density(nnps, src_index=0, dst_index=0,
 
 
 def compute_isothermal_eos(pa, rho0, c0, p0=0.0, out_prop='p',
-                           device=None):
+                           device=None, push=True):
     """Compute PySPH ``IsothermalEOS`` on a Warp ParticleArray."""
     if wp is None:  # pragma: no cover
         raise ImportError("warp is required for compute_isothermal_eos")
 
     device = wp.get_device(device)
     _ensure_property(pa, out_prop, device)
-    pa.gpu.push('rho', out_prop)
+    if push:
+        pa.gpu.push('rho', out_prop)
     rho = pa.gpu.get_device_array('rho')
     out = pa.gpu.get_device_array(out_prop)
     n = pa.gpu.get_number_of_particles()
@@ -594,7 +645,7 @@ def compute_continuity(nnps, src_index=0, dst_index=0, out_prop='arho'):
 
 
 def compute_pressure_gradient(nnps, src_index=0, dst_index=0,
-                              out_props=('au', 'av', 'aw')):
+                              out_props=('au', 'av', 'aw'), push=True):
     """Compute the inviscid pressure-gradient part of WCSPH momentum."""
     if wp is None:  # pragma: no cover
         raise ImportError("warp is required for compute_pressure_gradient")
@@ -604,8 +655,9 @@ def compute_pressure_gradient(nnps, src_index=0, dst_index=0,
     for prop in out_props:
         _ensure_property(dst_pa, prop, nnps.device)
 
-    src_pa.gpu.push('x', 'y', 'z', 'h', 'm', 'rho', 'p')
-    dst_pa.gpu.push('x', 'y', 'z', 'h', 'rho', 'p', *out_props)
+    if push:
+        src_pa.gpu.push('x', 'y', 'z', 'h', 'm', 'rho', 'p')
+        dst_pa.gpu.push('x', 'y', 'z', 'h', 'rho', 'p', *out_props)
     cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
     src = src_pa.gpu
     dst = dst_pa.gpu
@@ -635,3 +687,53 @@ def compute_pressure_gradient(nnps, src_index=0, dst_index=0,
         )
         wp.synchronize_device(nnps.device)
     return au, av, aw
+
+
+def euler_step(pa, dt, dim=3, device=None, push=True):
+    """Advance position and velocity using already-computed acceleration."""
+    if wp is None:  # pragma: no cover
+        raise ImportError("warp is required for euler_step")
+
+    device = wp.get_device(device)
+    _ensure_warp_helper(pa, device)
+    if push:
+        pa.gpu.push('x', 'y', 'z', 'u', 'v', 'w', 'au', 'av', 'aw')
+    gpu = pa.gpu
+    n = gpu.get_number_of_particles()
+    if gpu.x.dtype == np.float32:
+        kernel = _euler_step_f32
+        dt = np.float32(dt)
+    else:
+        kernel = _euler_step_f64
+        dt = np.float64(dt)
+    if n > 0:
+        wp.launch(
+            kernel,
+            dim=n,
+            inputs=[
+                gpu.x.dev, gpu.y.dev, gpu.z.dev,
+                gpu.u.dev, gpu.v.dev, gpu.w.dev,
+                gpu.au.dev, gpu.av.dev, gpu.aw.dev,
+                dt, np.int32(dim)
+            ],
+            device=device,
+        )
+        wp.synchronize_device(device)
+    return gpu.x, gpu.y, gpu.z, gpu.u, gpu.v, gpu.w
+
+
+def wc_sph_euler_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
+                      c0=20.0, p0=0.0):
+    """Run one minimal WCSPH-style device step.
+
+    The step computes summation density, isothermal pressure, inviscid pressure
+    acceleration, and a simple Euler velocity/position update on the device.
+    """
+    pa = nnps.particles[pa_index]
+    compute_summation_density(nnps, pa_index, pa_index)
+    compute_isothermal_eos(
+        pa, rho0=rho0, c0=c0, p0=p0, device=nnps.device, push=False
+    )
+    compute_pressure_gradient(nnps, pa_index, pa_index, push=False)
+    return euler_step(pa, dt=dt, dim=nnps.dim, device=nnps.device,
+                      push=False)

@@ -3,7 +3,7 @@ aspect: validation-benchmarks
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-15T14:25:00 CET
+last_reviewed: 2026-06-15T23:27:00 CET
 status: active
 ---
 
@@ -119,6 +119,17 @@ Warp pressure-gradient experiment:
   Core(TM) Ultra 7 155H versus NVIDIA GeForce RTX 4060 Laptop GPU shows
   speedups: `148.884x` at 1M, `129.854x` at 2M, and `38.722x` at 5M.
 
+Warp WCSPH Euler-step experiment:
+
+- `.ai/implementations/blast-from-the-past/experiments/2026-06-15_warp-wcsph-euler-step/experiment.md`
+- Correctness wrapper: `run_correctness.sh`.
+- Focused correctness checks Warp Euler stepping directly and the chained
+  `wc_sph_euler_step()` path against CPU reference density, pressure,
+  pressure-gradient acceleration, and final position/velocity state.
+- The focused Warp SPH/NNPS suite passes with `26 passed`.
+- This is a one-step correctness milestone. Repeated-step benchmarking should
+  wait for a device-aware NNPS refresh after positions move.
+
 ## Key sub-topics
 
 - Baseline selection.
@@ -132,6 +143,8 @@ Warp pressure-gradient experiment:
 - SPH equation-kernel correctness and operation speedup.
 - EOS/continuity capped benchmark metrics.
 - Pressure-gradient capped benchmark metrics.
+- One-step WCSPH chain correctness.
+- Device-aware repeated-step refresh criteria.
 - Optional parallel/Zoltan test slice after commit readiness.
 
 ## References for this aspect

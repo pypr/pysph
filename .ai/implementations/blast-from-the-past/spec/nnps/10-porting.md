@@ -32,8 +32,10 @@
    CubicSpline summation density.
 9. [DONE] Add EOS and continuity as the next simple SPH kernels.
 10. [DONE] Add inviscid pressure-gradient acceleration.
-11. [NEXT] Generalize the device-consumption proof into a reusable equation-loop
-   contract.
+11. [DONE] Add a minimal one-step WCSPH Euler chain that consumes density, EOS,
+   and pressure-gradient outputs on the device.
+12. [NEXT] Generalize the device-consumption proof into a reusable
+   equation-loop contract and repeated-step NNPS refresh.
 
 ## Phase 3: Warp Cell List
 
@@ -62,8 +64,9 @@
    equation kernel.
 3. [DONE] Port and benchmark `IsothermalEOS` plus `ContinuityEquation`.
 4. [DONE] Port and benchmark inviscid pressure-gradient acceleration.
-5. Add a Warp-aware acceleration-evaluation plan.
-6. Benchmark end-to-end solver steps.
+5. [DONE] Add a minimal Warp-aware acceleration-to-position step.
+6. Add a device-aware repeated-step NNPS refresh.
+7. Benchmark end-to-end solver steps.
 
 ## Risks
 
@@ -73,3 +76,5 @@
   when raw geometric queries are correct.
 - Parallel remote-particle exchange may reorder arrays in ways that require
   sorted-gid comparisons.
+- Repeated GPU stepping needs NNPS update semantics that do not push stale host
+  positions over device-updated positions.

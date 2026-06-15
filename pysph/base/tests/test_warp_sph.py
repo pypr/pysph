@@ -16,7 +16,7 @@ from pysph.base.utils import get_particle_array
 from pysph.base.warp_nnps import UniformGridWarpNNPS
 from pysph.base.warp_sph import (
     compute_continuity, compute_isothermal_eos, compute_pressure_gradient,
-    compute_summation_density
+    compute_summation_density, euler_step, wc_sph_euler_step
 )
 
 
@@ -315,3 +315,113 @@ def test_warp_pressure_gradient_matches_cpu_cross_array_in_3d_and_pulls_accel():
     assert np.allclose(solid.au, expected[:, 0])
     assert np.allclose(solid.av, expected[:, 1])
     assert np.allclose(solid.aw, expected[:, 2])
+
+
+def test_warp_euler_step_updates_velocity_and_position_on_device():
+    pa = get_particle_array(
+        name='fluid',
+        x=[0.0, 1.0, 2.0],
+        y=[0.5, 1.5, 2.5],
+        z=[1.0, 2.0, 3.0],
+        u=[1.0, -1.0, 0.5],
+        v=[0.0, 2.0, -0.5],
+        w=[0.25, -0.25, 1.0],
+        au=[0.1, 0.2, -0.3],
+        av=[-0.2, 0.4, 0.1],
+        aw=[0.5, -0.5, 0.25],
+        backend='warp',
+    )
+    dt = 0.25
+    old_x = pa.x.copy()
+    old_y = pa.y.copy()
+    old_z = pa.z.copy()
+    old_u = pa.u.copy()
+    old_v = pa.v.copy()
+    old_w = pa.w.copy()
+    au = pa.au.copy()
+    av = pa.av.copy()
+    aw = pa.aw.copy()
+
+    euler_step(pa, dt=dt, dim=2)
+    pa.gpu.pull('x', 'y', 'z', 'u', 'v', 'w')
+
+    expected_u = old_u + dt*au
+    expected_v = old_v + dt*av
+    expected_w = old_w + dt*aw
+    assert np.allclose(pa.u, expected_u)
+    assert np.allclose(pa.v, expected_v)
+    assert np.allclose(pa.w, expected_w)
+    assert np.allclose(pa.x, old_x + dt*expected_u)
+    assert np.allclose(pa.y, old_y + dt*expected_v)
+    assert np.allclose(pa.z, old_z)
+
+
+def test_warp_wc_sph_euler_step_matches_cpu_expected_state():
+    x = np.asarray([0.0, 0.2, 0.45, 1.2])
+    y = np.asarray([0.0, 0.1, -0.05, 0.2])
+    z = np.zeros_like(x)
+    h = np.asarray([0.35, 0.35, 0.4, 0.35])
+    m = np.asarray([1.0, 1.5, 1.2, 0.8])
+    u = np.asarray([0.1, -0.05, 0.2, 0.0])
+    v = np.asarray([0.0, 0.15, -0.1, 0.05])
+    w = np.zeros_like(x)
+    dt = 1.0e-3
+    rho0 = 1.0
+    c0 = 5.0
+    p0 = 0.1
+    pa = get_particle_array(
+        name='fluid',
+        x=x.copy(),
+        y=y.copy(),
+        z=z.copy(),
+        h=h.copy(),
+        m=m.copy(),
+        rho=np.zeros_like(x),
+        p=np.zeros_like(x),
+        u=u.copy(),
+        v=v.copy(),
+        w=w.copy(),
+        au=np.zeros_like(x),
+        av=np.zeros_like(x),
+        aw=np.zeros_like(x),
+        backend='warp',
+    )
+    particles = [pa]
+    expected_rho = _cpu_summation_density(particles, 0, 0, dim=2)
+    expected_p = p0 + c0*c0*(expected_rho - rho0)
+    expected_pa = get_particle_array(
+        name='expected',
+        x=x.copy(),
+        y=y.copy(),
+        z=z.copy(),
+        h=h.copy(),
+        m=m.copy(),
+        rho=expected_rho,
+        p=expected_p,
+        backend='warp',
+    )
+    expected_acc = _cpu_pressure_gradient([expected_pa], 0, 0, dim=2)
+    expected_u = u + dt*expected_acc[:, 0]
+    expected_v = v + dt*expected_acc[:, 1]
+    expected_w = w + dt*expected_acc[:, 2]
+    expected_x = x + dt*expected_u
+    expected_y = y + dt*expected_v
+
+    nnps = UniformGridWarpNNPS(dim=2, particles=particles, radius_scale=2.0)
+    wc_sph_euler_step(nnps, dt=dt, rho0=rho0, c0=c0, p0=p0)
+    pa.gpu.pull('rho', 'p', 'au', 'av', 'aw', 'x', 'y', 'z', 'u', 'v', 'w')
+
+    assert np.all(np.isfinite(pa.rho))
+    assert np.all(np.isfinite(pa.p))
+    assert np.all(np.isfinite(pa.au))
+    assert np.allclose(pa.rho, expected_rho)
+    assert np.allclose(pa.p, expected_p)
+    assert np.allclose(pa.au, expected_acc[:, 0], rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.av, expected_acc[:, 1], rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.aw, expected_acc[:, 2], rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.u, expected_u, rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.v, expected_v, rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.w, expected_w, rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.x, expected_x, rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.y, expected_y, rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.z, z)
