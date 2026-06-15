@@ -3,7 +3,7 @@ aspect: gpu-nnps
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-15T11:20:00 CET
+last_reviewed: 2026-06-15T12:30:00 CET
 status: active
 ---
 
@@ -80,6 +80,20 @@ Device-consumption proof:
   reported precision (`25.568`); the aggregate checksum differed by `6` over
   roughly `25.6M` contributions.
 
+First SPH equation proof:
+
+- `pysph/base/warp_sph.py` defines `compute_summation_density()` and Warp
+  CubicSpline density kernels for float32/float64.
+- The kernel mirrors PySPH `SummationDensity` with
+  `HIJ = 0.5*(d_h[d_idx] + s_h[s_idx])` and
+  `rho_i = sum_j m_j * W(XIJ, RIJ, HIJ)`.
+- Focused tests compare Warp density values against a CPU `CubicSpline`
+  reference in 2D and cross-array 3D and verify `rho` can be pulled back to the
+  host ParticleArray.
+- At 10,000,000 particles on PrediQT-02, `warp_grid_density` measured
+  `69.084x` CPU/Cython speed versus PySPH `SPHEvaluator` with
+  `SummationDensity`, `CubicSpline(dim=2)`, and `LinkedListNNPS`.
+
 ## Key sub-topics
 
 - Existing `GPUNeighborCache` behavior.
@@ -91,6 +105,7 @@ Device-consumption proof:
 - Optimize uniform-grid/cell-list structure.
 - Device-resident equation-kernel consumption of grid neighbor lists.
 - Reusable Warp equation-loop contract.
+- Warp SPH equation kernels.
 
 ## References for this aspect
 

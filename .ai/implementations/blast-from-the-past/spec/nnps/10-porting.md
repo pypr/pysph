@@ -28,7 +28,9 @@
    implementation baseline.
 7. [DONE] Add a narrow device-resident consumer that uses the grid cache for
    equation-like work.
-8. [NEXT] Generalize the device-consumption proof into a reusable equation-loop
+8. [DONE] Use the device-resident cache for a real SPH equation:
+   CubicSpline summation density.
+9. [NEXT] Generalize the device-consumption proof into a reusable equation-loop
    contract.
 
 ## Phase 3: Warp Cell List
@@ -54,8 +56,10 @@
 
 1. [DONE] Prove generated-equation-like kernels can consume cached neighbor
    lists directly with `compute_neighbor_sum()`.
-2. Add a Warp-aware acceleration-evaluation plan.
-3. Benchmark end-to-end solver steps.
+2. [DONE] Port and benchmark standard `SummationDensity` as the first real SPH
+   equation kernel.
+3. Add a Warp-aware acceleration-evaluation plan.
+4. Benchmark end-to-end solver steps.
 
 ## Risks
 

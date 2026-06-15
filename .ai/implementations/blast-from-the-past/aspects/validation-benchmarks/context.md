@@ -3,7 +3,7 @@ aspect: validation-benchmarks
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-15T11:20:00 CET
+last_reviewed: 2026-06-15T12:30:00 CET
 status: active
 ---
 
@@ -76,6 +76,20 @@ Device-consumption NNPS experiment:
   precision (`25.568`), with aggregate checksum delta `6` over roughly `25.6M`
   contributions.
 
+Warp summation-density experiment:
+
+- `.ai/implementations/blast-from-the-past/experiments/2026-06-15_warp-summation-density/experiment.md`
+- Correctness wrapper: `run_correctness.sh`.
+- Timing wrapper: `run_benchmark.sh`.
+- Focused correctness checks `compute_summation_density()` against a CPU
+  `CubicSpline` reference in 2D and cross-array 3D and passes with
+  `19 passed` across Warp SPH and NNPS tests.
+- The CPU baseline is PySPH `SPHEvaluator` with Cython backend,
+  `SummationDensity`, `CubicSpline(dim=2)`, and `LinkedListNNPS`.
+- A 1M-to-10M sweep on Intel(R) Core(TM) Ultra 7 155H versus NVIDIA GeForce RTX
+  4060 Laptop GPU shows matching checksums to reported precision and speedups:
+  `152.508x` at 1M, `227.555x` at 2M, `64.964x` at 5M, and `69.084x` at 10M.
+
 ## Key sub-topics
 
 - Baseline selection.
@@ -86,6 +100,7 @@ Device-consumption NNPS experiment:
 - NNPS benchmark fixtures and timing thresholds.
 - Warp grid optimization and device-resident neighbor-list metrics.
 - Device-consumption benchmark metrics.
+- SPH equation-kernel correctness and operation speedup.
 - Optional parallel/Zoltan test slice after commit readiness.
 
 ## References for this aspect
