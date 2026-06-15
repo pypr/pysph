@@ -1,9 +1,9 @@
 # Current - blast-from-the-past
 
-Updated: 2026-06-15T07:19:08 CET by @kunalpuri-prediqt
+Updated: 2026-06-15T09:06:00 CET by codex
 
-**Status:** Memory scaffold nested under `.ai/implementations/blast-from-the-past/` and validated; no host application code changed.
+**Status:** Initial Warp ParticleArray device mirror prototype has broad focused tests, tutorial docs, PQT editable install, and an active mutation/sync experiment with runnable correctness and timing scripts.
 **Active aspects:** warp-backend, gpu-nnps, particle-memory, cython-boundary, validation-benchmarks, host-integration
-**In-flight experiments:** (none)
-**Open approvals:** (none)
-**Next action:** Boot through `.ai/AGENTS.md`, then define measurable success criteria for the first GPU/Warp benchmark.
+**In-flight experiments:** `experiments/2026-06-15_initial-warp-benchmark-placeholder` now records Warp ParticleArray mutation/sync correctness and smoke timing.
+**Open approvals:** Commit is explicitly on hold per user.
+**Next action:** Record larger benchmark runs, then decide whether to move growth/removal internals from host-side concatenation to fully device-side Warp kernels.

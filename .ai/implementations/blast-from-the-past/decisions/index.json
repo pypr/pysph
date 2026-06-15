@@ -1,11 +1,24 @@
 {
-  "edges": [],
+  "edges": [
+    {
+      "from": "ADR-0002",
+      "to": "ADR-0001",
+      "type": "relates_to"
+    }
+  ],
   "nodes": [
     {
       "date": "2026-06-15",
       "file": "decisions/2026-06-15_adr-0001_adopt-ai-memory-system-for-blast-from-the-past.md",
       "id": "ADR-0001",
       "scope": "global",
+      "status": "Accepted"
+    },
+    {
+      "date": "2026-06-15",
+      "file": "decisions/2026-06-15_adr-0002_propose-warp-device-mirror-for-particle-array.md",
+      "id": "ADR-0002",
+      "scope": "particle-memory",
       "status": "Accepted"
     }
   ]

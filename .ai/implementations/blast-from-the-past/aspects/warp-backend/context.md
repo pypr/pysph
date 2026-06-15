@@ -3,7 +3,7 @@ aspect: warp-backend
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-15T07:19:08 CET
+last_reviewed: 2026-06-15T08:34:00 CET
 status: active
 ---
 
@@ -15,13 +15,20 @@ NVIDIA Warp API choices, kernel model, memory layout assumptions, and how Warp c
 
 ## Current understanding
 
-Initial scaffolding - to be filled in the first working session on this aspect.
+The first likely Warp integration boundary is a DeviceHelper-like mirror, not a replacement of ParticleArray host storage. The spec identifies required Warp primitives: device array creation, selective/full push and pull, Local-first partition/alignment, strided gather/scatter, resize/fill, add/remove/extract/append, and min/max if parity with current helper is desired.
+
+Warp imports successfully in the active environment as version `1.14.0`. Before code, decide whether Warp appears as a new `backend='warp'`, a CUDA backend variant, or a separate helper.
+
+ADR-0002 accepted the DeviceHelper-like mirror direction. The prototype adds `pysph/base/warp_device_helper.py`, exposes `backend='warp'` through ParticleArray backend resolution, and uses Warp gather kernels for alignment over scalar and strided properties. It now also supports remove, remove-tagged, add, append, extend, and extract through ParticleArray public methods. Focused Warp helper tests cover the main prototype surface and pass against a rebuilt `pysph.base.particle_array` extension.
 
 ## Key sub-topics
 
-- Warp version/API surface - Confirm with team.
-- Kernel launch model - Confirm with team.
-- Compatibility with existing PySPH GPU pathways - Confirm with team.
+- Warp version/API surface - Active environment has Warp `1.14.0`; confirm documentation set with team.
+- Kernel launch model for partition/gather/scatter kernels - Confirm with prototype.
+- Compatibility with existing PySPH GPU pathways.
+- Backend naming and ownership ADR.
+- Next kernel family decision: move add/remove/extract/append growth internals from host-side NumPy concatenation to fully device-side Warp kernels.
+- Tutorial documentation added at `docs/source/tutorial/warp_particle_array.rst`.
 
 ## References for this aspect
 

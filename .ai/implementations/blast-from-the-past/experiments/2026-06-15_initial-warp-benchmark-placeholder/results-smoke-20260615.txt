@@ -1,0 +1,37 @@
+Command:
+
+```bash
+bash .ai/implementations/blast-from-the-past/experiments/2026-06-15_initial-warp-benchmark-placeholder/run_mutation_benchmark.sh --sizes 1000 --repeats 2
+```
+
+Environment:
+
+- host: prediqt-02
+- Python environment: PQT venv
+- Warp: 1.14.0
+- CUDA device: NVIDIA GeForce RTX 4060 Laptop GPU
+- PySPH: editable install from this checkout
+
+Result:
+
+```text
+backend operation particles repeats p50_ms
+cpu     add_particles                 1000       2    0.386
+warp    add_particles                 1000       2   75.121
+cpu     remove_particles              1000       2    0.461
+warp    remove_particles              1000       2   16.717
+cpu     extract_particles             1000       2    0.386
+warp    extract_particles             1000       2   19.079
+cpu     align_particles               1000       2    0.393
+warp    align_particles               1000       2    7.831
+cpu     pull_after_device_write       1000       2    0.417
+warp    pull_after_device_write       1000       2    1.560
+```
+
+Interpretation:
+
+- Correctness checks passed inside the benchmark cases.
+- Warp structural mutation timings are slower in this prototype because
+  add/remove/extract still use host-side rebuilds/readback.
+- Device write/readback is already measured separately so later device-kernel
+  work has a comparison point.
