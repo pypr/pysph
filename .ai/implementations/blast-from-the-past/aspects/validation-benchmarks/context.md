@@ -3,7 +3,7 @@ aspect: validation-benchmarks
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-15T09:30:00 CET
+last_reviewed: 2026-06-15T10:10:00 CET
 status: active
 ---
 
@@ -32,7 +32,7 @@ Active experiment:
 - `.ai/implementations/blast-from-the-past/experiments/2026-06-15_initial-warp-benchmark-placeholder/experiment.md`
 - Correctness wrapper: `run_correctness.sh`.
 - Timing wrapper: `run_mutation_benchmark.sh`.
-- Smoke result: `results-smoke-20260615.txt`; Warp add/remove/extract are currently slower than CPU because the prototype still uses host-side rebuilds/readback for structural mutations.
+- Smoke result is recorded in the ParticleArray experiment doc; Warp add/remove/extract are currently slower than CPU because the prototype still uses host-side rebuilds/readback for structural mutations.
 
 Next benchmark family should target NNPS:
 
@@ -43,6 +43,26 @@ Next benchmark family should target NNPS:
 - readback time separated from device computation.
 - average neighbor count and smoothing-length mode recorded with each run.
 
+First NNPS experiment:
+
+- `.ai/implementations/blast-from-the-past/experiments/2026-06-15_warp-nnps-bruteforce-baseline/experiment.md`
+- Correctness wrapper: `run_correctness.sh`.
+- Timing wrapper: `run_benchmark.sh`.
+- Smoke result is recorded in the experiment doc; CPU, uncached Warp, cached
+  Warp, and Warp grid average neighbor counts match at 128 particles. Cached
+  Warp brute force is much faster than the per-query path but remains an O(N^2)
+  bridge; Warp grid is the first cell-list baseline.
+- The smoke benchmark now records CPU/GPU hardware and CPU-relative speedup. On
+  Intel(R) Core(TM) Ultra 7 155H versus NVIDIA GeForce RTX 4060 Laptop GPU, the
+  128-particle smoke run shows `warp_grid` at `0.041x` CPU speed.
+- A 1,000,000-particle host-facing benchmark on the same hardware shows
+  `warp_grid` at `4.269x` CPU speed with matching average neighbor count
+  (`25.568`).
+- A 1,000,000-particle device-oriented benchmark shows `warp_grid_device` at
+  `88.288x` CPU speed with matching average neighbor count (`25.568`). This is
+  the relevant GPU-side result because it avoids the per-particle
+  `get_nearest_particles()`/`UIntArray` loop.
+
 ## Key sub-topics
 
 - Baseline selection.
@@ -51,6 +71,7 @@ Next benchmark family should target NNPS:
 - ParticleArray/DeviceHelper parity suite.
 - Performance benchmarks for structural mutations and device sync.
 - NNPS benchmark fixtures and timing thresholds.
+- Warp grid optimization and device-resident neighbor-list metrics.
 - Optional parallel/Zoltan test slice after commit readiness.
 
 ## References for this aspect

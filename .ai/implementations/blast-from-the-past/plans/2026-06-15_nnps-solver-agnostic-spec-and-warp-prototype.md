@@ -4,7 +4,7 @@ id: 2026-06-15_nnps-solver-agnostic-spec-and-warp-prototype
 author: codex
 agent: codex
 created: 2026-06-15T09:30:00 CET
-status: proposed
+status: approved
 aspects: [gpu-nnps, particle-memory, warp-backend, validation-benchmarks]
 host_files: [pysph/base/nnps_base.pyx, pysph/base/gpu_nnps_base.pyx, pysph/base/gpu_nnps_base.pxd, pysph/base/gpu_nnps.py, pysph/solver/application.py]
 within_boundary: false
@@ -33,6 +33,23 @@ equation migration.
 4. Implement a Warp cell-list NNPS for performance relevance.
 5. Add explicit host integration only after the direct NNPS API passes.
 
+## Progress
+
+- User approved beginning NNPS implementation with: "ok. lets begin with the
+  NNPS implementation with warp".
+- Added `pysph/base/warp_nnps.py` with `BruteForceWarpNNPS`.
+- Added focused correctness tests in `pysph/base/tests/test_warp_nnps.py`.
+- Added experiment packet
+  `experiments/2026-06-15_warp-nnps-bruteforce-baseline/`.
+- Smoke benchmark confirms CPU and Warp average neighbor counts match, while
+  Warp brute force is slower due per-query kernel launch and readback.
+- Added cached flat-neighbor-list mode to reduce per-query launch/readback
+  overhead.
+- Added `UniformGridWarpNNPS`, which builds source cell lists on the device and
+  queries adjacent cells.
+- Focused tests now cover the grid path in 1D/2D/3D, multiple arrays, variable
+  smoothing length, and update-after-mutation cases.
+
 ## Initial Success Criteria
 
 - Spec identifies query contract, update timeline, domain/ghost semantics,
@@ -46,3 +63,10 @@ equation migration.
 - Migrating generated SPH equation kernels.
 - Replacing MPI/Zoltan partitioning.
 - Supporting every CPU NNPS variant immediately.
+
+## Approval
+
+- [x] Plan posted in chat
+- Approved by: @kunalpuri-prediqt at 2026-06-15T10:05:00 CET
+- Approval, verbatim quote:
+  > ok. lets begin with the NNPS implementation with warp

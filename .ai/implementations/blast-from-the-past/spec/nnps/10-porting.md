@@ -17,18 +17,26 @@
 
 ## Phase 2: Warp Brute Force
 
-1. Implement a minimal Warp NNPS using ParticleArray Warp arrays.
-2. Provide `update()`, `set_context()`, and `get_nearest_particles()`.
-3. Keep a host-compatible neighbor readback path for existing tests.
-4. Validate source/destination array pairs and variable `h`.
+1. [DONE] Implement a minimal Warp NNPS using ParticleArray Warp arrays.
+2. [DONE] Provide `update()`, `set_context()`, and
+   `get_nearest_particles()`.
+3. [DONE] Keep a host-compatible neighbor readback path for existing tests.
+4. [DONE] Validate source/destination array pairs and variable `h`.
+5. [DONE] Avoid one kernel launch and one full flag readback per destination
+   particle with a cached flat-neighbor-list path.
+6. [DONE] Replace brute-force O(N^2) cache construction with a cell-list
+   implementation baseline.
+7. [NEXT] Optimize the grid path and keep neighbor data device-resident for
+   equation kernels.
 
 ## Phase 3: Warp Cell List
 
-1. Compute cell ids on the device.
-2. Build per-cell counts and offsets.
-3. Scatter particle ids into a flat cell-particle array.
-4. Query adjacent cells on the device.
-5. Compare against brute-force Warp and CPU baselines.
+1. [DONE] Compute cell ids on the device.
+2. [DONE] Build per-cell counts and offsets.
+3. [DONE] Scatter particle ids into a flat cell-particle array.
+4. [DONE] Query adjacent cells on the device.
+5. [DONE] Compare against brute-force Warp and CPU baselines.
+6. [NEXT] Reduce host readback and tune cell-list performance.
 
 ## Phase 4: Solver Integration
 

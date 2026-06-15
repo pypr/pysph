@@ -3,7 +3,7 @@ aspect: gpu-nnps
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-15T09:30:00 CET
+last_reviewed: 2026-06-15T10:10:00 CET
 status: active
 ---
 
@@ -38,6 +38,34 @@ Existing PySPH surfaces observed for this spec:
 - Application setup currently chooses `OctreeGPUNNPS` or `ZOrderGPUNNPS` for
   existing OpenCL/CUDA modes.
 
+First Warp implementation:
+
+- `pysph/base/warp_nnps.py` defines `BruteForceWarpNNPS`.
+- It uses Warp kernels for the pairwise distance test and returns neighbors
+  through `UIntArray`.
+- It supports source/destination array pairs, 1D/2D/3D coordinate selection,
+  variable source/destination `h`, sorted-gid output, and update after host
+  ParticleArray mutation.
+- It supports an uncached per-query flags path and a cached flat-neighbor-list
+  path.
+- It is intentionally not the final performance target: the cached path avoids
+  per-destination launch/readback but remains brute-force O(N^2).
+
+Uniform-grid implementation:
+
+- `UniformGridWarpNNPS` builds per-source device-side cell ids, cell counts,
+  exclusive-scan cell starts, and flat cell-particle arrays.
+- Neighbor caches are built by scanning adjacent cells and applying the same
+  pairwise `h_i`/`h_j` inclusion rule.
+- The first grid path supports 1D/2D/3D, multiple particle arrays, variable
+  `h`, and update after mutation in focused tests.
+- It still materializes host-side neighbor arrays for the existing `UIntArray`
+  query contract; equation-kernel integration should avoid that readback.
+- `warp_grid_device` benchmarks bulk device neighbor-cache construction without
+  the per-particle `UIntArray` query loop. At 1,000,000 particles on
+  PrediQT-02, it measured `88.288x` CPU speed while matching average neighbor
+  count.
+
 ## Key sub-topics
 
 - Existing `GPUNeighborCache` behavior.
@@ -45,6 +73,9 @@ Existing PySPH surfaces observed for this spec:
 - Correctness and performance baselines.
 - Warp brute-force correctness baseline.
 - Warp cell-list performance prototype.
+- Cached flat neighbor list generation.
+- Optimize uniform-grid/cell-list structure.
+- Device-resident equation-kernel consumption of grid neighbor lists.
 
 ## References for this aspect
 

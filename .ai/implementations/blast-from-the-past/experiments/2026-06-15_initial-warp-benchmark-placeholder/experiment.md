@@ -5,7 +5,7 @@ created: 2026-06-15T07:19:08 CET
 author: @kunalpuri-prediqt
 aspect: validation-benchmarks
 status: active
-last_checked: 2026-06-15T09:06:00 CET
+last_checked: 2026-06-15T10:32:00 CET
 ---
 
 # Experiment: Warp ParticleArray Mutation And Sync Baseline
@@ -130,8 +130,45 @@ CPU ParticleArray sanity slice
 7 passed
 ```
 
-Smoke timing is captured in `results-smoke-20260615.txt`. Larger timing runs
-should be captured in `results-*.txt` files in this directory when performed.
+Current smoke benchmark:
+
+```bash
+bash .ai/implementations/blast-from-the-past/experiments/2026-06-15_initial-warp-benchmark-placeholder/run_mutation_benchmark.sh --sizes 1000 --repeats 2
+```
+
+Hardware and runtime:
+
+- host: PrediQT-02
+- Python environment: PQT venv
+- Python executable: `/home/kunalp/.pqt_venv_e0b41259/bin/python`
+- CPU: Intel(R) Core(TM) Ultra 7 155H
+- GPU: NVIDIA GeForce RTX 4060 Laptop GPU, driver 595.79, 8188 MiB
+- Warp: 1.14.0
+- PySPH: editable install from this checkout
+
+Expected/current smoke result:
+
+```text
+backend operation particles repeats p50_ms
+cpu     add_particles                 1000       2    0.386
+warp    add_particles                 1000       2   75.121
+cpu     remove_particles              1000       2    0.461
+warp    remove_particles              1000       2   16.717
+cpu     extract_particles             1000       2    0.386
+warp    extract_particles             1000       2   19.079
+cpu     align_particles               1000       2    0.393
+warp    align_particles               1000       2    7.831
+cpu     pull_after_device_write       1000       2    0.417
+warp    pull_after_device_write       1000       2    1.560
+```
+
+Interpretation:
+
+- Correctness checks passed inside the benchmark cases.
+- Warp structural mutation timings are slower in this prototype because
+  add/remove/extract still use host-side rebuilds/readback.
+- Device write/readback is already measured separately so later device-kernel
+  work has a comparison point.
 
 ## Conclusion
 

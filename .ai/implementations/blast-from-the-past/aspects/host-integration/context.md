@@ -3,7 +3,7 @@ aspect: host-integration
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-15T08:34:00 CET
+last_reviewed: 2026-06-15T09:45:00 CET
 status: active
 ---
 
@@ -21,6 +21,12 @@ Persistent rebuild configuration lives in `/home/kunalp/.compyle/config.py`, wit
 
 Validation showed plain imports work for `pysph`, `pyzoltan`, `pysph.parallel.parallel_manager`, and the Warp ParticleArray path; `has_mpi()`, `has_zoltan()`, and `in_parallel()` all return `True`.
 
+The top-level `CODEBASE_UNDERSTANDING.md` has been worked into
+`.ai/implementations/blast-from-the-past/spec/codebase-understanding/` as a
+curated implementation-facing digest. The spec now has an index at
+`.ai/implementations/blast-from-the-past/spec/README.md` linking the codebase,
+ParticleArray, and NNPS layers.
+
 ## Key sub-topics
 
 - Existing build/test commands.
@@ -28,6 +34,7 @@ Validation showed plain imports work for `pysph`, `pyzoltan`, `pysph.parallel.pa
 - Boundary amendments and review integrity.
 - Output/restart/dummy-particle compatibility.
 - Local PQT editable install and Zoltan/PyZoltan rebuild reproducibility.
+- Codebase-level architecture context for staged GPU migration.
 
 ## References for this aspect
 
