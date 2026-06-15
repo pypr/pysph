@@ -3,7 +3,7 @@ aspect: validation-benchmarks
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-15T09:06:00 CET
+last_reviewed: 2026-06-15T09:30:00 CET
 status: active
 ---
 
@@ -34,6 +34,15 @@ Active experiment:
 - Timing wrapper: `run_mutation_benchmark.sh`.
 - Smoke result: `results-smoke-20260615.txt`; Warp add/remove/extract are currently slower than CPU because the prototype still uses host-side rebuilds/readback for structural mutations.
 
+Next benchmark family should target NNPS:
+
+- CPU-vs-Warp neighbor set correctness.
+- NNPS update time.
+- all-particle query time.
+- cache build time.
+- readback time separated from device computation.
+- average neighbor count and smoothing-length mode recorded with each run.
+
 ## Key sub-topics
 
 - Baseline selection.
@@ -41,6 +50,7 @@ Active experiment:
 - Correctness tolerance and performance thresholds.
 - ParticleArray/DeviceHelper parity suite.
 - Performance benchmarks for structural mutations and device sync.
+- NNPS benchmark fixtures and timing thresholds.
 - Optional parallel/Zoltan test slice after commit readiness.
 
 ## References for this aspect
