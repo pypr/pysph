@@ -68,8 +68,8 @@ Device-consumption NNPS experiment:
 - `.ai/implementations/blast-from-the-past/experiments/2026-06-15_warp-nnps-device-consumption/experiment.md`
 - Correctness wrapper: `run_correctness.sh`.
 - Timing wrapper: `run_benchmark.sh`.
-- Focused Warp NNPS correctness now includes device-side neighbor-sum tests and
-  passes with `15 passed`.
+- Focused Warp NNPS correctness now includes direct packed-GPU-cache index
+  parity tests and device-side neighbor-sum tests, and passes with `17 passed`.
 - A 1,000,000-particle benchmark on Intel(R) Core(TM) Ultra 7 155H versus
   NVIDIA GeForce RTX 4060 Laptop GPU shows `warp_grid_reduce` at `145.583x`
   CPU speed for a neighbor mass sum. Average neighbor sum matches to reported

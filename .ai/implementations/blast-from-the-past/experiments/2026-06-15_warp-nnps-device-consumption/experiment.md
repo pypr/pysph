@@ -89,7 +89,7 @@ Focused correctness:
 
 ```text
 python -m pytest -q pysph/base/tests/test_warp_nnps.py
-15 passed
+17 passed
 ```
 
 Large device-consumption benchmark:
@@ -121,6 +121,9 @@ Interpretation:
 - `warp_grid_reduce` builds the device-resident uniform-grid neighbor cache,
   runs a Warp kernel that sums source `m` over each destination particle's
   neighbors, and reduces the output to one checksum.
+- Focused correctness now checks the actual packed GPU neighbor indices against
+  `LinkedListNNPS` for deterministic random 2D and cross-array 3D fixtures, in
+  addition to the equation-like neighbor-sum consumer.
 - Average neighbor sum matches to the reported precision: `25.568`.
 - The checksum delta is `6` over roughly `25.6M` accumulated neighbor
   contributions. This is small enough for the large random benchmark headline,

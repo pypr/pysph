@@ -41,6 +41,28 @@ def _neighbor_sum(cpu, particles, src_index, dst_index, prop):
     return result
 
 
+def _assert_device_cache_neighbors_match(cpu, grid, particles, pairs):
+    for src_index, dst_index in pairs:
+        cache = grid.build_neighbor_cache_gpu(src_index, dst_index)
+        starts = cache['starts_dev'].numpy()
+        lengths = cache['lengths']
+        neighbors = cache['neighbors_dev'].numpy()
+        dst_count = particles[dst_index].get_number_of_particles()
+
+        assert len(starts) == dst_count
+        assert len(lengths) == dst_count
+        assert len(neighbors) == cache['total_neighbors']
+
+        for d_idx in range(dst_count):
+            expected = _neighbors(cpu, src_index, dst_index, d_idx)
+            start = int(starts[d_idx])
+            stop = start + int(lengths[d_idx])
+            actual = np.sort(neighbors[start:stop])
+            assert np.array_equal(actual, expected), (
+                src_index, dst_index, d_idx, actual, expected
+            )
+
+
 def test_brute_force_warp_nnps_matches_cpu_linked_list_in_2d():
     pa = get_particle_array(
         name='fluid',
@@ -241,6 +263,53 @@ def test_uniform_grid_warp_nnps_matches_cpu_in_3d():
     grid = UniformGridWarpNNPS(dim=3, particles=particles, radius_scale=2.0)
 
     _assert_all_neighbors_match(cpu, grid, particles, [(0, 0)])
+
+
+def test_uniform_grid_warp_nnps_device_cache_matches_cpu_indices_in_random_2d():
+    rng = np.random.default_rng(1729)
+    n = 96
+    pa = get_particle_array(
+        name='fluid',
+        x=rng.random(n),
+        y=rng.random(n),
+        z=np.zeros(n),
+        h=0.055 + 0.035 * rng.random(n),
+        backend='warp',
+    )
+    particles = [pa]
+    cpu = LinkedListNNPS(dim=2, particles=particles, radius_scale=2.0)
+    grid = UniformGridWarpNNPS(dim=2, particles=particles, radius_scale=2.0)
+
+    _assert_device_cache_neighbors_match(cpu, grid, particles, [(0, 0)])
+
+
+def test_uniform_grid_warp_nnps_device_cache_matches_cpu_indices_cross_3d():
+    rng = np.random.default_rng(2718)
+    nsrc = 64
+    ndst = 41
+    fluid = get_particle_array(
+        name='fluid',
+        x=rng.random(nsrc),
+        y=rng.random(nsrc),
+        z=rng.random(nsrc),
+        h=0.08 + 0.04 * rng.random(nsrc),
+        backend='warp',
+    )
+    solid = get_particle_array(
+        name='solid',
+        x=rng.random(ndst),
+        y=rng.random(ndst),
+        z=rng.random(ndst),
+        h=0.08 + 0.04 * rng.random(ndst),
+        backend='warp',
+    )
+    particles = [fluid, solid]
+    cpu = LinkedListNNPS(dim=3, particles=particles, radius_scale=2.0)
+    grid = UniformGridWarpNNPS(dim=3, particles=particles, radius_scale=2.0)
+
+    _assert_device_cache_neighbors_match(
+        cpu, grid, particles, [(0, 1), (1, 0)]
+    )
 
 
 def test_uniform_grid_warp_nnps_matches_bruteforce_for_variable_h():
