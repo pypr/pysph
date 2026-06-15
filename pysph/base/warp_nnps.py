@@ -554,6 +554,42 @@ if wp is not None:
                                     k += wp.int32(1)
 
 
+    @wp.kernel
+    def _neighbor_sum_f64(
+            values: wp.array(dtype=wp.float64),
+            starts: wp.array(dtype=wp.int32),
+            lengths: wp.array(dtype=wp.int32),
+            neighbors: wp.array(dtype=wp.uint32),
+            out: wp.array(dtype=wp.float64),
+    ):
+        i = wp.tid()
+        total = wp.float64(0.0)
+        start = starts[i]
+        stop = start + lengths[i]
+        for pos in range(start, stop):
+            j = wp.int32(neighbors[pos])
+            total += values[j]
+        out[i] = total
+
+
+    @wp.kernel
+    def _neighbor_sum_f32(
+            values: wp.array(dtype=wp.float32),
+            starts: wp.array(dtype=wp.int32),
+            lengths: wp.array(dtype=wp.int32),
+            neighbors: wp.array(dtype=wp.uint32),
+            out: wp.array(dtype=wp.float32),
+    ):
+        i = wp.tid()
+        total = wp.float32(0.0)
+        start = starts[i]
+        stop = start + lengths[i]
+        for pos in range(start, stop):
+            j = wp.int32(neighbors[pos])
+            total += values[j]
+        out[i] = total
+
+
 class BruteForceWarpNNPS(object):
     """Brute-force NNPS using Warp arrays for the distance test.
 
@@ -990,6 +1026,51 @@ class UniformGridWarpNNPS(BruteForceWarpNNPS):
             'lengths': lengths_cpu,
             'total_neighbors': total,
         }
+
+    def compute_neighbor_sum(self, src_index, dst_index, prop):
+        """Sum a scalar source property over neighbors on the device.
+
+        This is a minimal equation-like consumer for the device-resident
+        neighbor cache. It returns one Warp array with a value per destination
+        particle and does not materialize per-particle neighbors on the host.
+        """
+        src_pa = self.particles[src_index]
+        dst = self.particles[dst_index].gpu
+        if prop not in src_pa.properties:
+            raise KeyError("Unknown source particle property: %s" % prop)
+        if src_pa.stride.get(prop, 1) != 1:
+            raise ValueError(
+                "compute_neighbor_sum only supports scalar properties"
+            )
+
+        src_pa.gpu.push(prop)
+        values = src_pa.gpu.get_device_array(prop)
+        cache = self.build_neighbor_cache_gpu(src_index, dst_index)
+        ndst = dst.get_number_of_particles()
+
+        if values.dtype == np.float32:
+            kernel = _neighbor_sum_f32
+            out = wp.empty(ndst, dtype=wp.float32, device=self.device)
+        elif values.dtype == np.float64:
+            kernel = _neighbor_sum_f64
+            out = wp.empty(ndst, dtype=wp.float64, device=self.device)
+        else:
+            raise TypeError(
+                "compute_neighbor_sum only supports float properties"
+            )
+
+        if ndst > 0:
+            wp.launch(
+                kernel,
+                dim=ndst,
+                inputs=[
+                    values.dev, cache['starts_dev'], cache['lengths_dev'],
+                    cache['neighbors_dev'], out
+                ],
+                device=self.device,
+            )
+            wp.synchronize_device(self.device)
+        return out
 
     def _build_cache(self, src_index, dst_index):
         device_cache = self.build_neighbor_cache_gpu(src_index, dst_index)

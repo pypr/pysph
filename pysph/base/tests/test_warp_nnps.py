@@ -31,6 +31,16 @@ def _assert_all_neighbors_match(cpu, warp, particles, pairs):
             assert np.array_equal(actual, expected)
 
 
+def _neighbor_sum(cpu, particles, src_index, dst_index, prop):
+    values = particles[src_index].properties[prop].get_npy_array()
+    dst_count = particles[dst_index].get_number_of_particles()
+    result = np.zeros(dst_count, dtype=values.dtype)
+    for d_idx in range(dst_count):
+        result[d_idx] = np.sum(values[_neighbors(cpu, src_index, dst_index,
+                                                 d_idx)])
+    return result
+
+
 def test_brute_force_warp_nnps_matches_cpu_linked_list_in_2d():
     pa = get_particle_array(
         name='fluid',
@@ -270,3 +280,79 @@ def test_uniform_grid_warp_nnps_rebuilds_after_update():
 
     assert np.array_equal(_neighbors(grid, 0, 0, 0),
                           np.array([0, 1], dtype=np.uint32))
+
+
+def test_uniform_grid_warp_nnps_computes_neighbor_sum_on_device():
+    pa = get_particle_array(
+        name='fluid',
+        x=[0.0, 0.2, 0.4, 1.5],
+        y=[0.0, 0.0, 0.1, 1.5],
+        z=[0.0, 0.0, 0.0, 0.0],
+        h=[0.25, 0.25, 0.25, 0.25],
+        m=[1.0, 2.0, 3.0, 4.0],
+        backend='warp',
+    )
+    particles = [pa]
+    cpu = LinkedListNNPS(dim=2, particles=particles, radius_scale=2.0)
+    grid = UniformGridWarpNNPS(dim=2, particles=particles, radius_scale=2.0)
+
+    expected = _neighbor_sum(cpu, particles, 0, 0, 'm')
+    actual = grid.compute_neighbor_sum(0, 0, 'm').numpy()
+
+    assert np.allclose(actual, expected)
+
+
+def test_uniform_grid_warp_nnps_computes_cross_array_neighbor_sum_on_device():
+    fluid = get_particle_array(
+        name='fluid',
+        x=[0.0, 0.25, 0.5],
+        y=[0.0, 0.0, 0.0],
+        z=[0.0, 0.0, 0.0],
+        h=[0.2, 0.2, 0.2],
+        m=[2.0, 4.0, 8.0],
+        backend='warp',
+    )
+    solid = get_particle_array(
+        name='solid',
+        x=[0.1, 0.8],
+        y=[0.0, 0.0],
+        z=[0.0, 0.0],
+        h=[0.2, 0.2],
+        m=[1.0, 1.0],
+        backend='warp',
+    )
+    particles = [fluid, solid]
+    cpu = LinkedListNNPS(dim=2, particles=particles, radius_scale=2.0)
+    grid = UniformGridWarpNNPS(dim=2, particles=particles, radius_scale=2.0)
+
+    expected = _neighbor_sum(cpu, particles, 0, 1, 'm')
+    actual = grid.compute_neighbor_sum(0, 1, 'm').numpy()
+
+    assert np.allclose(actual, expected)
+
+
+def test_uniform_grid_warp_nnps_neighbor_sum_rebuilds_after_update():
+    pa = get_particle_array(
+        name='fluid',
+        x=[0.0, 1.0],
+        y=[0.0, 0.0],
+        z=[0.0, 0.0],
+        h=[0.2, 0.2],
+        m=[2.0, 3.0],
+        backend='warp',
+    )
+    particles = [pa]
+    cpu = LinkedListNNPS(dim=1, particles=particles, radius_scale=1.0)
+    grid = UniformGridWarpNNPS(dim=1, particles=particles, radius_scale=1.0)
+
+    expected = _neighbor_sum(cpu, particles, 0, 0, 'm')
+    assert np.allclose(grid.compute_neighbor_sum(0, 0, 'm').numpy(),
+                       expected)
+
+    pa.x[1] = 0.1
+    cpu.update()
+    grid.update()
+
+    expected = _neighbor_sum(cpu, particles, 0, 0, 'm')
+    assert np.allclose(grid.compute_neighbor_sum(0, 0, 'm').numpy(),
+                       expected)

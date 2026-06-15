@@ -3,7 +3,7 @@ aspect: validation-benchmarks
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-15T10:10:00 CET
+last_reviewed: 2026-06-15T11:20:00 CET
 status: active
 ---
 
@@ -63,6 +63,19 @@ First NNPS experiment:
   the relevant GPU-side result because it avoids the per-particle
   `get_nearest_particles()`/`UIntArray` loop.
 
+Device-consumption NNPS experiment:
+
+- `.ai/implementations/blast-from-the-past/experiments/2026-06-15_warp-nnps-device-consumption/experiment.md`
+- Correctness wrapper: `run_correctness.sh`.
+- Timing wrapper: `run_benchmark.sh`.
+- Focused Warp NNPS correctness now includes device-side neighbor-sum tests and
+  passes with `15 passed`.
+- A 1,000,000-particle benchmark on Intel(R) Core(TM) Ultra 7 155H versus
+  NVIDIA GeForce RTX 4060 Laptop GPU shows `warp_grid_reduce` at `145.583x`
+  CPU speed for a neighbor mass sum. Average neighbor sum matches to reported
+  precision (`25.568`), with aggregate checksum delta `6` over roughly `25.6M`
+  contributions.
+
 ## Key sub-topics
 
 - Baseline selection.
@@ -72,6 +85,7 @@ First NNPS experiment:
 - Performance benchmarks for structural mutations and device sync.
 - NNPS benchmark fixtures and timing thresholds.
 - Warp grid optimization and device-resident neighbor-list metrics.
+- Device-consumption benchmark metrics.
 - Optional parallel/Zoltan test slice after commit readiness.
 
 ## References for this aspect

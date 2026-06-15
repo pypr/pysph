@@ -26,8 +26,10 @@
    particle with a cached flat-neighbor-list path.
 6. [DONE] Replace brute-force O(N^2) cache construction with a cell-list
    implementation baseline.
-7. [NEXT] Optimize the grid path and keep neighbor data device-resident for
-   equation kernels.
+7. [DONE] Add a narrow device-resident consumer that uses the grid cache for
+   equation-like work.
+8. [NEXT] Generalize the device-consumption proof into a reusable equation-loop
+   contract.
 
 ## Phase 3: Warp Cell List
 
@@ -36,7 +38,10 @@
 3. [DONE] Scatter particle ids into a flat cell-particle array.
 4. [DONE] Query adjacent cells on the device.
 5. [DONE] Compare against brute-force Warp and CPU baselines.
-6. [NEXT] Reduce host readback and tune cell-list performance.
+6. [DONE] Reduce host readback for bulk cache construction and a neighbor-sum
+   consumer.
+7. [NEXT] Tune cell-list performance and cache reuse across multiple equation
+   consumers.
 
 ## Phase 4: Solver Integration
 
@@ -47,8 +52,8 @@
 
 ## Phase 5: Equation Kernel Consumption
 
-1. Decide whether generated equation kernels consume cached neighbor lists or
-   invoke Warp neighbor-query kernels directly.
+1. [DONE] Prove generated-equation-like kernels can consume cached neighbor
+   lists directly with `compute_neighbor_sum()`.
 2. Add a Warp-aware acceleration-evaluation plan.
 3. Benchmark end-to-end solver steps.
 

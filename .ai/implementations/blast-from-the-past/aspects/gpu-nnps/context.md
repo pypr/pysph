@@ -3,7 +3,7 @@ aspect: gpu-nnps
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-15T10:10:00 CET
+last_reviewed: 2026-06-15T11:20:00 CET
 status: active
 ---
 
@@ -66,6 +66,20 @@ Uniform-grid implementation:
   PrediQT-02, it measured `88.288x` CPU speed while matching average neighbor
   count.
 
+Device-consumption proof:
+
+- `UniformGridWarpNNPS.compute_neighbor_sum(src_index, dst_index, prop)` builds
+  the device-resident neighbor cache and runs a Warp kernel that sums a scalar
+  source property over neighbors for each destination particle.
+- This is intentionally a narrow equation-like consumer, not the final solver
+  loop. It proves the cache can feed useful GPU work before any host
+  `UIntArray` materialization.
+- At 1,000,000 particles on PrediQT-02, `warp_grid_reduce` measured `145.583x`
+  CPU speed for a neighbor mass sum on Intel(R) Core(TM) Ultra 7 155H versus
+  NVIDIA GeForce RTX 4060 Laptop GPU. The average neighbor sum matched to the
+  reported precision (`25.568`); the aggregate checksum differed by `6` over
+  roughly `25.6M` contributions.
+
 ## Key sub-topics
 
 - Existing `GPUNeighborCache` behavior.
@@ -76,6 +90,7 @@ Uniform-grid implementation:
 - Cached flat neighbor list generation.
 - Optimize uniform-grid/cell-list structure.
 - Device-resident equation-kernel consumption of grid neighbor lists.
+- Reusable Warp equation-loop contract.
 
 ## References for this aspect
 
