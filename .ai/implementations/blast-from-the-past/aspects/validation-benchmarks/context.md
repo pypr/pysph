@@ -3,7 +3,7 @@ aspect: validation-benchmarks
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-15T12:30:00 CET
+last_reviewed: 2026-06-15T13:25:00 CET
 status: active
 ---
 
@@ -90,6 +90,22 @@ Warp summation-density experiment:
   4060 Laptop GPU shows matching checksums to reported precision and speedups:
   `152.508x` at 1M, `227.555x` at 2M, `64.964x` at 5M, and `69.084x` at 10M.
 
+Warp EOS+continuity experiment:
+
+- `.ai/implementations/blast-from-the-past/experiments/2026-06-15_warp-eos-continuity/experiment.md`
+- Correctness wrapper: `run_correctness.sh`.
+- Timing wrapper: `run_benchmark.sh`.
+- Focused correctness checks Warp `IsothermalEOS` and `ContinuityEquation`
+  against CPU references and passes with `22 passed` across Warp SPH and NNPS
+  tests.
+- The CPU baseline is PySPH `SPHEvaluator` with Cython backend,
+  `IsothermalEOS`, `ContinuityEquation`, `CubicSpline(dim=2)`, and
+  `LinkedListNNPS`.
+- The benchmark is capped at 5M particles. A 1M/2M/5M sweep on Intel(R)
+  Core(TM) Ultra 7 155H versus NVIDIA GeForce RTX 4060 Laptop GPU shows
+  pressure checksums matching to reported precision and speedups: `161.063x`
+  at 1M, `136.886x` at 2M, and `72.583x` at 5M.
+
 ## Key sub-topics
 
 - Baseline selection.
@@ -101,6 +117,7 @@ Warp summation-density experiment:
 - Warp grid optimization and device-resident neighbor-list metrics.
 - Device-consumption benchmark metrics.
 - SPH equation-kernel correctness and operation speedup.
+- EOS/continuity capped benchmark metrics.
 - Optional parallel/Zoltan test slice after commit readiness.
 
 ## References for this aspect

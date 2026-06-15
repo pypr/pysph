@@ -30,7 +30,8 @@
    equation-like work.
 8. [DONE] Use the device-resident cache for a real SPH equation:
    CubicSpline summation density.
-9. [NEXT] Generalize the device-consumption proof into a reusable equation-loop
+9. [DONE] Add EOS and continuity as the next simple SPH kernels.
+10. [NEXT] Generalize the device-consumption proof into a reusable equation-loop
    contract.
 
 ## Phase 3: Warp Cell List
@@ -58,8 +59,9 @@
    lists directly with `compute_neighbor_sum()`.
 2. [DONE] Port and benchmark standard `SummationDensity` as the first real SPH
    equation kernel.
-3. Add a Warp-aware acceleration-evaluation plan.
-4. Benchmark end-to-end solver steps.
+3. [DONE] Port and benchmark `IsothermalEOS` plus `ContinuityEquation`.
+4. Add a Warp-aware acceleration-evaluation plan.
+5. Benchmark end-to-end solver steps.
 
 ## Risks
 

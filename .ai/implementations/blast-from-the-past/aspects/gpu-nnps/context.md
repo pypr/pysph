@@ -3,7 +3,7 @@ aspect: gpu-nnps
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-15T12:30:00 CET
+last_reviewed: 2026-06-15T13:25:00 CET
 status: active
 ---
 
@@ -94,6 +94,19 @@ First SPH equation proof:
   `69.084x` CPU/Cython speed versus PySPH `SPHEvaluator` with
   `SummationDensity`, `CubicSpline(dim=2)`, and `LinkedListNNPS`.
 
+EOS and continuity proof:
+
+- `pysph/base/warp_sph.py` now also defines `compute_isothermal_eos()` and
+  `compute_continuity()`.
+- EOS mirrors PySPH `IsothermalEOS`: `p = p0 + c0^2*(rho-rho0)`.
+- Continuity mirrors PySPH `ContinuityEquation` with `VIJ . DWIJ` and the same
+  CubicSpline gradient convention at `HIJ`.
+- Focused tests compare EOS and continuity against CPU references in same-array
+  2D and cross-array 3D fixtures, including host pullback of `p` and `arho`.
+- The EOS+continuity benchmark is capped at 5M particles. At 5M on PrediQT-02,
+  `warp_grid_eos_cont` measured `72.583x` CPU/Cython speed versus PySPH
+  `SPHEvaluator`.
+
 ## Key sub-topics
 
 - Existing `GPUNeighborCache` behavior.
@@ -106,6 +119,7 @@ First SPH equation proof:
 - Device-resident equation-kernel consumption of grid neighbor lists.
 - Reusable Warp equation-loop contract.
 - Warp SPH equation kernels.
+- Pressure-gradient momentum equation as the next minimal dynamics kernel.
 
 ## References for this aspect
 
