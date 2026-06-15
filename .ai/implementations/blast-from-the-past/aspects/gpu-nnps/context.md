@@ -3,7 +3,7 @@ aspect: gpu-nnps
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-15T13:25:00 CET
+last_reviewed: 2026-06-15T14:25:00 CET
 status: active
 ---
 
@@ -107,6 +107,19 @@ EOS and continuity proof:
   `warp_grid_eos_cont` measured `72.583x` CPU/Cython speed versus PySPH
   `SPHEvaluator`.
 
+Pressure-gradient proof:
+
+- `pysph/base/warp_sph.py` now defines `compute_pressure_gradient()` for the
+  inviscid pressure-gradient portion of WCSPH momentum.
+- The kernel computes
+  `a_i = -sum_j m_j * (p_i/rho_i^2 + p_j/rho_j^2) * grad(W_ij)` using the
+  same CubicSpline gradient convention at `HIJ`.
+- Focused tests compare same-array 2D and cross-array 3D accelerations against
+  CPU references, including host pullback of `au`, `av`, and `aw`.
+- The pgrad benchmark is capped at 5M particles. At 5M on PrediQT-02,
+  `warp_grid_pgrad` measured `38.722x` CPU/Cython speed versus a pure Cython
+  pressure-gradient equation.
+
 ## Key sub-topics
 
 - Existing `GPUNeighborCache` behavior.
@@ -119,7 +132,7 @@ EOS and continuity proof:
 - Device-resident equation-kernel consumption of grid neighbor lists.
 - Reusable Warp equation-loop contract.
 - Warp SPH equation kernels.
-- Pressure-gradient momentum equation as the next minimal dynamics kernel.
+- Tiny Euler/PEC-style integrator loop.
 
 ## References for this aspect
 

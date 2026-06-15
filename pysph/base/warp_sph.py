@@ -310,6 +310,124 @@ if wp is not None:
 
 
     @wp.kernel
+    def _pressure_gradient_f64(
+            s_x: wp.array(dtype=wp.float64),
+            s_y: wp.array(dtype=wp.float64),
+            s_z: wp.array(dtype=wp.float64),
+            s_h: wp.array(dtype=wp.float64),
+            s_m: wp.array(dtype=wp.float64),
+            s_rho: wp.array(dtype=wp.float64),
+            s_p: wp.array(dtype=wp.float64),
+            d_x: wp.array(dtype=wp.float64),
+            d_y: wp.array(dtype=wp.float64),
+            d_z: wp.array(dtype=wp.float64),
+            d_h: wp.array(dtype=wp.float64),
+            d_rho: wp.array(dtype=wp.float64),
+            d_p: wp.array(dtype=wp.float64),
+            starts: wp.array(dtype=wp.int32),
+            lengths: wp.array(dtype=wp.int32),
+            neighbors: wp.array(dtype=wp.uint32),
+            dim: wp.int32,
+            d_au: wp.array(dtype=wp.float64),
+            d_av: wp.array(dtype=wp.float64),
+            d_aw: wp.array(dtype=wp.float64),
+    ):
+        i = wp.tid()
+        au = wp.float64(0.0)
+        av = wp.float64(0.0)
+        aw = wp.float64(0.0)
+        rhoi21 = wp.float64(1.0) / (d_rho[i] * d_rho[i])
+        tmpi = d_p[i] * rhoi21
+        start = starts[i]
+        stop = start + lengths[i]
+        for pos in range(start, stop):
+            j = wp.int32(neighbors[pos])
+            dx = d_x[i] - s_x[j]
+            dy = wp.float64(0.0)
+            dz = wp.float64(0.0)
+            if dim > wp.int32(1):
+                dy = d_y[i] - s_y[j]
+            if dim > wp.int32(2):
+                dz = d_z[i] - s_z[j]
+            rij = wp.sqrt(dx*dx + dy*dy + dz*dz)
+            hij = wp.float64(0.5) * (d_h[i] + s_h[j])
+            grad = wp.float64(0.0)
+            if rij > wp.float64(1.0e-12):
+                grad = _cubic_dwdq_f64(rij, hij, dim) / (hij * rij)
+            dwx = grad * dx
+            dwy = grad * dy
+            dwz = grad * dz
+            rhoj21 = wp.float64(1.0) / (s_rho[j] * s_rho[j])
+            tmp = tmpi + s_p[j] * rhoj21
+            fac = -s_m[j] * tmp
+            au += fac * dwx
+            av += fac * dwy
+            aw += fac * dwz
+        d_au[i] = au
+        d_av[i] = av
+        d_aw[i] = aw
+
+
+    @wp.kernel
+    def _pressure_gradient_f32(
+            s_x: wp.array(dtype=wp.float32),
+            s_y: wp.array(dtype=wp.float32),
+            s_z: wp.array(dtype=wp.float32),
+            s_h: wp.array(dtype=wp.float32),
+            s_m: wp.array(dtype=wp.float32),
+            s_rho: wp.array(dtype=wp.float32),
+            s_p: wp.array(dtype=wp.float32),
+            d_x: wp.array(dtype=wp.float32),
+            d_y: wp.array(dtype=wp.float32),
+            d_z: wp.array(dtype=wp.float32),
+            d_h: wp.array(dtype=wp.float32),
+            d_rho: wp.array(dtype=wp.float32),
+            d_p: wp.array(dtype=wp.float32),
+            starts: wp.array(dtype=wp.int32),
+            lengths: wp.array(dtype=wp.int32),
+            neighbors: wp.array(dtype=wp.uint32),
+            dim: wp.int32,
+            d_au: wp.array(dtype=wp.float32),
+            d_av: wp.array(dtype=wp.float32),
+            d_aw: wp.array(dtype=wp.float32),
+    ):
+        i = wp.tid()
+        au = wp.float32(0.0)
+        av = wp.float32(0.0)
+        aw = wp.float32(0.0)
+        rhoi21 = wp.float32(1.0) / (d_rho[i] * d_rho[i])
+        tmpi = d_p[i] * rhoi21
+        start = starts[i]
+        stop = start + lengths[i]
+        for pos in range(start, stop):
+            j = wp.int32(neighbors[pos])
+            dx = d_x[i] - s_x[j]
+            dy = wp.float32(0.0)
+            dz = wp.float32(0.0)
+            if dim > wp.int32(1):
+                dy = d_y[i] - s_y[j]
+            if dim > wp.int32(2):
+                dz = d_z[i] - s_z[j]
+            rij = wp.sqrt(dx*dx + dy*dy + dz*dz)
+            hij = wp.float32(0.5) * (d_h[i] + s_h[j])
+            grad = wp.float32(0.0)
+            if rij > wp.float32(1.0e-12):
+                grad = _cubic_dwdq_f32(rij, hij, dim) / (hij * rij)
+            dwx = grad * dx
+            dwy = grad * dy
+            dwz = grad * dz
+            rhoj21 = wp.float32(1.0) / (s_rho[j] * s_rho[j])
+            tmp = tmpi + s_p[j] * rhoj21
+            fac = -s_m[j] * tmp
+            au += fac * dwx
+            av += fac * dwy
+            aw += fac * dwz
+        d_au[i] = au
+        d_av[i] = av
+        d_aw[i] = aw
+
+
+    @wp.kernel
     def _summation_density_f32(
             s_x: wp.array(dtype=wp.float32),
             s_y: wp.array(dtype=wp.float32),
@@ -473,3 +591,47 @@ def compute_continuity(nnps, src_index=0, dst_index=0, out_prop='arho'):
         )
         wp.synchronize_device(nnps.device)
     return out
+
+
+def compute_pressure_gradient(nnps, src_index=0, dst_index=0,
+                              out_props=('au', 'av', 'aw')):
+    """Compute the inviscid pressure-gradient part of WCSPH momentum."""
+    if wp is None:  # pragma: no cover
+        raise ImportError("warp is required for compute_pressure_gradient")
+
+    src_pa = nnps.particles[src_index]
+    dst_pa = nnps.particles[dst_index]
+    for prop in out_props:
+        _ensure_property(dst_pa, prop, nnps.device)
+
+    src_pa.gpu.push('x', 'y', 'z', 'h', 'm', 'rho', 'p')
+    dst_pa.gpu.push('x', 'y', 'z', 'h', 'rho', 'p', *out_props)
+    cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
+    src = src_pa.gpu
+    dst = dst_pa.gpu
+    au = dst.get_device_array(out_props[0])
+    av = dst.get_device_array(out_props[1])
+    aw = dst.get_device_array(out_props[2])
+    ndst = dst.get_number_of_particles()
+    if src.x.dtype == np.float32:
+        kernel = _pressure_gradient_f32
+    else:
+        kernel = _pressure_gradient_f64
+
+    if ndst > 0:
+        wp.launch(
+            kernel,
+            dim=ndst,
+            inputs=[
+                src.x.dev, src.y.dev, src.z.dev, src.h.dev, src.m.dev,
+                src.rho.dev, src.p.dev,
+                dst.x.dev, dst.y.dev, dst.z.dev, dst.h.dev,
+                dst.rho.dev, dst.p.dev,
+                cache['starts_dev'], cache['lengths_dev'],
+                cache['neighbors_dev'], np.int32(nnps.dim),
+                au.dev, av.dev, aw.dev
+            ],
+            device=nnps.device,
+        )
+        wp.synchronize_device(nnps.device)
+    return au, av, aw

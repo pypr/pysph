@@ -3,7 +3,7 @@ aspect: validation-benchmarks
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-15T13:25:00 CET
+last_reviewed: 2026-06-15T14:25:00 CET
 status: active
 ---
 
@@ -106,6 +106,19 @@ Warp EOS+continuity experiment:
   pressure checksums matching to reported precision and speedups: `161.063x`
   at 1M, `136.886x` at 2M, and `72.583x` at 5M.
 
+Warp pressure-gradient experiment:
+
+- `.ai/implementations/blast-from-the-past/experiments/2026-06-15_warp-pressure-gradient/experiment.md`
+- Correctness wrapper: `run_correctness.sh`.
+- Timing wrapper: `run_benchmark.sh`.
+- Focused correctness checks Warp inviscid pressure gradient against CPU
+  references and passes with `24 passed` across Warp SPH and NNPS tests.
+- The CPU baseline is PySPH `SPHEvaluator` with Cython backend, a pure
+  `PressureGradientOnly` equation, `CubicSpline(dim=2)`, and `LinkedListNNPS`.
+- The benchmark is capped at 5M particles. A 1M/2M/5M sweep on Intel(R)
+  Core(TM) Ultra 7 155H versus NVIDIA GeForce RTX 4060 Laptop GPU shows
+  speedups: `148.884x` at 1M, `129.854x` at 2M, and `38.722x` at 5M.
+
 ## Key sub-topics
 
 - Baseline selection.
@@ -118,6 +131,7 @@ Warp EOS+continuity experiment:
 - Device-consumption benchmark metrics.
 - SPH equation-kernel correctness and operation speedup.
 - EOS/continuity capped benchmark metrics.
+- Pressure-gradient capped benchmark metrics.
 - Optional parallel/Zoltan test slice after commit readiness.
 
 ## References for this aspect
