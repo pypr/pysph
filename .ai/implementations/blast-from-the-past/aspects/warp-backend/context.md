@@ -21,6 +21,12 @@ Warp imports successfully in the active environment as version `1.14.0`. Before 
 
 ADR-0002 accepted the DeviceHelper-like mirror direction. The prototype adds `pysph/base/warp_device_helper.py`, exposes `backend='warp'` through ParticleArray backend resolution, and uses Warp gather kernels for alignment over scalar and strided properties. It now also supports remove, remove-tagged, add, append, extend, and extract through ParticleArray public methods. Focused Warp helper tests cover the main prototype surface and pass against a rebuilt `pysph.base.particle_array` extension.
 
+Warp equation kernels now cover the current elliptical-drop smoke formulation:
+CubicSpline/Gaussian kernel selection, summation density, isothermal/Tait EOS,
+continuity, pressure-gradient acceleration, Monaghan artificial viscosity,
+XSPH drift correction, KDK leapfrog, periodic position wrapping, and
+device-reduced WCSPH adaptive timestep factors.
+
 ## Key sub-topics
 
 - Warp version/API surface - Active environment has Warp `1.14.0`; confirm documentation set with team.
@@ -29,6 +35,8 @@ ADR-0002 accepted the DeviceHelper-like mirror direction. The prototype adds `py
 - Backend naming and ownership ADR.
 - Next kernel family decision: move add/remove/extract/append growth internals from host-side NumPy concatenation to fully device-side Warp kernels.
 - Tutorial documentation added at `docs/source/tutorial/warp_particle_array.rst`.
+- Adaptive timestep reductions currently transfer only the final scalar `dt`
+  back to Python because launch parameters remain host scalars.
 
 ## References for this aspect
 

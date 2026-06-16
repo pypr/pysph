@@ -10,15 +10,16 @@ pytest.importorskip('warp')
 
 from cyarray.carray import UIntArray
 
-from pysph.base.kernels import CubicSpline
+from pysph.base.kernels import CubicSpline, Gaussian
 from pysph.base.nnps import LinkedListNNPS
 from pysph.base.utils import get_particle_array
 from pysph.base.warp_nnps import UniformGridWarpNNPS
 from pysph.base.warp_sph import (
     compute_artificial_viscosity, compute_continuity, compute_isothermal_eos,
     compute_pressure_gradient, compute_summation_density, compute_tait_eos,
-    euler_step, leapfrog_drift, leapfrog_kick, wc_sph_euler_step,
-    wc_sph_leapfrog_step, wrap_periodic
+    compute_wcsph_adaptive_timestep, compute_xsph_correction, euler_step,
+    leapfrog_drift, leapfrog_kick, wc_sph_euler_step, wc_sph_leapfrog_step,
+    wrap_periodic
 )
 
 
@@ -28,12 +29,18 @@ def _neighbors(nnps, src_index, dst_index, d_idx):
     return nbrs.get_npy_array()[:nbrs.length]
 
 
+def _cpu_kernel(dim, kernel='cubic'):
+    if kernel == 'gaussian':
+        return Gaussian(dim=dim)
+    return CubicSpline(dim=dim)
+
+
 def _cpu_summation_density(particles, src_index, dst_index, dim,
-                           radius_scale=2.0):
+                           radius_scale=2.0, kernel='cubic'):
     nnps = LinkedListNNPS(
         dim=dim, particles=particles, radius_scale=radius_scale
     )
-    kernel = CubicSpline(dim=dim)
+    kernel_obj = _cpu_kernel(dim, kernel)
     src = particles[src_index]
     dst = particles[dst_index]
     result = np.zeros(dst.get_number_of_particles())
@@ -52,16 +59,19 @@ def _cpu_summation_density(particles, src_index, dst_index, dim,
                 xij[2] = dst.z[d_idx] - src.z[s_idx]
             rij = np.sqrt(xij[0]**2 + xij[1]**2 + xij[2]**2)
             hij = 0.5 * (dst.h[d_idx] + src.h[s_idx])
-            total += src.m[s_idx] * kernel.kernel(xij=xij, rij=rij, h=hij)
+            total += src.m[s_idx] * kernel_obj.kernel(
+                xij=xij, rij=rij, h=hij
+            )
         result[d_idx] = total
     return result
 
 
-def _cpu_continuity(particles, src_index, dst_index, dim, radius_scale=2.0):
+def _cpu_continuity(particles, src_index, dst_index, dim, radius_scale=2.0,
+                    kernel='cubic'):
     nnps = LinkedListNNPS(
         dim=dim, particles=particles, radius_scale=radius_scale
     )
-    kernel = CubicSpline(dim=dim)
+    kernel_obj = _cpu_kernel(dim, kernel)
     src = particles[src_index]
     dst = particles[dst_index]
     result = np.zeros(dst.get_number_of_particles())
@@ -88,7 +98,7 @@ def _cpu_continuity(particles, src_index, dst_index, dim, radius_scale=2.0):
             rij = np.sqrt(xij[0]**2 + xij[1]**2 + xij[2]**2)
             hij = 0.5 * (dst.h[d_idx] + src.h[s_idx])
             dwij = [0.0, 0.0, 0.0]
-            kernel.gradient(xij=xij, rij=rij, h=hij, grad=dwij)
+            kernel_obj.gradient(xij=xij, rij=rij, h=hij, grad=dwij)
             total += src.m[s_idx] * (
                 vij[0]*dwij[0] + vij[1]*dwij[1] + vij[2]*dwij[2]
             )
@@ -97,11 +107,11 @@ def _cpu_continuity(particles, src_index, dst_index, dim, radius_scale=2.0):
 
 
 def _cpu_pressure_gradient(particles, src_index, dst_index, dim,
-                           radius_scale=2.0):
+                           radius_scale=2.0, kernel='cubic'):
     nnps = LinkedListNNPS(
         dim=dim, particles=particles, radius_scale=radius_scale
     )
-    kernel = CubicSpline(dim=dim)
+    kernel_obj = _cpu_kernel(dim, kernel)
     src = particles[src_index]
     dst = particles[dst_index]
     result = np.zeros((dst.get_number_of_particles(), 3))
@@ -123,7 +133,7 @@ def _cpu_pressure_gradient(particles, src_index, dst_index, dim,
             rij = np.sqrt(xij[0]**2 + xij[1]**2 + xij[2]**2)
             hij = 0.5 * (dst.h[d_idx] + src.h[s_idx])
             dwij = [0.0, 0.0, 0.0]
-            kernel.gradient(xij=xij, rij=rij, h=hij, grad=dwij)
+            kernel_obj.gradient(xij=xij, rij=rij, h=hij, grad=dwij)
             rhoj21 = 1.0/(src.rho[s_idx]*src.rho[s_idx])
             tmp = tmpi + src.p[s_idx]*rhoj21
             acc += -src.m[s_idx] * tmp * np.asarray(dwij)
@@ -139,11 +149,12 @@ def _cpu_tait_eos(rho, rho0, c0, gamma=7.0, p0=0.0):
 
 
 def _cpu_artificial_viscosity(particles, src_index, dst_index, dim,
-                              alpha, beta, c0, radius_scale=2.0):
+                              alpha, beta, c0, radius_scale=2.0,
+                              kernel='cubic'):
     nnps = LinkedListNNPS(
         dim=dim, particles=particles, radius_scale=radius_scale
     )
-    kernel = CubicSpline(dim=dim)
+    kernel_obj = _cpu_kernel(dim, kernel)
     src = particles[src_index]
     dst = particles[dst_index]
     result = np.zeros((dst.get_number_of_particles(), 3))
@@ -181,10 +192,85 @@ def _cpu_artificial_viscosity(particles, src_index, dst_index, dim,
                 cij = 0.5 * (csi + csj)
                 piij = (-alpha*cij*mu + beta*mu*mu) * rhoij1
                 dwij = [0.0, 0.0, 0.0]
-                kernel.gradient(xij=xij, rij=rij, h=hij, grad=dwij)
+                kernel_obj.gradient(xij=xij, rij=rij, h=hij, grad=dwij)
                 acc += -src.m[s_idx] * piij * np.asarray(dwij)
         result[d_idx, :] = acc
     return result
+
+
+def _cpu_xsph_correction(particles, src_index, dst_index, dim, eps=0.5,
+                         radius_scale=2.0, kernel='cubic'):
+    nnps = LinkedListNNPS(
+        dim=dim, particles=particles, radius_scale=radius_scale
+    )
+    kernel_obj = _cpu_kernel(dim, kernel)
+    src = particles[src_index]
+    dst = particles[dst_index]
+    result = np.zeros((dst.get_number_of_particles(), 3))
+
+    for d_idx in range(dst.get_number_of_particles()):
+        acc = np.zeros(3)
+        for s_idx in _neighbors(nnps, src_index, dst_index, d_idx):
+            xij = [
+                dst.x[d_idx] - src.x[s_idx],
+                0.0,
+                0.0,
+            ]
+            vij = [
+                dst.u[d_idx] - src.u[s_idx],
+                0.0,
+                0.0,
+            ]
+            if dim > 1:
+                xij[1] = dst.y[d_idx] - src.y[s_idx]
+                vij[1] = dst.v[d_idx] - src.v[s_idx]
+            if dim > 2:
+                xij[2] = dst.z[d_idx] - src.z[s_idx]
+                vij[2] = dst.w[d_idx] - src.w[s_idx]
+            rij = np.sqrt(xij[0]**2 + xij[1]**2 + xij[2]**2)
+            hij = 0.5 * (dst.h[d_idx] + src.h[s_idx])
+            wij = kernel_obj.kernel(xij=xij, rij=rij, h=hij)
+            rhoij1 = 2.0 / (dst.rho[d_idx] + src.rho[s_idx])
+            tmp = -eps * src.m[s_idx] * wij * rhoij1
+            acc += tmp * np.asarray(vij)
+        result[d_idx, :] = acc
+    return result
+
+
+def _cpu_wcsph_dt(particles, pa_index, dim, c0, cfl, dt_min, dt_max,
+                  radius_scale=2.0):
+    nnps = LinkedListNNPS(
+        dim=dim, particles=particles, radius_scale=radius_scale
+    )
+    pa = particles[pa_index]
+    max_cfl = 0.0
+    max_force = 0.0
+    hmin = np.min(pa.h)
+    for i in range(pa.get_number_of_particles()):
+        for j in _neighbors(nnps, pa_index, pa_index, i):
+            xij = [pa.x[i] - pa.x[j], 0.0, 0.0]
+            vij = [pa.u[i] - pa.u[j], 0.0, 0.0]
+            if dim > 1:
+                xij[1] = pa.y[i] - pa.y[j]
+                vij[1] = pa.v[i] - pa.v[j]
+            if dim > 2:
+                xij[2] = pa.z[i] - pa.z[j]
+                vij[2] = pa.w[i] - pa.w[j]
+            rij2 = xij[0]**2 + xij[1]**2 + xij[2]**2
+            if rij2 > 1.0e-12:
+                hij = 0.5 * (pa.h[i] + pa.h[j])
+                vdotx = vij[0]*xij[0] + vij[1]*xij[1] + vij[2]*xij[2]
+                max_cfl = max(max_cfl, abs(hij * vdotx / rij2) + c0)
+        max_force = max(
+            max_force,
+            pa.au[i]*pa.au[i] + pa.av[i]*pa.av[i] + pa.aw[i]*pa.aw[i]
+        )
+    result = dt_max
+    if max_cfl > 0.0:
+        result = min(result, cfl * hmin / max_cfl)
+    if max_force > 0.0:
+        result = min(result, cfl * np.sqrt(hmin / np.sqrt(max_force)))
+    return min(max(result, dt_min), dt_max)
 
 
 def test_warp_isothermal_eos_matches_cpu_and_pulls_pressure():
@@ -243,6 +329,29 @@ def test_warp_summation_density_matches_cpu_in_2d():
     nnps = UniformGridWarpNNPS(dim=2, particles=particles, radius_scale=2.0)
 
     actual = compute_summation_density(nnps, 0, 0).get()
+
+    assert np.allclose(actual, expected)
+
+
+def test_warp_gaussian_summation_density_matches_pysph_kernel():
+    pa = get_particle_array(
+        name='fluid',
+        x=[0.0, 0.2, 0.4, 0.62],
+        y=[0.0, 0.0, 0.1, -0.05],
+        z=[0.0, 0.0, 0.0, 0.0],
+        h=[0.25, 0.25, 0.35, 0.3],
+        m=[1.0, 2.0, 1.5, 1.0],
+        backend='warp',
+    )
+    particles = [pa]
+    expected = _cpu_summation_density(
+        particles, 0, 0, dim=2, radius_scale=3.0, kernel='gaussian'
+    )
+    nnps = UniformGridWarpNNPS(dim=2, particles=particles, radius_scale=3.0)
+
+    actual = compute_summation_density(
+        nnps, 0, 0, kernel='gaussian'
+    ).get()
 
     assert np.allclose(actual, expected)
 
@@ -361,6 +470,36 @@ def test_warp_pressure_gradient_matches_cpu_in_2d():
     assert np.allclose(aw.get(), expected[:, 2])
 
 
+def test_warp_gaussian_pressure_gradient_matches_pysph_kernel():
+    pa = get_particle_array(
+        name='fluid',
+        x=[0.0, 0.2, 0.4, 0.62],
+        y=[0.0, 0.0, 0.1, -0.05],
+        z=[0.0, 0.0, 0.0, 0.0],
+        h=[0.25, 0.25, 0.35, 0.3],
+        m=[1.0, 2.0, 1.5, 1.0],
+        rho=[1.0, 1.1, 0.9, 1.2],
+        p=[2.0, 3.0, 1.5, 0.5],
+        au=[0.0, 0.0, 0.0, 0.0],
+        av=[0.0, 0.0, 0.0, 0.0],
+        aw=[0.0, 0.0, 0.0, 0.0],
+        backend='warp',
+    )
+    particles = [pa]
+    expected = _cpu_pressure_gradient(
+        particles, 0, 0, dim=2, radius_scale=3.0, kernel='gaussian'
+    )
+    nnps = UniformGridWarpNNPS(dim=2, particles=particles, radius_scale=3.0)
+
+    au, av, aw = compute_pressure_gradient(
+        nnps, 0, 0, kernel='gaussian'
+    )
+
+    assert np.allclose(au.get(), expected[:, 0])
+    assert np.allclose(av.get(), expected[:, 1])
+    assert np.allclose(aw.get(), expected[:, 2])
+
+
 def test_warp_pressure_gradient_matches_cpu_cross_array_in_3d_and_pulls_accel():
     fluid = get_particle_array(
         name='fluid',
@@ -434,6 +573,77 @@ def test_warp_artificial_viscosity_matches_cpu_and_adds_to_acceleration():
     assert np.allclose(au.get(), expected[:, 0])
     assert np.allclose(av.get(), expected[:, 1])
     assert np.allclose(aw.get(), expected[:, 2])
+
+
+def test_warp_xsph_correction_matches_cpu_reference():
+    pa = get_particle_array(
+        name='fluid',
+        x=[0.0, 0.2, 0.45, 0.7],
+        y=[0.0, 0.03, -0.02, 0.1],
+        z=[0.0, 0.0, 0.0, 0.0],
+        h=[0.35, 0.35, 0.4, 0.35],
+        m=[1.0, 1.5, 1.2, 0.8],
+        rho=[1.0, 1.1, 0.9, 1.2],
+        u=[1.0, -1.0, -0.2, 0.0],
+        v=[0.0, 0.05, -0.1, 0.0],
+        w=[0.0, 0.0, 0.0, 0.0],
+        ax=[0.0, 0.0, 0.0, 0.0],
+        ay=[0.0, 0.0, 0.0, 0.0],
+        az=[0.0, 0.0, 0.0, 0.0],
+        backend='warp',
+    )
+    particles = [pa]
+    eps = 0.5
+    expected = _cpu_xsph_correction(
+        particles, 0, 0, dim=2, eps=eps, radius_scale=3.0,
+        kernel='gaussian'
+    )
+    nnps = UniformGridWarpNNPS(dim=2, particles=particles, radius_scale=3.0)
+
+    ax, ay, az = compute_xsph_correction(
+        nnps, 0, 0, eps=eps, kernel='gaussian'
+    )
+
+    assert np.allclose(ax.get(), expected[:, 0])
+    assert np.allclose(ay.get(), expected[:, 1])
+    assert np.allclose(az.get(), expected[:, 2])
+
+
+def test_warp_adaptive_timestep_matches_cpu_reference_and_clamps():
+    pa = get_particle_array(
+        name='fluid',
+        x=[0.0, 0.2, 0.45, 0.7],
+        y=[0.0, 0.03, -0.02, 0.1],
+        z=[0.0, 0.0, 0.0, 0.0],
+        h=[0.35, 0.35, 0.4, 0.35],
+        m=[1.0, 1.5, 1.2, 0.8],
+        u=[1.0, -1.0, -0.2, 0.0],
+        v=[0.0, 0.05, -0.1, 0.0],
+        w=[0.0, 0.0, 0.0, 0.0],
+        au=[4.0, -0.5, 0.25, 0.0],
+        av=[0.0, 0.2, -0.1, 0.0],
+        aw=[0.0, 0.0, 0.0, 0.0],
+        backend='warp',
+    )
+    particles = [pa]
+    c0 = 5.0
+    cfl = 0.3
+    dt_min = 1.0e-6
+    dt_max = 1.0e-2
+    expected = _cpu_wcsph_dt(
+        particles, 0, dim=2, c0=c0, cfl=cfl, dt_min=dt_min,
+        dt_max=dt_max
+    )
+    nnps = UniformGridWarpNNPS(dim=2, particles=particles, radius_scale=2.0)
+
+    actual = compute_wcsph_adaptive_timestep(
+        nnps, 0, c0=c0, cfl=cfl, dt_min=dt_min, dt_max=dt_max
+    )
+    pa.gpu.pull('dt_cfl', 'dt_force')
+
+    assert np.isclose(actual, expected)
+    assert np.all(np.isfinite(pa.dt_cfl))
+    assert np.all(np.isfinite(pa.dt_force))
 
 
 def test_warp_wc_sph_euler_step_with_tait_eos_uses_sound_speed_in_avisc():

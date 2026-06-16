@@ -24,6 +24,12 @@ python .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-ellip
     --beta 0.0 \
     --eos tait \
     --gamma 7.0 \
+    --kernel gaussian \
+    --xsph-eps 0.5 \
+    --adaptive-dt \
+    --cfl 0.25 \
+    --dt-min 1.0e-7 \
+    --dt-max 1.0e-5 \
     --output "$OUT"
 
 test -s "$OUT"

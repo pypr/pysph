@@ -190,8 +190,39 @@ Warp elliptical-drop runner:
   `rho_min=0.6329819560050964`, `rho_max=0.9999754428863525`,
   `cs_min=5.072288990020752`, `cs_max=19.99852752685547`, and kinetic energy
   `7868.739071212255`.
-- This is a GPU state-evolution smoke run, not yet a validated published
-  elliptical-drop benchmark.
+- XSPH/Gaussian/adaptive-dt checkpoint:
+  `pysph/base/warp_sph.py` now supports Gaussian kernel selection,
+  `compute_xsph_correction()`, `leapfrog_drift_xsph()`, and
+  `compute_wcsph_adaptive_timestep()`. Adaptive dt computes `dt_cfl` and
+  `dt_force` on device, reduces them on device, and pulls only the final scalar
+  timestep per step.
+- Focused Warp SPH result after this checkpoint:
+
+```text
+python -m pytest pysph/base/tests/test_warp_sph.py -q
+18 passed, 2 warnings in 3.50s
+```
+
+- Updated smoke wrapper now exercises Gaussian + Tait + artificial viscosity +
+  XSPH + adaptive dt. Result with `nx=8`, 204 particles, 2 steps:
+  `all_finite=true`, `kernel=gaussian`, `radius_scale=3.0`,
+  `xsph_eps=0.5`, `adaptive_dt=true`, `rho_min=0.534595251083374`,
+  `rho_max=0.9998562335968018`, `dt_min_used=9.999999747378752e-06`,
+  `dt_max_used=9.999999747378752e-06`, kinetic energy
+  `8078.179766857993`.
+- New comparison script
+  `compare_warp_pysph_elliptical_drop.py` runs the Warp path and a CPU
+  PySPH-primitive baseline using `LinkedListNNPS`, `Gaussian`, Tait EOS,
+  artificial viscosity, XSPH, and adaptive dt formulas. It writes CPU/Warp
+  `.npz` outputs plus `comparison-smoke.png` with side-by-side speed-colored
+  scatter plots. Smoke comparison result: CPU and Warp both finite with 204
+  particles; CPU `rho_min=0.534595094929311`, Warp
+  `rho_min=0.534595251083374`; CPU kinetic energy `8078.179846214378`, Warp
+  `8078.179766857993`.
+- This is now a near-formulation smoke/comparison path, but still not a
+  validated published elliptical-drop benchmark. The next validation escalation
+  should use the full PySPH `Application/Solver` outputs at `t=0.0008` and
+  `t=0.0038`.
 
 ## Key sub-topics
 
@@ -213,6 +244,10 @@ Warp elliptical-drop runner:
 - Application-style Warp elliptical-drop smoke metrics.
 - Artificial-viscosity acceleration correctness and smoke metrics.
 - Tait EOS and per-particle sound-speed correctness and smoke metrics.
+- Gaussian kernel correctness.
+- XSPH leapfrog correction correctness.
+- Device-reduced adaptive timestep correctness.
+- CPU PySPH-primitive side-by-side image comparison.
 - Optional parallel/Zoltan test slice after commit readiness.
 
 ## References for this aspect

@@ -25,6 +25,12 @@ ParticleArray currently owns host `BaseArray` storage for properties and constan
 
 See `.ai/implementations/blast-from-the-past/spec/particle-array/`.
 
+The current Warp elliptical-drop path keeps repeated-step particle state on
+device. `wc_sph_leapfrog_step(push=False)` avoids host pushes during the loop;
+adaptive dt pulls only the reduced scalar timestep needed as the next launch
+parameter, and the runner pulls full arrays only for explicit final metrics,
+checkpoint `.npz` output, and side-by-side plots.
+
 ## Key sub-topics
 
 - ParticleArray property ownership.
@@ -32,6 +38,7 @@ See `.ai/implementations/blast-from-the-past/spec/particle-array/`.
 - Float/double precision choices.
 - Strided property gather/scatter behavior.
 - Host/device sync authority for `get()`, output, and Cython callers.
+- Scalar-only adaptive timestep handoff versus full-array checkpoint pulls.
 
 ## References for this aspect
 

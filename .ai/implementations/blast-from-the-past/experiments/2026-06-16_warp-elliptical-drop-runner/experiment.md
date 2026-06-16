@@ -5,7 +5,7 @@ created: 2026-06-16T12:30:00 CEST
 author: @kunalpuri-prediqt
 aspect: validation-benchmarks
 status: active
-last_checked: 2026-06-16T14:14:00 CEST
+last_checked: 2026-06-16T22:56:00 CEST
 ---
 
 # Experiment: Warp Elliptical-Drop Runner
@@ -25,16 +25,24 @@ UniformGridWarpNNPS
 wc_sph_leapfrog_step
 ```
 
-This is a GPU smoke run and output-generation checkpoint. It is not yet a
-validated recreation of the published elliptical-drop benchmark.
+This is now a GPU smoke/comparison run. It exercises the same core terms used
+by the PySPH no-scheme elliptical-drop example: Gaussian kernel, Tait EOS,
+artificial viscosity, XSPH correction, and adaptive timestep control.
 
-## Missing Physics / Integration
+## Active Physics / Integration
 
-The existing PySPH example uses Gaussian kernel, Tait EOS, artificial
-viscosity, XSPH correction, adaptive timestep, and PySPH's full
-Application/Solver stack. The current Warp runner uses CubicSpline summation
-density, Tait EOS with per-particle `cs`, pressure-gradient acceleration plus
-Monaghan-style artificial viscosity, and fixed-step KDK leapfrog.
+- Gaussian kernel with `radius_scale=3.0` by default.
+- Tait EOS with per-particle sound speed `cs`.
+- Pressure-gradient acceleration plus additive Monaghan artificial viscosity.
+- XSPH correction in the leapfrog drift path.
+- Device-computed adaptive timestep factors `dt_cfl` and `dt_force`.
+- One scalar `dt` transfer from device to host per adaptive step; no full
+  particle-array pulls during stepping.
+- Final checkpoint/output pulls are explicit and used for metrics/plots.
+
+The remaining gap is full PySPH `Application/Solver` parity for a production
+elliptical-drop run. The current comparison script uses PySPH CPU primitives
+(`LinkedListNNPS`, `Gaussian`, and the same equation formulas) as a baseline.
 
 ## What To Expect
 
@@ -44,6 +52,9 @@ A successful smoke run should:
 - run a small number of Warp leapfrog steps;
 - print JSON metrics;
 - report `"all_finite": true`;
+- record `"kernel": "gaussian"`;
+- record `"xsph_eps": 0.5`;
+- record `"adaptive_dt": true`;
 - write `results-smoke.npz`.
 
 The default smoke settings are intentionally conservative:
@@ -57,6 +68,10 @@ alpha=0.1
 beta=0.0
 eos=tait
 gamma=7.0
+kernel=gaussian
+xsph_eps=0.5
+adaptive_dt=true
+cfl=0.25
 ```
 
 ## Setup
@@ -77,7 +92,16 @@ This experiment succeeds when:
 - metrics report `all_finite == true`;
 - metrics record `alpha == 0.1` and `beta == 0.0`;
 - metrics record `eos == "tait"` and `gamma == 7.0`;
+- metrics record `kernel == "gaussian"`, `radius_scale == 3.0`,
+  `xsph_eps == 0.5`, and `adaptive_dt == true`;
+- metrics record finite `dt_min_used`, `dt_max_used`, and `dt_last`;
 - final scalar bounds and kinetic energy are printed for inspection.
+
+The comparison script succeeds when:
+
+- CPU and Warp `.npz` outputs exist;
+- CPU and Warp metrics report `all_finite == true`;
+- side-by-side image `comparison-smoke.png` exists and is non-empty.
 
 ## Results
 
@@ -92,32 +116,42 @@ Warp 1.14.0 initialized:
      "cuda:0"   : "NVIDIA GeForce RTX 4060 Laptop GPU" (8 GiB, sm_89, mempool enabled)
    Kernel cache:
      /home/kunalp/.cache/warp/1.14.0
-Module pysph.base.warp_nnps b046253 load on device 'cuda:0' took 16.14 ms  (cached)
-Module pysph.base.warp_sph 37ca4ca load on device 'cuda:0' took 4.78 ms  (cached)
+Module pysph.base.warp_nnps b046253 load on device 'cuda:0' took 22.79 ms  (cached)
+Module pysph.base.warp_sph 1bd567e load on device 'cuda:0' took 9.35 ms  (cached)
 {
+  "adaptive_dt": true,
   "all_finite": true,
   "alpha": 0.1,
   "beta": 0.0,
   "c0": 20.0,
-  "cs_max": 19.997066497802734,
-  "cs_min": 3.9725253582000732,
+  "cfl": 0.25,
+  "cs_max": 19.991374969482422,
+  "cs_min": 3.055661916732788,
   "dt": 1e-05,
+  "dt_last": 9.999999747378752e-06,
+  "dt_max": 1e-05,
+  "dt_max_used": 9.999999747378752e-06,
+  "dt_min": 1e-07,
+  "dt_min_used": 9.999999747378752e-06,
   "eos": "tait",
   "gamma": 7.0,
-  "kinetic_energy": 8078.17389338273,
+  "kernel": "gaussian",
+  "kinetic_energy": 8078.179766857993,
   "nx": 8,
-  "p_max": -0.01954691670835018,
-  "p_min": -55.82748794555664,
+  "p_max": -0.05748271942138672,
+  "p_min": -56.429779052734375,
   "particles": 204,
-  "radius_max": 0.9978746006297383,
-  "rho_max": 0.9999511241912842,
-  "rho_min": 0.5834615230560303,
+  "radius_max": 0.9978295868060059,
+  "radius_scale": 3.0,
+  "rho_max": 0.9998562335968018,
+  "rho_min": 0.534595251083374,
   "steps": 2,
-  "time": 2e-05,
-  "x_max": 0.9480999112129211,
-  "x_min": -0.9231499433517456,
-  "y_max": 0.9518999457359314,
-  "y_min": -0.9268499612808228
+  "time": 1.9999999494757503e-05,
+  "x_max": 0.9481551647186279,
+  "x_min": -0.9232051968574524,
+  "xsph_eps": 0.5,
+  "y_max": 0.951850950717926,
+  "y_min": -0.9268011450767517
 }
 ```
 
@@ -125,6 +159,44 @@ Output:
 
 ```text
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/results-smoke.npz
+```
+
+CPU/Warp side-by-side comparison smoke:
+
+```text
+$ python .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/compare_warp_pysph_elliptical_drop.py --nx 8 --steps 2 --dt 1.0e-5 --rho0 1.0 --c0 20.0 --p0 0.0 --alpha 0.1 --beta 0.0 --gamma 7.0 --xsph-eps 0.5 --adaptive-dt --cfl 0.25 --dt-min 1.0e-7 --dt-max 1.0e-5 --prefix comparison-smoke
+{
+  "cpu": {
+    "all_finite": true,
+    "dt_max_used": 1e-05,
+    "dt_min_used": 1e-05,
+    "kinetic_energy": 8078.179846214378,
+    "particles": 204,
+    "radius_max": 0.9978296023877065,
+    "rho_max": 0.9998561964891306,
+    "rho_min": 0.534595094929311,
+    "time": 2e-05
+  },
+  "warp": {
+    "all_finite": true,
+    "kernel": "gaussian",
+    "kinetic_energy": 8078.179766857993,
+    "particles": 204,
+    "radius_max": 0.9978295868060059,
+    "rho_max": 0.9998562335968018,
+    "rho_min": 0.534595251083374,
+    "time": 1.9999999494757503e-05,
+    "xsph_eps": 0.5
+  }
+}
+```
+
+Comparison outputs:
+
+```text
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/comparison-smoke-cpu.npz
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/comparison-smoke-warp.npz
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/comparison-smoke.png
 ```
 
 Ramp runs:
@@ -161,15 +233,11 @@ Ramp output files:
 
 ## Interpretation
 
-This runner is the bridge from isolated Warp equation tests to a particle
-dynamics workload. Once it runs reliably, the next work is to close the
-remaining physics and integration gaps with XSPH or equivalent stabilization,
-Gaussian kernel support, adaptive timestep logic, and eventually PySPH
-Application/Solver integration.
+This runner has crossed from isolated equation tests to a near-formulation
+match for the no-scheme elliptical-drop physics. The small comparison smoke is
+intentionally short, but it shows the Warp GPU and CPU PySPH-primitive paths
+agree closely for density bounds, radius, kinetic energy, and visual layout.
 
-The first ramp shows the current prototype can evolve finite states beyond the
-tiny smoke case. Tait EOS and per-particle sound speed are now present in the
-Warp path, and artificial viscosity uses pair-averaged `cs`. This is still
-short of PySPH's full elliptical-drop formulation because XSPH, Gaussian kernel
-support, adaptive timestep integration, and baseline output comparison remain
-open.
+The next escalation should be a longer production-oriented run using the full
+PySPH `Application/Solver` output as the baseline at `t=0.0008` and
+`t=0.0038`, then compare major/minor-axis metrics and images.
