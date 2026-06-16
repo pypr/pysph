@@ -23,7 +23,7 @@ class WarpEllipticalDropRunner:
     """
 
     def __init__(self, nx=8, steps=2, dt=1.0e-5, rho0=1.0, c0=20.0,
-                 p0=0.0, hdx=1.3, output=None):
+                 p0=0.0, hdx=1.3, alpha=0.1, beta=0.0, output=None):
         self.nx = int(nx)
         self.steps = int(steps)
         self.dt = float(dt)
@@ -31,6 +31,8 @@ class WarpEllipticalDropRunner:
         self.c0 = float(c0)
         self.p0 = float(p0)
         self.hdx = float(hdx)
+        self.alpha = float(alpha)
+        self.beta = float(beta)
         self.dx = 1.0 / self.nx
         self.output = Path(output) if output is not None else None
 
@@ -65,7 +67,8 @@ class WarpEllipticalDropRunner:
 
         for _ in range(self.steps):
             wc_sph_leapfrog_step(
-                nnps, dt=self.dt, rho0=self.rho0, c0=self.c0, p0=self.p0
+                nnps, dt=self.dt, rho0=self.rho0, c0=self.c0, p0=self.p0,
+                alpha=self.alpha, beta=self.beta
             )
 
         pa.gpu.pull('x', 'y', 'z', 'rho', 'p', 'u', 'v', 'w', 'au', 'av',
@@ -91,6 +94,9 @@ class WarpEllipticalDropRunner:
             'nx': self.nx,
             'rho_min': float(np.min(pa.rho)),
             'rho_max': float(np.max(pa.rho)),
+            'c0': self.c0,
+            'alpha': self.alpha,
+            'beta': self.beta,
             'p_min': float(np.min(pa.p)),
             'p_max': float(np.max(pa.p)),
             'x_min': float(np.min(pa.x)),
@@ -121,6 +127,8 @@ def _parse_args():
     parser.add_argument('--c0', type=float, default=20.0)
     parser.add_argument('--p0', type=float, default=0.0)
     parser.add_argument('--hdx', type=float, default=1.3)
+    parser.add_argument('--alpha', type=float, default=0.1)
+    parser.add_argument('--beta', type=float, default=0.0)
     parser.add_argument('--output', default=None)
     return parser.parse_args()
 
@@ -129,7 +137,8 @@ def main():
     args = _parse_args()
     runner = WarpEllipticalDropRunner(
         nx=args.nx, steps=args.steps, dt=args.dt, rho0=args.rho0,
-        c0=args.c0, p0=args.p0, hdx=args.hdx, output=args.output
+        c0=args.c0, p0=args.p0, hdx=args.hdx, alpha=args.alpha,
+        beta=args.beta, output=args.output
     )
     metrics = runner.run()
     print(json.dumps(metrics, indent=2, sort_keys=True))

@@ -428,6 +428,150 @@ if wp is not None:
 
 
     @wp.kernel
+    def _artificial_viscosity_f64(
+            s_x: wp.array(dtype=wp.float64),
+            s_y: wp.array(dtype=wp.float64),
+            s_z: wp.array(dtype=wp.float64),
+            s_h: wp.array(dtype=wp.float64),
+            s_m: wp.array(dtype=wp.float64),
+            s_rho: wp.array(dtype=wp.float64),
+            s_u: wp.array(dtype=wp.float64),
+            s_v: wp.array(dtype=wp.float64),
+            s_w: wp.array(dtype=wp.float64),
+            d_x: wp.array(dtype=wp.float64),
+            d_y: wp.array(dtype=wp.float64),
+            d_z: wp.array(dtype=wp.float64),
+            d_h: wp.array(dtype=wp.float64),
+            d_rho: wp.array(dtype=wp.float64),
+            d_u: wp.array(dtype=wp.float64),
+            d_v: wp.array(dtype=wp.float64),
+            d_w: wp.array(dtype=wp.float64),
+            starts: wp.array(dtype=wp.int32),
+            lengths: wp.array(dtype=wp.int32),
+            neighbors: wp.array(dtype=wp.uint32),
+            dim: wp.int32,
+            alpha: wp.float64,
+            beta: wp.float64,
+            c0: wp.float64,
+            d_au: wp.array(dtype=wp.float64),
+            d_av: wp.array(dtype=wp.float64),
+            d_aw: wp.array(dtype=wp.float64),
+    ):
+        i = wp.tid()
+        au = d_au[i]
+        av = d_av[i]
+        aw = d_aw[i]
+        start = starts[i]
+        stop = start + lengths[i]
+        for pos in range(start, stop):
+            j = wp.int32(neighbors[pos])
+            dx = d_x[i] - s_x[j]
+            dy = wp.float64(0.0)
+            dz = wp.float64(0.0)
+            if dim > wp.int32(1):
+                dy = d_y[i] - s_y[j]
+            if dim > wp.int32(2):
+                dz = d_z[i] - s_z[j]
+            vijx = d_u[i] - s_u[j]
+            vijy = wp.float64(0.0)
+            vijz = wp.float64(0.0)
+            if dim > wp.int32(1):
+                vijy = d_v[i] - s_v[j]
+            if dim > wp.int32(2):
+                vijz = d_w[i] - s_w[j]
+            vdotx = vijx*dx + vijy*dy + vijz*dz
+            if vdotx < wp.float64(0.0):
+                rij2 = dx*dx + dy*dy + dz*dz
+                rij = wp.sqrt(rij2)
+                hij = wp.float64(0.5) * (d_h[i] + s_h[j])
+                grad = wp.float64(0.0)
+                if rij > wp.float64(1.0e-12):
+                    grad = _cubic_dwdq_f64(rij, hij, dim) / (hij * rij)
+                mu = hij * vdotx / (rij2 + wp.float64(0.01)*hij*hij)
+                rhoij1 = wp.float64(2.0) / (d_rho[i] + s_rho[j])
+                piij = (-alpha*c0*mu + beta*mu*mu) * rhoij1
+                fac = -s_m[j] * piij
+                au += fac * grad * dx
+                av += fac * grad * dy
+                aw += fac * grad * dz
+        d_au[i] = au
+        d_av[i] = av
+        d_aw[i] = aw
+
+
+    @wp.kernel
+    def _artificial_viscosity_f32(
+            s_x: wp.array(dtype=wp.float32),
+            s_y: wp.array(dtype=wp.float32),
+            s_z: wp.array(dtype=wp.float32),
+            s_h: wp.array(dtype=wp.float32),
+            s_m: wp.array(dtype=wp.float32),
+            s_rho: wp.array(dtype=wp.float32),
+            s_u: wp.array(dtype=wp.float32),
+            s_v: wp.array(dtype=wp.float32),
+            s_w: wp.array(dtype=wp.float32),
+            d_x: wp.array(dtype=wp.float32),
+            d_y: wp.array(dtype=wp.float32),
+            d_z: wp.array(dtype=wp.float32),
+            d_h: wp.array(dtype=wp.float32),
+            d_rho: wp.array(dtype=wp.float32),
+            d_u: wp.array(dtype=wp.float32),
+            d_v: wp.array(dtype=wp.float32),
+            d_w: wp.array(dtype=wp.float32),
+            starts: wp.array(dtype=wp.int32),
+            lengths: wp.array(dtype=wp.int32),
+            neighbors: wp.array(dtype=wp.uint32),
+            dim: wp.int32,
+            alpha: wp.float32,
+            beta: wp.float32,
+            c0: wp.float32,
+            d_au: wp.array(dtype=wp.float32),
+            d_av: wp.array(dtype=wp.float32),
+            d_aw: wp.array(dtype=wp.float32),
+    ):
+        i = wp.tid()
+        au = d_au[i]
+        av = d_av[i]
+        aw = d_aw[i]
+        start = starts[i]
+        stop = start + lengths[i]
+        for pos in range(start, stop):
+            j = wp.int32(neighbors[pos])
+            dx = d_x[i] - s_x[j]
+            dy = wp.float32(0.0)
+            dz = wp.float32(0.0)
+            if dim > wp.int32(1):
+                dy = d_y[i] - s_y[j]
+            if dim > wp.int32(2):
+                dz = d_z[i] - s_z[j]
+            vijx = d_u[i] - s_u[j]
+            vijy = wp.float32(0.0)
+            vijz = wp.float32(0.0)
+            if dim > wp.int32(1):
+                vijy = d_v[i] - s_v[j]
+            if dim > wp.int32(2):
+                vijz = d_w[i] - s_w[j]
+            vdotx = vijx*dx + vijy*dy + vijz*dz
+            if vdotx < wp.float32(0.0):
+                rij2 = dx*dx + dy*dy + dz*dz
+                rij = wp.sqrt(rij2)
+                hij = wp.float32(0.5) * (d_h[i] + s_h[j])
+                grad = wp.float32(0.0)
+                if rij > wp.float32(1.0e-12):
+                    grad = _cubic_dwdq_f32(rij, hij, dim) / (hij * rij)
+                mu = hij * vdotx / (rij2 + wp.float32(0.01)*hij*hij)
+                rhoij1 = wp.float32(2.0) / (d_rho[i] + s_rho[j])
+                piij = (-alpha*c0*mu + beta*mu*mu) * rhoij1
+                fac = -s_m[j] * piij
+                au += fac * grad * dx
+                av += fac * grad * dy
+                aw += fac * grad * dz
+        d_au[i] = au
+        d_av[i] = av
+        d_aw[i] = aw
+
+
+    @wp.kernel
     def _euler_step_f64(
             x: wp.array(dtype=wp.float64),
             y: wp.array(dtype=wp.float64),
@@ -840,6 +984,60 @@ def compute_pressure_gradient(nnps, src_index=0, dst_index=0,
     return au, av, aw
 
 
+def compute_artificial_viscosity(nnps, src_index=0, dst_index=0, alpha=0.1,
+                                 beta=0.0, c0=20.0,
+                                 out_props=('au', 'av', 'aw'), push=True):
+    """Add Monaghan artificial viscosity to WCSPH acceleration arrays."""
+    if wp is None:  # pragma: no cover
+        raise ImportError("warp is required for compute_artificial_viscosity")
+
+    src_pa = nnps.particles[src_index]
+    dst_pa = nnps.particles[dst_index]
+    for prop in out_props:
+        _ensure_property(dst_pa, prop, nnps.device)
+
+    if push:
+        src_pa.gpu.push('x', 'y', 'z', 'h', 'm', 'rho', 'u', 'v', 'w')
+        dst_pa.gpu.push(
+            'x', 'y', 'z', 'h', 'rho', 'u', 'v', 'w', *out_props
+        )
+    cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
+    src = src_pa.gpu
+    dst = dst_pa.gpu
+    au = dst.get_device_array(out_props[0])
+    av = dst.get_device_array(out_props[1])
+    aw = dst.get_device_array(out_props[2])
+    ndst = dst.get_number_of_particles()
+    if src.x.dtype == np.float32:
+        kernel = _artificial_viscosity_f32
+        alpha = np.float32(alpha)
+        beta = np.float32(beta)
+        c0 = np.float32(c0)
+    else:
+        kernel = _artificial_viscosity_f64
+        alpha = np.float64(alpha)
+        beta = np.float64(beta)
+        c0 = np.float64(c0)
+
+    if ndst > 0:
+        wp.launch(
+            kernel,
+            dim=ndst,
+            inputs=[
+                src.x.dev, src.y.dev, src.z.dev, src.h.dev, src.m.dev,
+                src.rho.dev, src.u.dev, src.v.dev, src.w.dev,
+                dst.x.dev, dst.y.dev, dst.z.dev, dst.h.dev,
+                dst.rho.dev, dst.u.dev, dst.v.dev, dst.w.dev,
+                cache['starts_dev'], cache['lengths_dev'],
+                cache['neighbors_dev'], np.int32(nnps.dim),
+                alpha, beta, c0, au.dev, av.dev, aw.dev
+            ],
+            device=nnps.device,
+        )
+        wp.synchronize_device(nnps.device)
+    return au, av, aw
+
+
 def euler_step(pa, dt, dim=3, device=None, push=True):
     """Advance position and velocity using already-computed acceleration."""
     if wp is None:  # pragma: no cover
@@ -1008,18 +1206,25 @@ def wrap_periodic(pa, bounds, dim=3, device=None):
     return gpu.x, gpu.y, gpu.z
 
 
-def _compute_wcsph_acceleration(nnps, pa_index, rho0, c0, p0, push):
+def _compute_wcsph_acceleration(nnps, pa_index, rho0, c0, p0, alpha, beta,
+                                push):
     pa = nnps.particles[pa_index]
     compute_summation_density(nnps, pa_index, pa_index, push=push)
     compute_isothermal_eos(
         pa, rho0=rho0, c0=c0, p0=p0, device=nnps.device, push=False
     )
-    return compute_pressure_gradient(nnps, pa_index, pa_index, push=False)
+    result = compute_pressure_gradient(nnps, pa_index, pa_index, push=False)
+    if alpha != 0.0 or beta != 0.0:
+        result = compute_artificial_viscosity(
+            nnps, pa_index, pa_index, alpha=alpha, beta=beta, c0=c0,
+            push=False
+        )
+    return result
 
 
 def wc_sph_leapfrog_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
                          c0=20.0, p0=0.0, periodic_bounds=None,
-                         push=False):
+                         push=False, alpha=0.0, beta=0.0):
     """Run one minimal WCSPH KDK leapfrog step on the device.
 
     ``push`` defaults to ``False`` so repeated calls keep the Warp arrays as the
@@ -1029,19 +1234,23 @@ def wc_sph_leapfrog_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
     pa = nnps.particles[pa_index]
     if push:
         nnps.update(push=True)
-    _compute_wcsph_acceleration(nnps, pa_index, rho0, c0, p0, push=push)
+    _compute_wcsph_acceleration(
+        nnps, pa_index, rho0, c0, p0, alpha, beta, push=push
+    )
     leapfrog_kick(pa, dt=0.5*dt, dim=nnps.dim, device=nnps.device,
                   push=False)
     leapfrog_drift(pa, dt=dt, dim=nnps.dim, device=nnps.device, push=False)
     wrap_periodic(pa, periodic_bounds, dim=nnps.dim, device=nnps.device)
     nnps.update(push=False)
-    _compute_wcsph_acceleration(nnps, pa_index, rho0, c0, p0, push=False)
+    _compute_wcsph_acceleration(
+        nnps, pa_index, rho0, c0, p0, alpha, beta, push=False
+    )
     return leapfrog_kick(pa, dt=0.5*dt, dim=nnps.dim, device=nnps.device,
                          push=False)
 
 
 def wc_sph_euler_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
-                      c0=20.0, p0=0.0):
+                      c0=20.0, p0=0.0, alpha=0.0, beta=0.0):
     """Run one minimal WCSPH-style device step.
 
     The step computes summation density, isothermal pressure, inviscid pressure
@@ -1053,5 +1262,10 @@ def wc_sph_euler_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
         pa, rho0=rho0, c0=c0, p0=p0, device=nnps.device, push=False
     )
     compute_pressure_gradient(nnps, pa_index, pa_index, push=False)
+    if alpha != 0.0 or beta != 0.0:
+        compute_artificial_viscosity(
+            nnps, pa_index, pa_index, alpha=alpha, beta=beta, c0=c0,
+            push=False
+        )
     return euler_step(pa, dt=dt, dim=nnps.dim, device=nnps.device,
                       push=False)

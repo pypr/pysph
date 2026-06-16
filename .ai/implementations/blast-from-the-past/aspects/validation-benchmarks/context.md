@@ -143,6 +143,21 @@ python -m pytest -q pysph/base/tests/test_warp_sph.py pysph/base/tests/test_warp
 29 passed, 2 warnings in 5.82s
 ```
 
+Warp artificial-viscosity checkpoint:
+
+- `pysph/base/warp_sph.py` now has an additive Monaghan-style artificial
+  viscosity kernel for the WCSPH momentum path. The first implementation uses
+  constant `c0` instead of a per-particle `cs` property.
+- Focused tests compare the artificial-viscosity acceleration against a CPU
+  CubicSpline reference and verify that the viscosity term adds onto existing
+  acceleration arrays instead of replacing them.
+- Current focused result:
+
+```text
+python -m pytest -q pysph/base/tests/test_warp_sph.py pysph/base/tests/test_warp_nnps.py
+30 passed, 2 warnings in 4.39s
+```
+
 Warp elliptical-drop runner:
 
 - `.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/`
@@ -150,12 +165,17 @@ Warp elliptical-drop runner:
 - It creates the standard circular elliptical-drop initial patch and velocity
   field, advances with `UniformGridWarpNNPS` and `wc_sph_leapfrog_step()`, pulls
   final arrays once, and writes scalar metrics plus an `.npz` result.
-- Smoke result with `nx=8`, `steps=2`, `dt=1.0e-5`, `c0=20.0`: 204 particles,
-  `all_finite=true`, final time `2e-05`, `rho_min=0.5834630727767944`,
-  `rho_max=0.999951183795929`, kinetic energy `8078.22338525834`.
+- Smoke result with `nx=8`, `steps=2`, `dt=1.0e-5`, `c0=20.0`, `alpha=0.1`,
+  `beta=0.0`: 204 particles, `all_finite=true`, final time `2e-05`,
+  `rho_min=0.5834630727767944`, `rho_max=0.999951183795929`, kinetic energy
+  `8078.167363381624`.
 - Ramp results stayed finite through `nx=24`, 1808 particles, 10 steps at
   `dt=5.0e-6`, with `rho_min=0.633074939250946`,
   `rho_max=0.9999793767929077`, and kinetic energy `7840.533230601928`.
+- Artificial-viscosity ramp check with `nx=16`, 805 particles, 5 steps,
+  `dt=1.0e-5`, `alpha=0.1`, `beta=0.0` stayed finite with
+  `rho_min=0.6330116391181946`, `rho_max=0.9999754428863525`, and kinetic
+  energy `7868.737673401772`.
 - This is a GPU state-evolution smoke run, not yet a validated published
   elliptical-drop benchmark.
 
@@ -177,6 +197,7 @@ Warp elliptical-drop runner:
 - KDK leapfrog correctness.
 - Periodic position wrapping correctness.
 - Application-style Warp elliptical-drop smoke metrics.
+- Artificial-viscosity acceleration correctness and smoke metrics.
 - Optional parallel/Zoltan test slice after commit readiness.
 
 ## References for this aspect

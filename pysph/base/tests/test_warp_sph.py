@@ -15,9 +15,10 @@ from pysph.base.nnps import LinkedListNNPS
 from pysph.base.utils import get_particle_array
 from pysph.base.warp_nnps import UniformGridWarpNNPS
 from pysph.base.warp_sph import (
-    compute_continuity, compute_isothermal_eos, compute_pressure_gradient,
-    compute_summation_density, euler_step, leapfrog_drift, leapfrog_kick,
-    wc_sph_euler_step, wc_sph_leapfrog_step, wrap_periodic
+    compute_artificial_viscosity, compute_continuity, compute_isothermal_eos,
+    compute_pressure_gradient, compute_summation_density, euler_step,
+    leapfrog_drift, leapfrog_kick, wc_sph_euler_step, wc_sph_leapfrog_step,
+    wrap_periodic
 )
 
 
@@ -126,6 +127,50 @@ def _cpu_pressure_gradient(particles, src_index, dst_index, dim,
             rhoj21 = 1.0/(src.rho[s_idx]*src.rho[s_idx])
             tmp = tmpi + src.p[s_idx]*rhoj21
             acc += -src.m[s_idx] * tmp * np.asarray(dwij)
+        result[d_idx, :] = acc
+    return result
+
+
+def _cpu_artificial_viscosity(particles, src_index, dst_index, dim,
+                              alpha, beta, c0, radius_scale=2.0):
+    nnps = LinkedListNNPS(
+        dim=dim, particles=particles, radius_scale=radius_scale
+    )
+    kernel = CubicSpline(dim=dim)
+    src = particles[src_index]
+    dst = particles[dst_index]
+    result = np.zeros((dst.get_number_of_particles(), 3))
+
+    for d_idx in range(dst.get_number_of_particles()):
+        acc = np.zeros(3)
+        for s_idx in _neighbors(nnps, src_index, dst_index, d_idx):
+            xij = [
+                dst.x[d_idx] - src.x[s_idx],
+                0.0,
+                0.0,
+            ]
+            vij = [
+                dst.u[d_idx] - src.u[s_idx],
+                0.0,
+                0.0,
+            ]
+            if dim > 1:
+                xij[1] = dst.y[d_idx] - src.y[s_idx]
+                vij[1] = dst.v[d_idx] - src.v[s_idx]
+            if dim > 2:
+                xij[2] = dst.z[d_idx] - src.z[s_idx]
+                vij[2] = dst.w[d_idx] - src.w[s_idx]
+            vdotx = vij[0]*xij[0] + vij[1]*xij[1] + vij[2]*xij[2]
+            if vdotx < 0.0:
+                rij2 = xij[0]**2 + xij[1]**2 + xij[2]**2
+                rij = np.sqrt(rij2)
+                hij = 0.5 * (dst.h[d_idx] + src.h[s_idx])
+                mu = hij * vdotx / (rij2 + 0.01*hij*hij)
+                rhoij1 = 2.0 / (dst.rho[d_idx] + src.rho[s_idx])
+                piij = (-alpha*c0*mu + beta*mu*mu) * rhoij1
+                dwij = [0.0, 0.0, 0.0]
+                kernel.gradient(xij=xij, rij=rij, h=hij, grad=dwij)
+                acc += -src.m[s_idx] * piij * np.asarray(dwij)
         result[d_idx, :] = acc
     return result
 
@@ -316,6 +361,42 @@ def test_warp_pressure_gradient_matches_cpu_cross_array_in_3d_and_pulls_accel():
     assert np.allclose(solid.au, expected[:, 0])
     assert np.allclose(solid.av, expected[:, 1])
     assert np.allclose(solid.aw, expected[:, 2])
+
+
+def test_warp_artificial_viscosity_matches_cpu_and_adds_to_acceleration():
+    pa = get_particle_array(
+        name='fluid',
+        x=[0.0, 0.2, 0.45, 1.2],
+        y=[0.0, 0.03, -0.02, 0.1],
+        z=[0.0, 0.0, 0.0, 0.0],
+        h=[0.35, 0.35, 0.4, 0.35],
+        m=[1.0, 1.5, 1.2, 0.8],
+        rho=[1.0, 1.1, 0.9, 1.2],
+        u=[1.0, -1.0, -0.2, 0.0],
+        v=[0.0, 0.05, -0.1, 0.0],
+        w=[0.0, 0.0, 0.0, 0.0],
+        au=[0.5, -0.25, 0.1, 0.0],
+        av=[0.0, 0.2, -0.1, 0.0],
+        aw=[0.0, 0.0, 0.0, 0.0],
+        backend='warp',
+    )
+    particles = [pa]
+    alpha = 0.1
+    beta = 0.2
+    c0 = 5.0
+    initial = np.column_stack([pa.au.copy(), pa.av.copy(), pa.aw.copy()])
+    expected = initial + _cpu_artificial_viscosity(
+        particles, 0, 0, dim=2, alpha=alpha, beta=beta, c0=c0
+    )
+    nnps = UniformGridWarpNNPS(dim=2, particles=particles, radius_scale=2.0)
+
+    au, av, aw = compute_artificial_viscosity(
+        nnps, 0, 0, alpha=alpha, beta=beta, c0=c0
+    )
+
+    assert np.allclose(au.get(), expected[:, 0])
+    assert np.allclose(av.get(), expected[:, 1])
+    assert np.allclose(aw.get(), expected[:, 2])
 
 
 def test_warp_euler_step_updates_velocity_and_position_on_device():

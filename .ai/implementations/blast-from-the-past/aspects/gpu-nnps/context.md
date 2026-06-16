@@ -133,6 +133,17 @@ Repeated-step proof:
 - Periodic behavior is currently position wrapping only. Minimum-image distance
   and periodic cell lookup remain open for true periodic neighbor interaction.
 
+Artificial-viscosity proof:
+
+- `pysph/base/warp_sph.py` now adds Monaghan-style artificial viscosity through
+  the same device-resident `UniformGridWarpNNPS` neighbor cache used by density,
+  continuity, and pressure-gradient kernels.
+- The viscosity kernel is additive over existing `au/av/aw`, so the pressure
+  gradient path can remain the owner of resetting acceleration before optional
+  stabilizing terms contribute.
+- The current implementation uses constant `c0`; per-particle sound speed
+  remains part of the Tait EOS follow-up.
+
 ## Key sub-topics
 
 - Existing `GPUNeighborCache` behavior.
@@ -148,6 +159,7 @@ Repeated-step proof:
 - Tiny Euler/PEC-style integrator loop.
 - Device-authoritative NNPS refresh after position updates.
 - Minimal KDK leapfrog step and periodic position wrapping.
+- Additive artificial-viscosity momentum term.
 
 ## References for this aspect
 

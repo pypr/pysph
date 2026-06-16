@@ -5,7 +5,7 @@ created: 2026-06-16T12:30:00 CEST
 author: @kunalpuri-prediqt
 aspect: validation-benchmarks
 status: active
-last_checked: 2026-06-16T12:45:00 CEST
+last_checked: 2026-06-16T13:55:00 CEST
 ---
 
 # Experiment: Warp Elliptical-Drop Runner
@@ -33,8 +33,8 @@ validated recreation of the published elliptical-drop benchmark.
 The existing PySPH example uses Gaussian kernel, Tait EOS, artificial
 viscosity, XSPH correction, adaptive timestep, and PySPH's full
 Application/Solver stack. The current Warp runner uses CubicSpline summation
-density, isothermal EOS, inviscid pressure-gradient acceleration, and fixed-step
-KDK leapfrog.
+density, isothermal EOS, pressure-gradient acceleration plus Monaghan-style
+artificial viscosity with constant `c0`, and fixed-step KDK leapfrog.
 
 ## What To Expect
 
@@ -53,6 +53,8 @@ nx=8
 steps=2
 dt=1.0e-5
 c0=20.0
+alpha=0.1
+beta=0.0
 ```
 
 ## Setup
@@ -71,6 +73,7 @@ This experiment succeeds when:
 - output file `results-smoke.npz` exists and is non-empty;
 - metrics report `particles > 0`;
 - metrics report `all_finite == true`;
+- metrics record `alpha == 0.1` and `beta == 0.0`;
 - final scalar bounds and kinetic energy are printed for inspection.
 
 ## Results
@@ -86,17 +89,20 @@ Warp 1.14.0 initialized:
      "cuda:0"   : "NVIDIA GeForce RTX 4060 Laptop GPU" (8 GiB, sm_89, mempool enabled)
    Kernel cache:
      /home/kunalp/.cache/warp/1.14.0
-Module pysph.base.warp_nnps b046253 load on device 'cuda:0' took 25.10 ms  (cached)
-Module pysph.base.warp_sph e548a6b load on device 'cuda:0' took 6.87 ms  (cached)
+Module pysph.base.warp_nnps b046253 load on device 'cuda:0' took 15.35 ms  (cached)
+Module pysph.base.warp_sph 128be63 load on device 'cuda:0' took 4.16 ms  (cached)
 {
   "all_finite": true,
+  "alpha": 0.1,
+  "beta": 0.0,
+  "c0": 20.0,
   "dt": 1e-05,
-  "kinetic_energy": 8078.22338525834,
+  "kinetic_energy": 8078.167363381624,
   "nx": 8,
   "p_max": -0.01952648162841797,
   "p_min": -166.61477661132812,
   "particles": 204,
-  "radius_max": 0.9978743942869612,
+  "radius_max": 0.9978744032287784,
   "rho_max": 0.999951183795929,
   "rho_min": 0.5834630727767944,
   "steps": 2,
@@ -123,6 +129,12 @@ Ramp runs:
 | nx=16 | 805 | 20 | 5e-06 | 0.0001 | true | 0.6331153512001038 | 1.0000600814819336 | 1.0066060209042353 | 7868.821050761739 |
 | nx=24 | 1808 | 10 | 5e-06 | 5e-05 | true | 0.633074939250946 | 0.9999793767929077 | 1.0033569350841507 | 7840.533230601928 |
 
+Artificial-viscosity ramp check:
+
+| Case | alpha | beta | Particles | Steps | dt | Time | all_finite | rho_min | rho_max | radius_max | kinetic_energy |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |
+| nx=16 | 0.1 | 0.0 | 805 | 5 | 1e-05 | 5e-05 | true | 0.6330116391181946 | 0.9999754428863525 | 1.0018194069173603 | 7868.737673401772 |
+
 Ramp output files:
 
 ```text
@@ -130,6 +142,7 @@ Ramp output files:
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/results-ramp-nx16-steps5.npz
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/results-ramp-nx16-steps20.npz
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/results-ramp-nx24-steps10.npz
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/results-avisc-nx16-steps5.npz
 ```
 
 ## Interpretation
@@ -140,6 +153,11 @@ gap with Tait EOS, artificial viscosity, XSPH or equivalent stabilization, and
 eventually PySPH Application/Solver integration.
 
 The first ramp shows the current prototype can evolve finite states beyond the
-tiny smoke case. The most important next physics gap is the WCSPH momentum
-stabilization term: artificial viscosity, followed by Tait EOS and XSPH/Gaussian
-support to move closer to the PySPH elliptical-drop formulation.
+tiny smoke case. The most important next physics gaps are Tait EOS,
+per-particle sound speed, XSPH, Gaussian kernel support, and adaptive timestep
+integration.
+
+Artificial viscosity is now present in the Warp momentum path using constant
+`c0`. This is still short of PySPH's full elliptical-drop formulation because
+Tait EOS, per-particle sound speed, XSPH, Gaussian kernel support, and adaptive
+timestep integration remain open.
