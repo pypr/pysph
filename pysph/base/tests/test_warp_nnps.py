@@ -351,6 +351,32 @@ def test_uniform_grid_warp_nnps_rebuilds_after_update():
                           np.array([0, 1], dtype=np.uint32))
 
 
+def test_uniform_grid_warp_nnps_can_rebuild_from_device_positions():
+    pa = get_particle_array(
+        name='fluid',
+        x=[0.0, 1.0],
+        y=[0.0, 0.0],
+        z=[0.0, 0.0],
+        h=[0.2, 0.2],
+        backend='warp',
+    )
+    grid = UniformGridWarpNNPS(dim=1, particles=[pa], radius_scale=1.0)
+
+    assert np.array_equal(_neighbors(grid, 0, 0, 0),
+                          np.array([0], dtype=np.uint32))
+
+    pa.gpu.x.set(np.asarray([0.0, 0.1]))
+    grid.update(push=False)
+
+    assert np.array_equal(_neighbors(grid, 0, 0, 0),
+                          np.array([0, 1], dtype=np.uint32))
+
+    grid.update()
+
+    assert np.array_equal(_neighbors(grid, 0, 0, 0),
+                          np.array([0], dtype=np.uint32))
+
+
 def test_uniform_grid_warp_nnps_computes_neighbor_sum_on_device():
     pa = get_particle_array(
         name='fluid',

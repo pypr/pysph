@@ -478,6 +478,154 @@ if wp is not None:
 
 
     @wp.kernel
+    def _leapfrog_kick_f64(
+            u: wp.array(dtype=wp.float64),
+            v: wp.array(dtype=wp.float64),
+            w: wp.array(dtype=wp.float64),
+            au: wp.array(dtype=wp.float64),
+            av: wp.array(dtype=wp.float64),
+            aw: wp.array(dtype=wp.float64),
+            dt: wp.float64,
+            dim: wp.int32,
+    ):
+        i = wp.tid()
+        u[i] = u[i] + dt * au[i]
+        if dim > wp.int32(1):
+            v[i] = v[i] + dt * av[i]
+        if dim > wp.int32(2):
+            w[i] = w[i] + dt * aw[i]
+
+
+    @wp.kernel
+    def _leapfrog_kick_f32(
+            u: wp.array(dtype=wp.float32),
+            v: wp.array(dtype=wp.float32),
+            w: wp.array(dtype=wp.float32),
+            au: wp.array(dtype=wp.float32),
+            av: wp.array(dtype=wp.float32),
+            aw: wp.array(dtype=wp.float32),
+            dt: wp.float32,
+            dim: wp.int32,
+    ):
+        i = wp.tid()
+        u[i] = u[i] + dt * au[i]
+        if dim > wp.int32(1):
+            v[i] = v[i] + dt * av[i]
+        if dim > wp.int32(2):
+            w[i] = w[i] + dt * aw[i]
+
+
+    @wp.kernel
+    def _leapfrog_drift_f64(
+            x: wp.array(dtype=wp.float64),
+            y: wp.array(dtype=wp.float64),
+            z: wp.array(dtype=wp.float64),
+            u: wp.array(dtype=wp.float64),
+            v: wp.array(dtype=wp.float64),
+            w: wp.array(dtype=wp.float64),
+            dt: wp.float64,
+            dim: wp.int32,
+    ):
+        i = wp.tid()
+        x[i] = x[i] + dt * u[i]
+        if dim > wp.int32(1):
+            y[i] = y[i] + dt * v[i]
+        if dim > wp.int32(2):
+            z[i] = z[i] + dt * w[i]
+
+
+    @wp.kernel
+    def _leapfrog_drift_f32(
+            x: wp.array(dtype=wp.float32),
+            y: wp.array(dtype=wp.float32),
+            z: wp.array(dtype=wp.float32),
+            u: wp.array(dtype=wp.float32),
+            v: wp.array(dtype=wp.float32),
+            w: wp.array(dtype=wp.float32),
+            dt: wp.float32,
+            dim: wp.int32,
+    ):
+        i = wp.tid()
+        x[i] = x[i] + dt * u[i]
+        if dim > wp.int32(1):
+            y[i] = y[i] + dt * v[i]
+        if dim > wp.int32(2):
+            z[i] = z[i] + dt * w[i]
+
+
+    @wp.func
+    def _wrap_value_f64(value: wp.float64, lower: wp.float64,
+                        upper: wp.float64):
+        length = upper - lower
+        result = value
+        if length > wp.float64(0.0):
+            offset = result - lower
+            result = lower + offset - wp.floor(offset / length) * length
+        return result
+
+
+    @wp.func
+    def _wrap_value_f32(value: wp.float32, lower: wp.float32,
+                        upper: wp.float32):
+        length = upper - lower
+        result = value
+        if length > wp.float32(0.0):
+            offset = result - lower
+            result = lower + offset - wp.floor(offset / length) * length
+        return result
+
+
+    @wp.kernel
+    def _wrap_periodic_f64(
+            x: wp.array(dtype=wp.float64),
+            y: wp.array(dtype=wp.float64),
+            z: wp.array(dtype=wp.float64),
+            xmin: wp.float64,
+            xmax: wp.float64,
+            ymin: wp.float64,
+            ymax: wp.float64,
+            zmin: wp.float64,
+            zmax: wp.float64,
+            periodic_x: wp.int32,
+            periodic_y: wp.int32,
+            periodic_z: wp.int32,
+            dim: wp.int32,
+    ):
+        i = wp.tid()
+        if periodic_x:
+            x[i] = _wrap_value_f64(x[i], xmin, xmax)
+        if dim > wp.int32(1) and periodic_y:
+            y[i] = _wrap_value_f64(y[i], ymin, ymax)
+        if dim > wp.int32(2) and periodic_z:
+            z[i] = _wrap_value_f64(z[i], zmin, zmax)
+
+
+    @wp.kernel
+    def _wrap_periodic_f32(
+            x: wp.array(dtype=wp.float32),
+            y: wp.array(dtype=wp.float32),
+            z: wp.array(dtype=wp.float32),
+            xmin: wp.float32,
+            xmax: wp.float32,
+            ymin: wp.float32,
+            ymax: wp.float32,
+            zmin: wp.float32,
+            zmax: wp.float32,
+            periodic_x: wp.int32,
+            periodic_y: wp.int32,
+            periodic_z: wp.int32,
+            dim: wp.int32,
+    ):
+        i = wp.tid()
+        if periodic_x:
+            x[i] = _wrap_value_f32(x[i], xmin, xmax)
+        if dim > wp.int32(1) and periodic_y:
+            y[i] = _wrap_value_f32(y[i], ymin, ymax)
+        if dim > wp.int32(2) and periodic_z:
+            z[i] = _wrap_value_f32(z[i], zmin, zmax)
+
+
+    @wp.kernel
     def _summation_density_f32(
             s_x: wp.array(dtype=wp.float32),
             s_y: wp.array(dtype=wp.float32),
@@ -528,7 +676,7 @@ def _ensure_property(pa, prop, device):
 
 
 def compute_summation_density(nnps, src_index=0, dst_index=0,
-                              out_prop='rho'):
+                              out_prop='rho', push=True):
     """Compute standard SPH summation density with Warp.
 
     This mirrors ``pysph.sph.basic_equations.SummationDensity`` for one
@@ -542,8 +690,9 @@ def compute_summation_density(nnps, src_index=0, dst_index=0,
     dst_pa = nnps.particles[dst_index]
     _ensure_property(dst_pa, out_prop, nnps.device)
 
-    src_pa.gpu.push('x', 'y', 'z', 'h', 'm')
-    dst_pa.gpu.push('x', 'y', 'z', 'h', out_prop)
+    if push:
+        src_pa.gpu.push('x', 'y', 'z', 'h', 'm')
+        dst_pa.gpu.push('x', 'y', 'z', 'h', out_prop)
     cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
     src = src_pa.gpu
     dst = dst_pa.gpu
@@ -605,7 +754,8 @@ def compute_isothermal_eos(pa, rho0, c0, p0=0.0, out_prop='p',
     return out
 
 
-def compute_continuity(nnps, src_index=0, dst_index=0, out_prop='arho'):
+def compute_continuity(nnps, src_index=0, dst_index=0, out_prop='arho',
+                       push=True):
     """Compute PySPH ``ContinuityEquation`` with Warp."""
     if wp is None:  # pragma: no cover
         raise ImportError("warp is required for compute_continuity")
@@ -614,8 +764,9 @@ def compute_continuity(nnps, src_index=0, dst_index=0, out_prop='arho'):
     dst_pa = nnps.particles[dst_index]
     _ensure_property(dst_pa, out_prop, nnps.device)
 
-    src_pa.gpu.push('x', 'y', 'z', 'h', 'm', 'u', 'v', 'w')
-    dst_pa.gpu.push('x', 'y', 'z', 'h', 'u', 'v', 'w', out_prop)
+    if push:
+        src_pa.gpu.push('x', 'y', 'z', 'h', 'm', 'u', 'v', 'w')
+        dst_pa.gpu.push('x', 'y', 'z', 'h', 'u', 'v', 'w', out_prop)
     cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
     src = src_pa.gpu
     dst = dst_pa.gpu
@@ -720,6 +871,173 @@ def euler_step(pa, dt, dim=3, device=None, push=True):
         )
         wp.synchronize_device(device)
     return gpu.x, gpu.y, gpu.z, gpu.u, gpu.v, gpu.w
+
+
+def leapfrog_kick(pa, dt, dim=3, device=None, push=True):
+    """Kick velocity with the current acceleration."""
+    if wp is None:  # pragma: no cover
+        raise ImportError("warp is required for leapfrog_kick")
+
+    device = wp.get_device(device)
+    _ensure_warp_helper(pa, device)
+    if push:
+        pa.gpu.push('u', 'v', 'w', 'au', 'av', 'aw')
+    gpu = pa.gpu
+    n = gpu.get_number_of_particles()
+    if gpu.u.dtype == np.float32:
+        kernel = _leapfrog_kick_f32
+        dt = np.float32(dt)
+    else:
+        kernel = _leapfrog_kick_f64
+        dt = np.float64(dt)
+    if n > 0:
+        wp.launch(
+            kernel,
+            dim=n,
+            inputs=[
+                gpu.u.dev, gpu.v.dev, gpu.w.dev,
+                gpu.au.dev, gpu.av.dev, gpu.aw.dev,
+                dt, np.int32(dim)
+            ],
+            device=device,
+        )
+        wp.synchronize_device(device)
+    return gpu.u, gpu.v, gpu.w
+
+
+def leapfrog_drift(pa, dt, dim=3, device=None, push=True):
+    """Drift position with the current velocity."""
+    if wp is None:  # pragma: no cover
+        raise ImportError("warp is required for leapfrog_drift")
+
+    device = wp.get_device(device)
+    _ensure_warp_helper(pa, device)
+    if push:
+        pa.gpu.push('x', 'y', 'z', 'u', 'v', 'w')
+    gpu = pa.gpu
+    n = gpu.get_number_of_particles()
+    if gpu.x.dtype == np.float32:
+        kernel = _leapfrog_drift_f32
+        dt = np.float32(dt)
+    else:
+        kernel = _leapfrog_drift_f64
+        dt = np.float64(dt)
+    if n > 0:
+        wp.launch(
+            kernel,
+            dim=n,
+            inputs=[
+                gpu.x.dev, gpu.y.dev, gpu.z.dev,
+                gpu.u.dev, gpu.v.dev, gpu.w.dev,
+                dt, np.int32(dim)
+            ],
+            device=device,
+        )
+        wp.synchronize_device(device)
+    return gpu.x, gpu.y, gpu.z
+
+
+def _periodic_bounds(bounds, dim):
+    if bounds is None:
+        return None
+    if not isinstance(bounds, dict):
+        raise TypeError("periodic bounds must be a dict or None")
+
+    xmin = bounds.get('xmin', 0.0)
+    xmax = bounds.get('xmax', xmin)
+    ymin = bounds.get('ymin', 0.0)
+    ymax = bounds.get('ymax', ymin)
+    zmin = bounds.get('zmin', 0.0)
+    zmax = bounds.get('zmax', zmin)
+    periodic_x = bool(bounds.get('periodic_in_x', 'xmin' in bounds and
+                                 'xmax' in bounds))
+    periodic_y = bool(bounds.get('periodic_in_y', 'ymin' in bounds and
+                                 'ymax' in bounds and dim > 1))
+    periodic_z = bool(bounds.get('periodic_in_z', 'zmin' in bounds and
+                                 'zmax' in bounds and dim > 2))
+    return (
+        xmin, xmax, ymin, ymax, zmin, zmax,
+        periodic_x, periodic_y, periodic_z
+    )
+
+
+def wrap_periodic(pa, bounds, dim=3, device=None):
+    """Wrap particle coordinates into a periodic box on the device."""
+    if wp is None:  # pragma: no cover
+        raise ImportError("warp is required for wrap_periodic")
+
+    parsed = _periodic_bounds(bounds, dim)
+    if parsed is None:
+        return None
+
+    device = wp.get_device(device)
+    _ensure_warp_helper(pa, device)
+    gpu = pa.gpu
+    n = gpu.get_number_of_particles()
+    if n == 0:
+        return gpu.x, gpu.y, gpu.z
+
+    xmin, xmax, ymin, ymax, zmin, zmax, px, py, pz = parsed
+    if gpu.x.dtype == np.float32:
+        kernel = _wrap_periodic_f32
+        scalars = [
+            np.float32(xmin), np.float32(xmax),
+            np.float32(ymin), np.float32(ymax),
+            np.float32(zmin), np.float32(zmax),
+        ]
+    else:
+        kernel = _wrap_periodic_f64
+        scalars = [
+            np.float64(xmin), np.float64(xmax),
+            np.float64(ymin), np.float64(ymax),
+            np.float64(zmin), np.float64(zmax),
+        ]
+
+    wp.launch(
+        kernel,
+        dim=n,
+        inputs=[
+            gpu.x.dev, gpu.y.dev, gpu.z.dev,
+            scalars[0], scalars[1], scalars[2], scalars[3],
+            scalars[4], scalars[5],
+            np.int32(px), np.int32(py), np.int32(pz), np.int32(dim)
+        ],
+        device=device,
+    )
+    wp.synchronize_device(device)
+    return gpu.x, gpu.y, gpu.z
+
+
+def _compute_wcsph_acceleration(nnps, pa_index, rho0, c0, p0, push):
+    pa = nnps.particles[pa_index]
+    compute_summation_density(nnps, pa_index, pa_index, push=push)
+    compute_isothermal_eos(
+        pa, rho0=rho0, c0=c0, p0=p0, device=nnps.device, push=False
+    )
+    return compute_pressure_gradient(nnps, pa_index, pa_index, push=False)
+
+
+def wc_sph_leapfrog_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
+                         c0=20.0, p0=0.0, periodic_bounds=None,
+                         push=False):
+    """Run one minimal WCSPH KDK leapfrog step on the device.
+
+    ``push`` defaults to ``False`` so repeated calls keep the Warp arrays as the
+    source of truth. Pass ``push=True`` only when host ParticleArray values were
+    intentionally changed before the step.
+    """
+    pa = nnps.particles[pa_index]
+    if push:
+        nnps.update(push=True)
+    _compute_wcsph_acceleration(nnps, pa_index, rho0, c0, p0, push=push)
+    leapfrog_kick(pa, dt=0.5*dt, dim=nnps.dim, device=nnps.device,
+                  push=False)
+    leapfrog_drift(pa, dt=dt, dim=nnps.dim, device=nnps.device, push=False)
+    wrap_periodic(pa, periodic_bounds, dim=nnps.dim, device=nnps.device)
+    nnps.update(push=False)
+    _compute_wcsph_acceleration(nnps, pa_index, rho0, c0, p0, push=False)
+    return leapfrog_kick(pa, dt=0.5*dt, dim=nnps.dim, device=nnps.device,
+                         push=False)
 
 
 def wc_sph_euler_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,

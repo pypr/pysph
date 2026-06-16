@@ -130,6 +130,19 @@ Warp WCSPH Euler-step experiment:
 - This is a one-step correctness milestone. Repeated-step benchmarking should
   wait for a device-aware NNPS refresh after positions move.
 
+Warp WCSPH leapfrog checkpoint:
+
+- The Euler-step experiment now also records a KDK leapfrog checkpoint.
+- Focused tests cover device-coordinate NNPS refresh, direct leapfrog
+  kick/drift with periodic position wrapping, and `wc_sph_leapfrog_step()`
+  against CPU reference calculations.
+- Current focused result:
+
+```text
+python -m pytest -q pysph/base/tests/test_warp_sph.py pysph/base/tests/test_warp_nnps.py
+29 passed, 2 warnings in 5.82s
+```
+
 ## Key sub-topics
 
 - Baseline selection.
@@ -145,6 +158,8 @@ Warp WCSPH Euler-step experiment:
 - Pressure-gradient capped benchmark metrics.
 - One-step WCSPH chain correctness.
 - Device-aware repeated-step refresh criteria.
+- KDK leapfrog correctness.
+- Periodic position wrapping correctness.
 - Optional parallel/Zoltan test slice after commit readiness.
 
 ## References for this aspect

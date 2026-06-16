@@ -120,6 +120,19 @@ Pressure-gradient proof:
   `warp_grid_pgrad` measured `38.722x` CPU/Cython speed versus a pure Cython
   pressure-gradient equation.
 
+Repeated-step proof:
+
+- `UniformGridWarpNNPS.update(push=False)` can rebuild bounds, grids, and
+  caches from device-resident `x/y/z/h` values without pushing stale host
+  ParticleArray coordinates over the device state.
+- `pysph/base/warp_sph.py` now has device-side leapfrog kick/drift kernels,
+  periodic position wrapping, and a minimal `wc_sph_leapfrog_step()`.
+- Focused tests compare the KDK step against CPU reference density, EOS,
+  pressure-gradient acceleration, and final state. The Warp SPH/NNPS suite
+  passes with `29 passed`.
+- Periodic behavior is currently position wrapping only. Minimum-image distance
+  and periodic cell lookup remain open for true periodic neighbor interaction.
+
 ## Key sub-topics
 
 - Existing `GPUNeighborCache` behavior.
@@ -133,6 +146,8 @@ Pressure-gradient proof:
 - Reusable Warp equation-loop contract.
 - Warp SPH equation kernels.
 - Tiny Euler/PEC-style integrator loop.
+- Device-authoritative NNPS refresh after position updates.
+- Minimal KDK leapfrog step and periodic position wrapping.
 
 ## References for this aspect
 

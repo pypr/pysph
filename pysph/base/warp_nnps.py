@@ -633,9 +633,10 @@ class BruteForceWarpNNPS(object):
         if self.domain is not None:
             self.domain.update()
 
-    def update(self):
-        for pa in self.particles:
-            pa.gpu.push('x', 'y', 'z', 'h')
+    def update(self, push=True):
+        if push:
+            for pa in self.particles:
+                pa.gpu.push('x', 'y', 'z', 'h')
         self._flags.clear()
         self._cache.clear()
 
@@ -814,9 +815,10 @@ class UniformGridWarpNNPS(BruteForceWarpNNPS):
         )
         self.use_cache = True
 
-    def update(self):
-        for pa in self.particles:
-            pa.gpu.push('x', 'y', 'z', 'h')
+    def update(self, push=True):
+        if push:
+            for pa in self.particles:
+                pa.gpu.push('x', 'y', 'z', 'h')
         self._flags.clear()
         self._cache.clear()
         self._grid.clear()

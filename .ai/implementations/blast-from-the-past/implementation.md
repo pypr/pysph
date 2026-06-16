@@ -31,10 +31,15 @@ The set of host files, modules, and interfaces this implementation interacts wit
 - `pysph/**/*.pxd` - Cython declarations and ABI/public extension surfaces that may constrain Warp integration.
 - `pysph/**/*.pyx` - Cython implementation files that may need wrapping, comparison, or future implementation changes.
 - `pysph/base/gpu_nnps.py` - GPU NNPS export surface read during discovery because it re-exports the active GPU NNPS classes.
+- `pysph/base/warp_*.py` - Python Warp prototype helpers for ParticleArray,
+  NNPS, and SPH equation/integrator checkpoints.
+- `pysph/base/tests/test_warp_*.py` - focused tests for the Python Warp
+  prototype helpers.
 
 ## Boundary amendments
 
-- (none yet)
+- 2026-06-16 - Added Python Warp prototype files and focused Warp tests to the
+  active implementation boundary for the repeated-step leapfrog checkpoint.
 
 ## Aspects
 
