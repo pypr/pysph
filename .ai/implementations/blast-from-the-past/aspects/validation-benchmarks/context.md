@@ -143,6 +143,22 @@ python -m pytest -q pysph/base/tests/test_warp_sph.py pysph/base/tests/test_warp
 29 passed, 2 warnings in 5.82s
 ```
 
+Warp elliptical-drop runner:
+
+- `.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/`
+  contains the first application-style runner around the current Warp prototype.
+- It creates the standard circular elliptical-drop initial patch and velocity
+  field, advances with `UniformGridWarpNNPS` and `wc_sph_leapfrog_step()`, pulls
+  final arrays once, and writes scalar metrics plus an `.npz` result.
+- Smoke result with `nx=8`, `steps=2`, `dt=1.0e-5`, `c0=20.0`: 204 particles,
+  `all_finite=true`, final time `2e-05`, `rho_min=0.5834630727767944`,
+  `rho_max=0.999951183795929`, kinetic energy `8078.22338525834`.
+- Ramp results stayed finite through `nx=24`, 1808 particles, 10 steps at
+  `dt=5.0e-6`, with `rho_min=0.633074939250946`,
+  `rho_max=0.9999793767929077`, and kinetic energy `7840.533230601928`.
+- This is a GPU state-evolution smoke run, not yet a validated published
+  elliptical-drop benchmark.
+
 ## Key sub-topics
 
 - Baseline selection.
@@ -160,6 +176,7 @@ python -m pytest -q pysph/base/tests/test_warp_sph.py pysph/base/tests/test_warp
 - Device-aware repeated-step refresh criteria.
 - KDK leapfrog correctness.
 - Periodic position wrapping correctness.
+- Application-style Warp elliptical-drop smoke metrics.
 - Optional parallel/Zoltan test slice after commit readiness.
 
 ## References for this aspect
