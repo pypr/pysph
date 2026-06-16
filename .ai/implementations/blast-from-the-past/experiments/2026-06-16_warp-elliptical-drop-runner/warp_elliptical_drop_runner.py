@@ -23,7 +23,8 @@ class WarpEllipticalDropRunner:
     """
 
     def __init__(self, nx=8, steps=2, dt=1.0e-5, rho0=1.0, c0=20.0,
-                 p0=0.0, hdx=1.3, alpha=0.1, beta=0.0, output=None):
+                 p0=0.0, hdx=1.3, alpha=0.1, beta=0.0, eos='tait',
+                 gamma=7.0, output=None):
         self.nx = int(nx)
         self.steps = int(steps)
         self.dt = float(dt)
@@ -33,6 +34,8 @@ class WarpEllipticalDropRunner:
         self.hdx = float(hdx)
         self.alpha = float(alpha)
         self.beta = float(beta)
+        self.eos = eos
+        self.gamma = float(gamma)
         self.dx = 1.0 / self.nx
         self.output = Path(output) if output is not None else None
 
@@ -49,6 +52,7 @@ class WarpEllipticalDropRunner:
         h = np.ones_like(x) * self.hdx * dx
         rho = np.ones_like(x) * self.rho0
         p = np.zeros_like(x)
+        cs = np.ones_like(x) * self.c0
         u = -100.0 * x
         v = 100.0 * y
         w = np.zeros_like(x)
@@ -58,7 +62,7 @@ class WarpEllipticalDropRunner:
 
         return get_particle_array(
             name='fluid', x=x, y=y, z=z, h=h, m=m, rho=rho, p=p,
-            u=u, v=v, w=w, au=au, av=av, aw=aw, backend='warp'
+            cs=cs, u=u, v=v, w=w, au=au, av=av, aw=aw, backend='warp'
         )
 
     def run(self):
@@ -68,10 +72,11 @@ class WarpEllipticalDropRunner:
         for _ in range(self.steps):
             wc_sph_leapfrog_step(
                 nnps, dt=self.dt, rho0=self.rho0, c0=self.c0, p0=self.p0,
-                alpha=self.alpha, beta=self.beta
+                alpha=self.alpha, beta=self.beta, eos=self.eos,
+                gamma=self.gamma
             )
 
-        pa.gpu.pull('x', 'y', 'z', 'rho', 'p', 'u', 'v', 'w', 'au', 'av',
+        pa.gpu.pull('x', 'y', 'z', 'rho', 'p', 'cs', 'u', 'v', 'w', 'au', 'av',
                     'aw')
         metrics = self._metrics(pa)
         if self.output is not None:
@@ -81,8 +86,8 @@ class WarpEllipticalDropRunner:
     def _metrics(self, pa):
         finite = all(
             np.all(np.isfinite(getattr(pa, name)))
-            for name in ('x', 'y', 'z', 'rho', 'p', 'u', 'v', 'w', 'au', 'av',
-                         'aw')
+            for name in ('x', 'y', 'z', 'rho', 'p', 'cs', 'u', 'v', 'w', 'au',
+                         'av', 'aw')
         )
         ke = 0.5 * np.sum(pa.m * (pa.u*pa.u + pa.v*pa.v + pa.w*pa.w))
         radius = np.sqrt(pa.x*pa.x + pa.y*pa.y)
@@ -95,10 +100,14 @@ class WarpEllipticalDropRunner:
             'rho_min': float(np.min(pa.rho)),
             'rho_max': float(np.max(pa.rho)),
             'c0': self.c0,
+            'eos': self.eos,
+            'gamma': self.gamma,
             'alpha': self.alpha,
             'beta': self.beta,
             'p_min': float(np.min(pa.p)),
             'p_max': float(np.max(pa.p)),
+            'cs_min': float(np.min(pa.cs)),
+            'cs_max': float(np.max(pa.cs)),
             'x_min': float(np.min(pa.x)),
             'x_max': float(np.max(pa.x)),
             'y_min': float(np.min(pa.y)),
@@ -113,7 +122,7 @@ class WarpEllipticalDropRunner:
         np.savez(
             self.output,
             x=pa.x, y=pa.y, z=pa.z, h=pa.h, m=pa.m, rho=pa.rho, p=pa.p,
-            u=pa.u, v=pa.v, w=pa.w, au=pa.au, av=pa.av, aw=pa.aw,
+            cs=pa.cs, u=pa.u, v=pa.v, w=pa.w, au=pa.au, av=pa.av, aw=pa.aw,
             metrics=json.dumps(metrics, sort_keys=True),
         )
 
@@ -129,6 +138,9 @@ def _parse_args():
     parser.add_argument('--hdx', type=float, default=1.3)
     parser.add_argument('--alpha', type=float, default=0.1)
     parser.add_argument('--beta', type=float, default=0.0)
+    parser.add_argument('--eos', choices=('isothermal', 'tait'),
+                        default='tait')
+    parser.add_argument('--gamma', type=float, default=7.0)
     parser.add_argument('--output', default=None)
     return parser.parse_args()
 
@@ -138,7 +150,7 @@ def main():
     runner = WarpEllipticalDropRunner(
         nx=args.nx, steps=args.steps, dt=args.dt, rho0=args.rho0,
         c0=args.c0, p0=args.p0, hdx=args.hdx, alpha=args.alpha,
-        beta=args.beta, output=args.output
+        beta=args.beta, eos=args.eos, gamma=args.gamma, output=args.output
     )
     metrics = runner.run()
     print(json.dumps(metrics, indent=2, sort_keys=True))

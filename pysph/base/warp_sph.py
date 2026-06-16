@@ -208,6 +208,46 @@ if wp is not None:
 
 
     @wp.kernel
+    def _tait_eos_f64(
+            rho: wp.array(dtype=wp.float64),
+            p: wp.array(dtype=wp.float64),
+            cs: wp.array(dtype=wp.float64),
+            rho0: wp.float64,
+            rho01: wp.float64,
+            c0: wp.float64,
+            gamma: wp.float64,
+            gamma1: wp.float64,
+            b: wp.float64,
+            p0: wp.float64,
+    ):
+        i = wp.tid()
+        ratio = rho[i] * rho01
+        tmp = wp.pow(ratio, gamma)
+        p[i] = p0 + b * (tmp - wp.float64(1.0))
+        cs[i] = c0 * wp.pow(ratio, gamma1)
+
+
+    @wp.kernel
+    def _tait_eos_f32(
+            rho: wp.array(dtype=wp.float32),
+            p: wp.array(dtype=wp.float32),
+            cs: wp.array(dtype=wp.float32),
+            rho0: wp.float32,
+            rho01: wp.float32,
+            c0: wp.float32,
+            gamma: wp.float32,
+            gamma1: wp.float32,
+            b: wp.float32,
+            p0: wp.float32,
+    ):
+        i = wp.tid()
+        ratio = rho[i] * rho01
+        tmp = wp.pow(ratio, gamma)
+        p[i] = p0 + b * (tmp - wp.float32(1.0))
+        cs[i] = c0 * wp.pow(ratio, gamma1)
+
+
+    @wp.kernel
     def _continuity_f64(
             s_x: wp.array(dtype=wp.float64),
             s_y: wp.array(dtype=wp.float64),
@@ -435,6 +475,7 @@ if wp is not None:
             s_h: wp.array(dtype=wp.float64),
             s_m: wp.array(dtype=wp.float64),
             s_rho: wp.array(dtype=wp.float64),
+            s_cs: wp.array(dtype=wp.float64),
             s_u: wp.array(dtype=wp.float64),
             s_v: wp.array(dtype=wp.float64),
             s_w: wp.array(dtype=wp.float64),
@@ -443,6 +484,7 @@ if wp is not None:
             d_z: wp.array(dtype=wp.float64),
             d_h: wp.array(dtype=wp.float64),
             d_rho: wp.array(dtype=wp.float64),
+            d_cs: wp.array(dtype=wp.float64),
             d_u: wp.array(dtype=wp.float64),
             d_v: wp.array(dtype=wp.float64),
             d_w: wp.array(dtype=wp.float64),
@@ -452,7 +494,6 @@ if wp is not None:
             dim: wp.int32,
             alpha: wp.float64,
             beta: wp.float64,
-            c0: wp.float64,
             d_au: wp.array(dtype=wp.float64),
             d_av: wp.array(dtype=wp.float64),
             d_aw: wp.array(dtype=wp.float64),
@@ -489,7 +530,8 @@ if wp is not None:
                     grad = _cubic_dwdq_f64(rij, hij, dim) / (hij * rij)
                 mu = hij * vdotx / (rij2 + wp.float64(0.01)*hij*hij)
                 rhoij1 = wp.float64(2.0) / (d_rho[i] + s_rho[j])
-                piij = (-alpha*c0*mu + beta*mu*mu) * rhoij1
+                cij = wp.float64(0.5) * (d_cs[i] + s_cs[j])
+                piij = (-alpha*cij*mu + beta*mu*mu) * rhoij1
                 fac = -s_m[j] * piij
                 au += fac * grad * dx
                 av += fac * grad * dy
@@ -507,6 +549,7 @@ if wp is not None:
             s_h: wp.array(dtype=wp.float32),
             s_m: wp.array(dtype=wp.float32),
             s_rho: wp.array(dtype=wp.float32),
+            s_cs: wp.array(dtype=wp.float32),
             s_u: wp.array(dtype=wp.float32),
             s_v: wp.array(dtype=wp.float32),
             s_w: wp.array(dtype=wp.float32),
@@ -515,6 +558,7 @@ if wp is not None:
             d_z: wp.array(dtype=wp.float32),
             d_h: wp.array(dtype=wp.float32),
             d_rho: wp.array(dtype=wp.float32),
+            d_cs: wp.array(dtype=wp.float32),
             d_u: wp.array(dtype=wp.float32),
             d_v: wp.array(dtype=wp.float32),
             d_w: wp.array(dtype=wp.float32),
@@ -524,7 +568,6 @@ if wp is not None:
             dim: wp.int32,
             alpha: wp.float32,
             beta: wp.float32,
-            c0: wp.float32,
             d_au: wp.array(dtype=wp.float32),
             d_av: wp.array(dtype=wp.float32),
             d_aw: wp.array(dtype=wp.float32),
@@ -561,7 +604,8 @@ if wp is not None:
                     grad = _cubic_dwdq_f32(rij, hij, dim) / (hij * rij)
                 mu = hij * vdotx / (rij2 + wp.float32(0.01)*hij*hij)
                 rhoij1 = wp.float32(2.0) / (d_rho[i] + s_rho[j])
-                piij = (-alpha*c0*mu + beta*mu*mu) * rhoij1
+                cij = wp.float32(0.5) * (d_cs[i] + s_cs[j])
+                piij = (-alpha*cij*mu + beta*mu*mu) * rhoij1
                 fac = -s_m[j] * piij
                 au += fac * grad * dx
                 av += fac * grad * dy
@@ -819,6 +863,15 @@ def _ensure_property(pa, prop, device):
     _ensure_warp_helper(pa, device)
 
 
+def _ensure_sound_speed(pa, c0, device):
+    if 'cs' not in pa.properties:
+        n = pa.get_number_of_particles()
+        pa.add_property('cs', data=np.ones(n) * c0)
+        if pa.gpu is not None and getattr(pa.gpu, 'backend', None) == 'warp':
+            pa.gpu.add_prop('cs', pa.properties['cs'])
+    _ensure_warp_helper(pa, device)
+
+
 def compute_summation_density(nnps, src_index=0, dst_index=0,
                               out_prop='rho', push=True):
     """Compute standard SPH summation density with Warp.
@@ -896,6 +949,53 @@ def compute_isothermal_eos(pa, rho0, c0, p0=0.0, out_prop='p',
         )
         wp.synchronize_device(device)
     return out
+
+
+def compute_tait_eos(pa, rho0, c0, gamma=7.0, p0=0.0, out_prop='p',
+                     cs_prop='cs', device=None, push=True):
+    """Compute PySPH ``TaitEOS`` pressure and sound speed with Warp."""
+    if wp is None:  # pragma: no cover
+        raise ImportError("warp is required for compute_tait_eos")
+
+    device = wp.get_device(device)
+    _ensure_property(pa, out_prop, device)
+    _ensure_property(pa, cs_prop, device)
+    if push:
+        pa.gpu.push('rho', out_prop, cs_prop)
+    rho = pa.gpu.get_device_array('rho')
+    out = pa.gpu.get_device_array(out_prop)
+    cs = pa.gpu.get_device_array(cs_prop)
+    n = pa.gpu.get_number_of_particles()
+    if rho.dtype == np.float32:
+        kernel = _tait_eos_f32
+        rho0 = np.float32(rho0)
+        rho01 = np.float32(1.0 / rho0)
+        c0 = np.float32(c0)
+        gamma = np.float32(gamma)
+        gamma1 = np.float32(0.5 * (gamma - np.float32(1.0)))
+        b = np.float32(rho0*c0*c0/gamma)
+        p0 = np.float32(p0)
+    else:
+        kernel = _tait_eos_f64
+        rho0 = np.float64(rho0)
+        rho01 = np.float64(1.0 / rho0)
+        c0 = np.float64(c0)
+        gamma = np.float64(gamma)
+        gamma1 = np.float64(0.5 * (gamma - np.float64(1.0)))
+        b = np.float64(rho0*c0*c0/gamma)
+        p0 = np.float64(p0)
+    if n > 0:
+        wp.launch(
+            kernel,
+            dim=n,
+            inputs=[
+                rho.dev, out.dev, cs.dev, rho0, rho01, c0, gamma,
+                gamma1, b, p0
+            ],
+            device=device,
+        )
+        wp.synchronize_device(device)
+    return out, cs
 
 
 def compute_continuity(nnps, src_index=0, dst_index=0, out_prop='arho',
@@ -993,13 +1093,16 @@ def compute_artificial_viscosity(nnps, src_index=0, dst_index=0, alpha=0.1,
 
     src_pa = nnps.particles[src_index]
     dst_pa = nnps.particles[dst_index]
+    _ensure_sound_speed(src_pa, c0, nnps.device)
+    if dst_pa is not src_pa:
+        _ensure_sound_speed(dst_pa, c0, nnps.device)
     for prop in out_props:
         _ensure_property(dst_pa, prop, nnps.device)
 
     if push:
-        src_pa.gpu.push('x', 'y', 'z', 'h', 'm', 'rho', 'u', 'v', 'w')
+        src_pa.gpu.push('x', 'y', 'z', 'h', 'm', 'rho', 'cs', 'u', 'v', 'w')
         dst_pa.gpu.push(
-            'x', 'y', 'z', 'h', 'rho', 'u', 'v', 'w', *out_props
+            'x', 'y', 'z', 'h', 'rho', 'cs', 'u', 'v', 'w', *out_props
         )
     cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
     src = src_pa.gpu
@@ -1012,12 +1115,10 @@ def compute_artificial_viscosity(nnps, src_index=0, dst_index=0, alpha=0.1,
         kernel = _artificial_viscosity_f32
         alpha = np.float32(alpha)
         beta = np.float32(beta)
-        c0 = np.float32(c0)
     else:
         kernel = _artificial_viscosity_f64
         alpha = np.float64(alpha)
         beta = np.float64(beta)
-        c0 = np.float64(c0)
 
     if ndst > 0:
         wp.launch(
@@ -1025,12 +1126,12 @@ def compute_artificial_viscosity(nnps, src_index=0, dst_index=0, alpha=0.1,
             dim=ndst,
             inputs=[
                 src.x.dev, src.y.dev, src.z.dev, src.h.dev, src.m.dev,
-                src.rho.dev, src.u.dev, src.v.dev, src.w.dev,
+                src.rho.dev, src.cs.dev, src.u.dev, src.v.dev, src.w.dev,
                 dst.x.dev, dst.y.dev, dst.z.dev, dst.h.dev,
-                dst.rho.dev, dst.u.dev, dst.v.dev, dst.w.dev,
+                dst.rho.dev, dst.cs.dev, dst.u.dev, dst.v.dev, dst.w.dev,
                 cache['starts_dev'], cache['lengths_dev'],
                 cache['neighbors_dev'], np.int32(nnps.dim),
-                alpha, beta, c0, au.dev, av.dev, aw.dev
+                alpha, beta, au.dev, av.dev, aw.dev
             ],
             device=nnps.device,
         )
@@ -1207,12 +1308,21 @@ def wrap_periodic(pa, bounds, dim=3, device=None):
 
 
 def _compute_wcsph_acceleration(nnps, pa_index, rho0, c0, p0, alpha, beta,
-                                push):
+                                push, eos, gamma):
     pa = nnps.particles[pa_index]
     compute_summation_density(nnps, pa_index, pa_index, push=push)
-    compute_isothermal_eos(
-        pa, rho0=rho0, c0=c0, p0=p0, device=nnps.device, push=False
-    )
+    if eos == 'isothermal':
+        compute_isothermal_eos(
+            pa, rho0=rho0, c0=c0, p0=p0, device=nnps.device, push=False
+        )
+        _ensure_sound_speed(pa, c0, nnps.device)
+    elif eos == 'tait':
+        compute_tait_eos(
+            pa, rho0=rho0, c0=c0, gamma=gamma, p0=p0,
+            device=nnps.device, push=False
+        )
+    else:
+        raise ValueError("EOS must be 'isothermal' or 'tait'")
     result = compute_pressure_gradient(nnps, pa_index, pa_index, push=False)
     if alpha != 0.0 or beta != 0.0:
         result = compute_artificial_viscosity(
@@ -1224,7 +1334,8 @@ def _compute_wcsph_acceleration(nnps, pa_index, rho0, c0, p0, alpha, beta,
 
 def wc_sph_leapfrog_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
                          c0=20.0, p0=0.0, periodic_bounds=None,
-                         push=False, alpha=0.0, beta=0.0):
+                         push=False, alpha=0.0, beta=0.0,
+                         eos='isothermal', gamma=7.0):
     """Run one minimal WCSPH KDK leapfrog step on the device.
 
     ``push`` defaults to ``False`` so repeated calls keep the Warp arrays as the
@@ -1235,7 +1346,8 @@ def wc_sph_leapfrog_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
     if push:
         nnps.update(push=True)
     _compute_wcsph_acceleration(
-        nnps, pa_index, rho0, c0, p0, alpha, beta, push=push
+        nnps, pa_index, rho0, c0, p0, alpha, beta, push=push,
+        eos=eos, gamma=gamma
     )
     leapfrog_kick(pa, dt=0.5*dt, dim=nnps.dim, device=nnps.device,
                   push=False)
@@ -1243,24 +1355,35 @@ def wc_sph_leapfrog_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
     wrap_periodic(pa, periodic_bounds, dim=nnps.dim, device=nnps.device)
     nnps.update(push=False)
     _compute_wcsph_acceleration(
-        nnps, pa_index, rho0, c0, p0, alpha, beta, push=False
+        nnps, pa_index, rho0, c0, p0, alpha, beta, push=False,
+        eos=eos, gamma=gamma
     )
     return leapfrog_kick(pa, dt=0.5*dt, dim=nnps.dim, device=nnps.device,
                          push=False)
 
 
 def wc_sph_euler_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
-                      c0=20.0, p0=0.0, alpha=0.0, beta=0.0):
+                      c0=20.0, p0=0.0, alpha=0.0, beta=0.0,
+                      eos='isothermal', gamma=7.0):
     """Run one minimal WCSPH-style device step.
 
-    The step computes summation density, isothermal pressure, inviscid pressure
-    acceleration, and a simple Euler velocity/position update on the device.
+    The step computes summation density, pressure, optional artificial
+    viscosity, and a simple Euler velocity/position update on the device.
     """
     pa = nnps.particles[pa_index]
     compute_summation_density(nnps, pa_index, pa_index)
-    compute_isothermal_eos(
-        pa, rho0=rho0, c0=c0, p0=p0, device=nnps.device, push=False
-    )
+    if eos == 'isothermal':
+        compute_isothermal_eos(
+            pa, rho0=rho0, c0=c0, p0=p0, device=nnps.device, push=False
+        )
+        _ensure_sound_speed(pa, c0, nnps.device)
+    elif eos == 'tait':
+        compute_tait_eos(
+            pa, rho0=rho0, c0=c0, gamma=gamma, p0=p0,
+            device=nnps.device, push=False
+        )
+    else:
+        raise ValueError("EOS must be 'isothermal' or 'tait'")
     compute_pressure_gradient(nnps, pa_index, pa_index, push=False)
     if alpha != 0.0 or beta != 0.0:
         compute_artificial_viscosity(

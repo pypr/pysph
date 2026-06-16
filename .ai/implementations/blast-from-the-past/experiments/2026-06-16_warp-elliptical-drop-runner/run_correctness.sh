@@ -22,6 +22,8 @@ python .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-ellip
     --p0 0.0 \
     --alpha 0.1 \
     --beta 0.0 \
+    --eos tait \
+    --gamma 7.0 \
     --output "$OUT"
 
 test -s "$OUT"

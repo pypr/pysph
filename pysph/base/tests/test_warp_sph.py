@@ -16,9 +16,9 @@ from pysph.base.utils import get_particle_array
 from pysph.base.warp_nnps import UniformGridWarpNNPS
 from pysph.base.warp_sph import (
     compute_artificial_viscosity, compute_continuity, compute_isothermal_eos,
-    compute_pressure_gradient, compute_summation_density, euler_step,
-    leapfrog_drift, leapfrog_kick, wc_sph_euler_step, wc_sph_leapfrog_step,
-    wrap_periodic
+    compute_pressure_gradient, compute_summation_density, compute_tait_eos,
+    euler_step, leapfrog_drift, leapfrog_kick, wc_sph_euler_step,
+    wc_sph_leapfrog_step, wrap_periodic
 )
 
 
@@ -131,6 +131,13 @@ def _cpu_pressure_gradient(particles, src_index, dst_index, dim,
     return result
 
 
+def _cpu_tait_eos(rho, rho0, c0, gamma=7.0, p0=0.0):
+    ratio = rho / rho0
+    p = p0 + (rho0*c0*c0/gamma) * (ratio**gamma - 1.0)
+    cs = c0 * ratio**(0.5 * (gamma - 1.0))
+    return p, cs
+
+
 def _cpu_artificial_viscosity(particles, src_index, dst_index, dim,
                               alpha, beta, c0, radius_scale=2.0):
     nnps = LinkedListNNPS(
@@ -140,6 +147,8 @@ def _cpu_artificial_viscosity(particles, src_index, dst_index, dim,
     src = particles[src_index]
     dst = particles[dst_index]
     result = np.zeros((dst.get_number_of_particles(), 3))
+    src_has_cs = 'cs' in src.properties
+    dst_has_cs = 'cs' in dst.properties
 
     for d_idx in range(dst.get_number_of_particles()):
         acc = np.zeros(3)
@@ -167,7 +176,10 @@ def _cpu_artificial_viscosity(particles, src_index, dst_index, dim,
                 hij = 0.5 * (dst.h[d_idx] + src.h[s_idx])
                 mu = hij * vdotx / (rij2 + 0.01*hij*hij)
                 rhoij1 = 2.0 / (dst.rho[d_idx] + src.rho[s_idx])
-                piij = (-alpha*c0*mu + beta*mu*mu) * rhoij1
+                csi = dst.cs[d_idx] if dst_has_cs else c0
+                csj = src.cs[s_idx] if src_has_cs else c0
+                cij = 0.5 * (csi + csj)
+                piij = (-alpha*cij*mu + beta*mu*mu) * rhoij1
                 dwij = [0.0, 0.0, 0.0]
                 kernel.gradient(xij=xij, rij=rij, h=hij, grad=dwij)
                 acc += -src.m[s_idx] * piij * np.asarray(dwij)
@@ -190,6 +202,30 @@ def test_warp_isothermal_eos_matches_cpu_and_pulls_pressure():
 
     assert np.allclose(actual, expected)
     assert np.allclose(pa.p, expected)
+
+
+def test_warp_tait_eos_matches_cpu_and_pulls_pressure_and_sound_speed():
+    rho = np.asarray([0.9, 1.0, 1.1, 1.25])
+    pa = get_particle_array(
+        name='fluid',
+        rho=rho,
+        p=np.zeros_like(rho),
+        cs=np.zeros_like(rho),
+        backend='warp',
+    )
+    expected_p, expected_cs = _cpu_tait_eos(
+        rho, rho0=1.0, c0=20.0, gamma=7.0, p0=0.5
+    )
+
+    p, cs = compute_tait_eos(
+        pa, rho0=1.0, c0=20.0, gamma=7.0, p0=0.5
+    )
+    pa.gpu.pull('p', 'cs')
+
+    assert np.allclose(p.get(), expected_p)
+    assert np.allclose(cs.get(), expected_cs)
+    assert np.allclose(pa.p, expected_p)
+    assert np.allclose(pa.cs, expected_cs)
 
 
 def test_warp_summation_density_matches_cpu_in_2d():
@@ -372,6 +408,7 @@ def test_warp_artificial_viscosity_matches_cpu_and_adds_to_acceleration():
         h=[0.35, 0.35, 0.4, 0.35],
         m=[1.0, 1.5, 1.2, 0.8],
         rho=[1.0, 1.1, 0.9, 1.2],
+        cs=[4.0, 5.0, 6.0, 7.0],
         u=[1.0, -1.0, -0.2, 0.0],
         v=[0.0, 0.05, -0.1, 0.0],
         w=[0.0, 0.0, 0.0, 0.0],
@@ -397,6 +434,89 @@ def test_warp_artificial_viscosity_matches_cpu_and_adds_to_acceleration():
     assert np.allclose(au.get(), expected[:, 0])
     assert np.allclose(av.get(), expected[:, 1])
     assert np.allclose(aw.get(), expected[:, 2])
+
+
+def test_warp_wc_sph_euler_step_with_tait_eos_uses_sound_speed_in_avisc():
+    x = np.asarray([0.0, 0.2, 0.45, 1.2])
+    y = np.asarray([0.0, 0.1, -0.05, 0.2])
+    z = np.zeros_like(x)
+    h = np.asarray([0.35, 0.35, 0.4, 0.35])
+    m = np.asarray([1.0, 1.5, 1.2, 0.8])
+    u = np.asarray([0.5, -0.4, 0.2, 0.0])
+    v = np.asarray([0.0, 0.15, -0.1, 0.05])
+    w = np.zeros_like(x)
+    dt = 1.0e-3
+    rho0 = 1.0
+    c0 = 5.0
+    gamma = 7.0
+    p0 = 0.1
+    alpha = 0.1
+    beta = 0.2
+    pa = get_particle_array(
+        name='fluid',
+        x=x.copy(),
+        y=y.copy(),
+        z=z.copy(),
+        h=h.copy(),
+        m=m.copy(),
+        rho=np.zeros_like(x),
+        p=np.zeros_like(x),
+        cs=np.zeros_like(x),
+        u=u.copy(),
+        v=v.copy(),
+        w=w.copy(),
+        au=np.zeros_like(x),
+        av=np.zeros_like(x),
+        aw=np.zeros_like(x),
+        backend='warp',
+    )
+    particles = [pa]
+    expected_rho = _cpu_summation_density(particles, 0, 0, dim=2)
+    expected_p, expected_cs = _cpu_tait_eos(
+        expected_rho, rho0=rho0, c0=c0, gamma=gamma, p0=p0
+    )
+    expected_pa = get_particle_array(
+        name='expected',
+        x=x.copy(),
+        y=y.copy(),
+        z=z.copy(),
+        h=h.copy(),
+        m=m.copy(),
+        rho=expected_rho,
+        p=expected_p,
+        cs=expected_cs,
+        u=u.copy(),
+        v=v.copy(),
+        w=w.copy(),
+        backend='warp',
+    )
+    expected_acc = (
+        _cpu_pressure_gradient([expected_pa], 0, 0, dim=2) +
+        _cpu_artificial_viscosity(
+            [expected_pa], 0, 0, dim=2, alpha=alpha, beta=beta, c0=c0
+        )
+    )
+    expected_u = u + dt*expected_acc[:, 0]
+    expected_v = v + dt*expected_acc[:, 1]
+    expected_w = w + dt*expected_acc[:, 2]
+
+    nnps = UniformGridWarpNNPS(dim=2, particles=particles, radius_scale=2.0)
+    wc_sph_euler_step(
+        nnps, dt=dt, rho0=rho0, c0=c0, p0=p0, alpha=alpha, beta=beta,
+        eos='tait', gamma=gamma
+    )
+    pa.gpu.pull('rho', 'p', 'cs', 'au', 'av', 'aw', 'u', 'v', 'w')
+
+    assert np.all(np.isfinite(pa.cs))
+    assert np.allclose(pa.rho, expected_rho)
+    assert np.allclose(pa.p, expected_p)
+    assert np.allclose(pa.cs, expected_cs)
+    assert np.allclose(pa.au, expected_acc[:, 0], rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.av, expected_acc[:, 1], rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.aw, expected_acc[:, 2], rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.u, expected_u, rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.v, expected_v, rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.w, expected_w, rtol=1e-5, atol=1e-5)
 
 
 def test_warp_euler_step_updates_velocity_and_position_on_device():

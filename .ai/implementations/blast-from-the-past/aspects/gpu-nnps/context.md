@@ -141,8 +141,17 @@ Artificial-viscosity proof:
 - The viscosity kernel is additive over existing `au/av/aw`, so the pressure
   gradient path can remain the owner of resetting acceleration before optional
   stabilizing terms contribute.
-- The current implementation uses constant `c0`; per-particle sound speed
-  remains part of the Tait EOS follow-up.
+- The current implementation uses per-particle sound speed `cs` when available,
+  with a constant-`c0` fallback for callers that have not run Tait EOS.
+
+Tait EOS proof:
+
+- `pysph/base/warp_sph.py` now adds a Warp `TaitEOS` path that writes both
+  pressure `p` and sound speed `cs`.
+- The WCSPH step helpers keep `eos='isothermal'` as the compatibility default
+  and accept `eos='tait'`, `gamma=7.0` for the elliptical-drop path.
+- Artificial viscosity now consumes `cs` through the same device-resident
+  neighbor cache and computes `cij = 0.5*(d_cs + s_cs)`.
 
 ## Key sub-topics
 
@@ -160,6 +169,7 @@ Artificial-viscosity proof:
 - Device-authoritative NNPS refresh after position updates.
 - Minimal KDK leapfrog step and periodic position wrapping.
 - Additive artificial-viscosity momentum term.
+- Tait EOS and per-particle sound-speed path.
 
 ## References for this aspect
 
