@@ -1,0 +1,96 @@
+{
+  "case": {
+    "alpha": 0.1,
+    "beta": 0.0,
+    "c0": 1400.0,
+    "cfl": 0.3,
+    "dt": 2.1090201168072683e-06,
+    "gamma": 7.0,
+    "hdx": 1.3,
+    "n_damp": 50,
+    "nx": 100,
+    "output_times": [
+      0.0008,
+      0.0038
+    ],
+    "p0": 0.0,
+    "rho0": 1.0,
+    "warp_density_mode": "continuity",
+    "warp_dt_max": Infinity,
+    "warp_timestep_policy": "pysph",
+    "xsph_eps": 0.5
+  },
+  "hardware": {
+    "platform": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+    "processor": "",
+    "python": "3.14.4",
+    "warp_device": "cuda:0",
+    "warp_version": "1.14.0"
+  },
+  "warp": {
+    "average_step_time_s": 0.019076272167982626,
+    "backend": "warp",
+    "checkpoints": {
+      "t0p0008000": {
+        "metrics": {
+          "all_finite": true,
+          "axis_major_estimate": 1.0816634893417358,
+          "axis_minor_estimate": 0.9220718145370483,
+          "axis_x_abs": 0.9220718145370483,
+          "axis_y_abs": 1.0816634893417358,
+          "dt_max": 2.7813784981844947e-06,
+          "dt_mean": 2.555910543130991e-06,
+          "dt_min": 2.7459356128852786e-09,
+          "exact_major_axis": 1.0831034701687434,
+          "exact_minor_axis": 0.9232728243814081,
+          "kinetic_energy": 7818.5529387218885,
+          "p_max": 11072.68359375,
+          "p_min": -836.4510498046875,
+          "particles": 31417,
+          "rho_max": 1.0055549144744873,
+          "rho_min": 0.9995721578598022,
+          "steps": 313,
+          "time": 0.0008,
+          "x_max": 0.9220717549324036,
+          "x_min": -0.9220718145370483,
+          "y_max": 1.0816634893417358,
+          "y_min": -1.0816634893417358
+        },
+        "path": ".ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/fp32/resolved-nx100-fp32-warp-only-warp-t0p0008000.npz"
+      },
+      "t0p0038000": {
+        "metrics": {
+          "all_finite": true,
+          "axis_major_estimate": 1.4365266561508179,
+          "axis_minor_estimate": 0.6964129209518433,
+          "axis_x_abs": 0.6964129209518433,
+          "axis_y_abs": 1.4365266561508179,
+          "dt_max": 2.7813784981844947e-06,
+          "dt_mean": 2.727925340990668e-06,
+          "dt_min": 2.7459356128852786e-09,
+          "exact_major_axis": 1.4392190525454083,
+          "exact_minor_axis": 0.6948212631228,
+          "kinetic_energy": 7797.707070654135,
+          "p_max": 4208.27392578125,
+          "p_min": -4747.02099609375,
+          "particles": 31417,
+          "rho_max": 1.002132773399353,
+          "rho_min": 0.9975613951683044,
+          "steps": 1393,
+          "time": 0.0038,
+          "x_max": 0.6964129209518433,
+          "x_min": -0.6964129209518433,
+          "y_max": 1.4365266561508179,
+          "y_min": -1.4365260601043701
+        },
+        "path": ".ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/fp32/resolved-nx100-fp32-warp-only-warp-t0p0038000.npz"
+      }
+    },
+    "dt_max": 2.7813784981844947e-06,
+    "dt_mean": 2.727925340990668e-06,
+    "dt_min": 2.7459356128852786e-09,
+    "final_time": 0.0038,
+    "steps": 1393,
+    "wall_time_s": 26.5732471299998
+  }
+}

@@ -256,6 +256,14 @@ python -m pytest pysph/base/tests/test_warp_sph.py -q
   `9.947815438060559e-07`, and kinetic-energy delta was
   `-0.0004318240680731833`. The very small Warp `dt_min` is an output-time
   landing step and does not permanently shrink later adaptive steps.
+- Precision note for the resolved Warp runner: initial host arrays are created
+  as `float64`, but `WarpDeviceHelper` casts floating properties to
+  `compyle.config.get_config().use_double`. On the active machine this config
+  is `False`, so the current Warp device execution path is fp32. An explicit
+  Warp-only `nx=100` rerun under that fp32 config took
+  `26.5732471299998` s / 1393 steps, versus the committed run's
+  `23.629107111992198` s / 1393 steps; both are the same fp32 device path, so
+  the timing difference is treated as run-to-run/module-cache variance.
 
 ## Key sub-topics
 

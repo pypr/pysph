@@ -5,7 +5,7 @@ created: 2026-06-16T12:30:00 CEST
 author: @kunalpuri-prediqt
 aspect: validation-benchmarks
 status: active
-last_checked: 2026-06-17T08:41:00 CEST
+last_checked: 2026-06-17T09:33:00 CEST
 ---
 
 # Experiment: Warp Elliptical-Drop Runner
@@ -264,6 +264,43 @@ Resolved outputs:
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved/resolved-nx100-timestep-policy-summary.json
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved/resolved-nx100-timestep-policy-t0p0008000.png
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved/resolved-nx100-timestep-policy-t0p0038000.png
+```
+
+Explicit Warp fp32 rerun:
+
+The runner creates host arrays as `float64`, but `WarpDeviceHelper` casts float
+properties to `compyle.config.get_config().use_double`; in this environment the
+config is `False`, so the active Warp device arrays are `float32`. The
+comparison loaders cast checkpoint arrays to `float64` for metrics/plotting,
+which can hide the device precision in the saved summary.
+
+```text
+$ python .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved_elliptical_drop_comparison.py --nx 100 --output-times 0.0008,0.0038 --prefix resolved-nx100-fp32-warp-only --output-dir .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/fp32 --skip-pysph-application --max-steps 10000000
+```
+
+Result:
+
+```text
+Warp fp32 wall time: 26.5732471299998 s
+steps: 1393
+average step time: 0.019076272167982626 s
+dt_min: 2.7459356128852786e-09
+dt_mean: 2.727925340990668e-06
+dt_max: 2.7813784981844947e-06
+all_finite: true at both checkpoints
+```
+
+Compared with the committed timestep-policy run's Warp timing
+(`23.629107111992198` s), this explicit rerun is `1.1245980224328238x`
+slower. Since both runs use the same fp32 device path, this is treated as
+run-to-run/module-cache variance rather than a precision effect. Relative to
+the committed PySPH CPU Application time (`233.97314716299297` s), the explicit
+fp32 Warp-only rerun is `8.804838415808415x` faster.
+
+Output:
+
+```text
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/fp32/resolved-nx100-fp32-warp-only-summary.json
 ```
 
 Earlier continuity-density-only diagnostic run:
