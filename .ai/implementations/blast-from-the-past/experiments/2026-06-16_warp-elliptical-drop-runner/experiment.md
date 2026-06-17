@@ -303,6 +303,74 @@ Output:
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/fp32/resolved-nx100-fp32-warp-only-summary.json
 ```
 
+Million-particle fixed-step CPU/GPU comparison:
+
+```text
+$ python pysph/examples/elliptical_drop_no_scheme.py --nx 565 --tf 0.000003732778967800475 --timestep 0.0000003732778967800475 --no-adaptive-timestep --n-damp 0 --pfreq 10 --fname million-pysph --directory .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-10step/pysph --logfile '' --quiet
+real 57.48
+
+$ python .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/warp_elliptical_drop_runner.py --nx 565 --steps 10 --dt 0.0000003732778967800475 --rho0 1.0 --c0 1400.0 --p0 0.0 --alpha 0.1 --beta 0.0 --eos tait --gamma 7.0 --kernel gaussian --xsph-eps 0.5 --density-mode continuity --output .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-10step/warp/million-warp.npz
+real 7.17
+```
+
+Case:
+
+```text
+nx=565
+particles=1,002,885
+steps=10
+fixed dt=3.732778967800475e-07
+tf=3.732778967800475e-06
+c0=1400.0
+Gaussian kernel
+Tait EOS gamma=7.0
+alpha=0.1 beta=0.0
+XSPH eps=0.5
+density_mode=continuity
+```
+
+Performance:
+
+| Backend | Wall time (s) | Steps | Average step time (s) |
+| --- | ---: | ---: | ---: |
+| PySPH CPU Application | 57.48 | 10 | 5.747999999999999 |
+| Warp GPU | 7.17 | 10 | 0.717 |
+
+Overall wall-time speedup: `8.01673640167364x`.
+
+Final-state CPU-vs-Warp deltas:
+
+| Metric | Delta |
+| --- | ---: |
+| axis_x_abs | -1.2296967044633789e-07 |
+| axis_y_abs | 4.773760275966765e-10 |
+| rho_min | -9.119009991565008e-10 |
+| rho_max | 1.4501548406542497e-08 |
+| kinetic_energy | 8.523681572114583e-06 |
+
+Both final checkpoints were finite. The comparison is intentionally fixed-step
+to make the short ten-step CPU/GPU timing apples-to-apples without adaptive
+damping or output-time policy effects.
+
+Output:
+
+```text
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-10step/million-cpu-gpu-10step-summary.json
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-10step/pysph/million-pysph_00010.hdf5
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-10step/warp/million-warp.npz
+```
+
+Million-particle adaptive GPU probe:
+
+```text
+$ python .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/warp_elliptical_drop_runner.py --nx 565 --steps 1 --dt 0.0000003732778967800475 --rho0 1.0 --c0 1400.0 --p0 0.0 --alpha 0.1 --beta 0.0 --eos tait --gamma 7.0 --kernel gaussian --xsph-eps 0.5 --adaptive-dt --cfl 0.3 --dt-min 1.0e-10 --dt-max 0.0000003732778967800475 --density-mode continuity --output .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/full-nx565-gpu/adaptive-one-step-probe.npz
+real 4.87
+```
+
+The one-step adaptive probe was finite for 1,002,885 particles. A full
+`nx=565`, `tf=0.0076` GPU-only run was not started after the user clarified
+"no multi hour run".
+
 Earlier continuity-density-only diagnostic run:
 
 - Same CPU baseline and physics, but Warp used the old runner policy that capped
