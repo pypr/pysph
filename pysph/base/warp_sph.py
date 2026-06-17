@@ -2284,7 +2284,8 @@ def _compute_wcsph_xsph(nnps, pa_index, xsph_eps, kernel):
 def _wc_sph_pec_continuity_step(nnps, pa_index, dt, rho0, c0, p0,
                                 periodic_bounds, push, alpha, beta, eos,
                                 gamma, kernel, xsph_eps, adaptive_dt, cfl,
-                                dt_min, dt_max):
+                                dt_min, dt_max, adaptive_dt_scale,
+                                step_dt_max):
     pa = nnps.particles[pa_index]
     if push:
         nnps.update(push=True)
@@ -2298,6 +2299,7 @@ def _wc_sph_pec_continuity_step(nnps, pa_index, dt, rho0, c0, p0,
             nnps, pa_index=pa_index, c0=c0, cfl=cfl, dt_min=dt_min,
             dt_max=dt_max, push=False
         )
+        dt = min(float(dt) * float(adaptive_dt_scale), float(step_dt_max))
     use_xsph = _compute_wcsph_xsph(nnps, pa_index, xsph_eps, kernel)
     wcsph_pec_stage(
         pa, dt=dt, stage=0.5, dim=nnps.dim, xsph=use_xsph,
@@ -2325,7 +2327,8 @@ def wc_sph_leapfrog_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
                          eos='isothermal', gamma=7.0, kernel='cubic',
                          xsph_eps=None, adaptive_dt=False, cfl=0.25,
                          dt_min=0.0, dt_max=np.inf, return_dt=False,
-                         density_mode='summation'):
+                         density_mode='summation', adaptive_dt_scale=1.0,
+                         step_dt_max=np.inf):
     """Run one minimal WCSPH KDK leapfrog step on the device.
 
     ``push`` defaults to ``False`` so repeated calls keep the Warp arrays as the
@@ -2337,7 +2340,7 @@ def wc_sph_leapfrog_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
         result, dt = _wc_sph_pec_continuity_step(
             nnps, pa_index, dt, rho0, c0, p0, periodic_bounds, push,
             alpha, beta, eos, gamma, kernel, xsph_eps, adaptive_dt, cfl,
-            dt_min, dt_max
+            dt_min, dt_max, adaptive_dt_scale, step_dt_max
         )
         if return_dt:
             return result, dt
@@ -2355,6 +2358,7 @@ def wc_sph_leapfrog_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
             nnps, pa_index=pa_index, c0=c0, cfl=cfl, dt_min=dt_min,
             dt_max=dt_max, push=False
         )
+        dt = min(float(dt) * float(adaptive_dt_scale), float(step_dt_max))
     leapfrog_kick(pa, dt=0.5*dt, dim=nnps.dim, device=nnps.device,
                   push=False)
     if xsph_eps is None or xsph_eps == 0.0:

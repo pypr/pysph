@@ -5,7 +5,7 @@ created: 2026-06-16T12:30:00 CEST
 author: @kunalpuri-prediqt
 aspect: validation-benchmarks
 status: active
-last_checked: 2026-06-17T00:18:00 CEST
+last_checked: 2026-06-17T08:41:00 CEST
 ---
 
 # Experiment: Warp Elliptical-Drop Runner
@@ -211,10 +211,10 @@ Comparison outputs:
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/comparison-smoke.png
 ```
 
-Resolved PySPH Application vs Warp comparison, continuity-density parity:
+Resolved PySPH Application vs Warp comparison, timestep-policy parity:
 
 ```text
-$ python .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved_elliptical_drop_comparison.py --nx 100 --output-times 0.0008,0.0038 --prefix resolved-nx100-continuity --output-dir .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved --max-steps 10000000
+$ python .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved_elliptical_drop_comparison.py --nx 100 --output-times 0.0008,0.0038 --prefix resolved-nx100-timestep-policy --output-dir .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved --max-steps 10000000
 ```
 
 Case:
@@ -228,6 +228,7 @@ Tait EOS gamma=7.0
 alpha=0.1 beta=0.0
 XSPH eps=0.5
 density_mode=continuity
+warp_timestep_policy=pysph
 adaptive timestep cfl=0.3 n_damp=50
 checkpoints: 0.0008, 0.0038
 ```
@@ -236,34 +237,43 @@ Performance:
 
 | Backend | Wall time (s) | Steps | Average step time (s) | dt_min | dt_mean | dt_max |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| PySPH CPU Application | 228.25765374601178 | 1393 | 0.16386048366547867 | 2.2023818173548364e-06 | 2.7404840979225977e-06 | 2.780917055777183e-06 |
-| Warp GPU | 30.008050591000938 | 1804 | 0.01663417438525551 | 4.4383333813735604e-14 | 2.106430155210643e-06 | 2.1090202153573046e-06 |
+| PySPH CPU Application | 233.97314716299297 | 1393 | 0.16796349401507032 | 2.2023818173548364e-06 | 2.7404840979225977e-06 | 2.780917055777183e-06 |
+| Warp GPU | 23.629107111992198 | 1393 | 0.016962747388364823 | 2.7459356128852786e-09 | 2.727925340990668e-06 | 2.7813784981844947e-06 |
 
-Overall wall-time speedup: `7.606547218180963x`.
+Overall wall-time speedup: `9.901903870258701x`.
 
 Checkpoint metrics:
 
 | Time | Backend | Major axis | Minor axis | Exact major | Exact minor | rho_min | rho_max | Kinetic energy |
 | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 0.0008 | PySPH CPU | 1.0816640490130147 | 0.9220712094421513 | 1.0831034701687434 | 0.9232728243814081 | 0.9995725485493702 | 1.0055542309769985 | 7818.556269923258 |
-| 0.0008 | Warp GPU | 1.0816640853881836 | 0.9220711588859558 | 1.0831034701716546 | 0.9232728243789265 | 0.9995715618133545 | 1.0055574178695679 | 7818.55485157222 |
+| 0.0008 | Warp GPU | 1.0816634893417358 | 0.9220717549324036 | 1.0831034701687434 | 0.9232728243814081 | 0.9995719790458679 | 1.0055550336837769 | 7818.5528883068255 |
 | 0.0038 | PySPH CPU | 1.4365264918961826 | 0.6964109650387659 | 1.4392190525454083 | 0.6948212631228 | 0.9975631121324761 | 1.002131063362072 | 7797.707446258537 |
-| 0.0038 | Warp GPU | 1.4365280866622925 | 0.6964131593704224 | 1.4392190525454083 | 0.6948212631228 | 0.9975582957267761 | 1.0021319389343262 | 7797.707012490816 |
+| 0.0038 | Warp GPU | 1.4365261793136597 | 0.6964123249053955 | 1.4392190525454083 | 0.6948212631228 | 0.9975622892379761 | 1.0021320581436157 | 7797.707014434469 |
 
 CPU-vs-Warp deltas:
 
 | Time | Major axis delta | Minor axis delta | rho_min delta | rho_max delta | KE delta |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 0.0008 | 3.6375168877000874e-08 | -5.055619545224488e-08 | -9.867360156734506e-07 | 3.1868925693956385e-06 | -0.0014183510375005426 |
-| 0.0038 | 1.5947661098358878e-06 | 2.1943316564909665e-06 | -4.816405699936688e-06 | 8.755722542552746e-07 | -0.00043376772100600647 |
+| 0.0008 | -5.596712788769054e-07 | 5.454902523016614e-07 | -5.695035022457162e-07 | 8.027067783800135e-07 | -0.0033816164323070552 |
+| 0.0038 | -3.1258252297661215e-07 | 1.3598666296354978e-06 | -8.228944999855159e-07 | 9.947815438060559e-07 | -0.0004318240680731833 |
 
 Resolved outputs:
 
 ```text
-.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved/resolved-nx100-continuity-summary.json
-.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved/resolved-nx100-continuity-t0p0008000.png
-.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved/resolved-nx100-continuity-t0p0038000.png
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved/resolved-nx100-timestep-policy-summary.json
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved/resolved-nx100-timestep-policy-t0p0008000.png
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved/resolved-nx100-timestep-policy-t0p0038000.png
 ```
+
+Earlier continuity-density-only diagnostic run:
+
+- Same CPU baseline and physics, but Warp used the old runner policy that capped
+  `dt_max` to the initial timestep.
+- Warp took 1804 steps versus PySPH's 1393.
+- Warp `dt_max=2.1090202153573046e-06`, while PySPH grew to
+  `dt_max=2.780917055777183e-06`.
+- This explained the remaining step-count difference after density parity.
 
 Earlier summation-density diagnostic run:
 
@@ -312,20 +322,21 @@ Ramp output files:
 
 ## Interpretation
 
-The resolved `nx=100` continuity-density run is now an apples-to-apples
+The resolved `nx=100` timestep-policy run is now an apples-to-apples
 Application-backed comparison for the current prototype. Warp keeps the repeated
-state device-authoritative, evolves density through `arho`, and matches the
-PySPH CPU Application's shape, density, and kinetic-energy metrics to small
+state device-authoritative, evolves density through `arho`, follows PySPH's
+early `n_damp` timestep growth policy, and matches the PySPH CPU Application's
+step count, shape, density, and kinetic-energy metrics to small
 floating-point-scale deltas at both checkpoint times.
 
 The original summation-density resolved run is retained as diagnostic evidence,
 not as a benchmark. It explains why Warp previously took thousands more
 iterations: summation-density refreshes caused larger pressure/density
-excursions and collapsed the force timestep. With continuity-density staging,
-the Warp step count is 1804 versus PySPH's 1393, and the wall-time speedup is
-`7.606547218180963x`.
+excursions and collapsed the force timestep. Continuity-density staging fixed
+the physics mismatch, and PySPH-like timestep policy fixed the remaining step
+count mismatch.
 
-Remaining differences are now much more likely to be timestep policy and
-integrator staging details than a density-formulation mismatch. In particular,
-the Warp resolved runner caps `dt` to land exactly on output times, which
-explains the tiny reported `dt_min` at the final checkpoint.
+The final resolved run gives exact step-count parity (`1393` CPU and `1393`
+Warp steps) and `9.901903870258701x` wall-time speedup on this machine. The
+tiny Warp `dt_min` is from an output-time landing step; it no longer affects
+subsequent timestep growth.

@@ -239,10 +239,23 @@ python -m pytest pysph/base/tests/test_warp_sph.py -q
   `-4.816405699936688e-06`, `rho_max` delta was
   `8.755722542552746e-07`, and kinetic-energy delta was
   `-0.00043376772100600647`.
-- The remaining step-count difference is now attributed to timestep policy and
-  integrator staging details, especially the Warp comparison runner's explicit
-  `dt` cap to land exactly on requested output times, rather than a
-  density-formulation mismatch.
+- The old continuity-density run's remaining step-count difference was caused
+  by timestep policy, not the density formulation: the Warp runner capped
+  adaptive `dt` to the initial value while PySPH allowed the damped timestep to
+  grow after the `n_damp` ramp.
+- The timestep-policy parity run adds a PySPH-like policy to the resolved
+  runner: damp early timesteps with `n_damp`, allow adaptive growth through an
+  undamped `warp_dt_max`, and apply checkpoint landing caps only to the current
+  step. At `nx=100`, 31417 particles, PySPH CPU took
+  `233.97314716299297` s / 1393 steps, and Warp took
+  `23.629107111992198` s / 1393 steps, for
+  `9.901903870258701x` wall-time speedup. At `t=0.0038`, major-axis delta was
+  `-3.1258252297661215e-07`, minor-axis delta was
+  `1.3598666296354978e-06`, `rho_min` delta was
+  `-8.228944999855159e-07`, `rho_max` delta was
+  `9.947815438060559e-07`, and kinetic-energy delta was
+  `-0.0004318240680731833`. The very small Warp `dt_min` is an output-time
+  landing step and does not permanently shrink later adaptive steps.
 
 ## Key sub-topics
 

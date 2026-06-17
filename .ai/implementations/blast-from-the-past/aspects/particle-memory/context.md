@@ -36,7 +36,9 @@ device-authoritative. `density_mode='continuity'` stores `x0/y0/z0`,
 `u0/v0/w0`, and `rho0` on device, computes `arho` on device, and updates `rho`
 through WCSPH PEC-style stages without full host pulls/pushes inside the
 repeated stepping loop. The only per-step host handoff remains the scalar
-adaptive timestep.
+adaptive timestep. The PySPH-like `n_damp` and output-time landing policy is
+applied to that scalar only; it does not introduce particle-array transfers
+inside the step loop.
 
 ## Key sub-topics
 

@@ -646,6 +646,59 @@ def test_warp_adaptive_timestep_matches_cpu_reference_and_clamps():
     assert np.all(np.isfinite(pa.dt_force))
 
 
+def test_warp_leapfrog_adaptive_timestep_scale_and_step_cap():
+    def make_pa():
+        x = np.asarray([0.0, 0.2, 0.45, 0.7])
+        y = np.asarray([0.0, 0.03, -0.02, 0.1])
+        z = np.zeros_like(x)
+        return get_particle_array(
+            name='fluid',
+            x=x.copy(), y=y.copy(), z=z.copy(),
+            h=np.asarray([0.35, 0.35, 0.4, 0.35]),
+            m=np.asarray([1.0, 1.5, 1.2, 0.8]),
+            rho=np.ones_like(x),
+            p=np.zeros_like(x),
+            cs=np.ones_like(x) * 5.0,
+            u=np.asarray([1.0, -1.0, -0.2, 0.0]),
+            v=np.asarray([0.0, 0.05, -0.1, 0.0]),
+            w=z.copy(),
+            au=np.zeros_like(x), av=np.zeros_like(x), aw=np.zeros_like(x),
+            backend='warp',
+        )
+
+    raw_pa = make_pa()
+    raw_nnps = UniformGridWarpNNPS(
+        dim=2, particles=[raw_pa], radius_scale=2.0
+    )
+    _result, raw_dt = wc_sph_leapfrog_step(
+        raw_nnps, dt=1.0e-3, rho0=1.0, c0=5.0, adaptive_dt=True,
+        cfl=0.3, dt_min=1.0e-8, dt_max=1.0e-2, return_dt=True
+    )
+
+    scaled_pa = make_pa()
+    scaled_nnps = UniformGridWarpNNPS(
+        dim=2, particles=[scaled_pa], radius_scale=2.0
+    )
+    _result, scaled_dt = wc_sph_leapfrog_step(
+        scaled_nnps, dt=1.0e-3, rho0=1.0, c0=5.0, adaptive_dt=True,
+        cfl=0.3, dt_min=1.0e-8, dt_max=1.0e-2, return_dt=True,
+        adaptive_dt_scale=0.5
+    )
+
+    capped_pa = make_pa()
+    capped_nnps = UniformGridWarpNNPS(
+        dim=2, particles=[capped_pa], radius_scale=2.0
+    )
+    _result, capped_dt = wc_sph_leapfrog_step(
+        capped_nnps, dt=1.0e-3, rho0=1.0, c0=5.0, adaptive_dt=True,
+        cfl=0.3, dt_min=1.0e-8, dt_max=1.0e-2, return_dt=True,
+        step_dt_max=1.0e-7
+    )
+
+    assert np.isclose(scaled_dt, 0.5 * raw_dt)
+    assert np.isclose(capped_dt, 1.0e-7)
+
+
 def test_warp_wc_sph_euler_step_with_tait_eos_uses_sound_speed_in_avisc():
     x = np.asarray([0.0, 0.2, 0.45, 1.2])
     y = np.asarray([0.0, 0.1, -0.05, 0.2])

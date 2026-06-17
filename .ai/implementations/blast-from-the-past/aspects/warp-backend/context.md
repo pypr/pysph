@@ -26,6 +26,10 @@ CubicSpline/Gaussian kernel selection, summation density, isothermal/Tait EOS,
 continuity, pressure-gradient acceleration, Monaghan artificial viscosity,
 XSPH correction, KDK leapfrog, WCSPH PEC-style continuity-density staging,
 periodic position wrapping, and device-reduced WCSPH adaptive timestep factors.
+The leapfrog helper exposes scalar policy controls for adaptive timesteps:
+`adaptive_dt_scale` applies PySPH-style damping after the device reduction and
+`step_dt_max` caps only the current physical step, leaving full particle state
+device-resident.
 
 ## Key sub-topics
 
@@ -36,7 +40,8 @@ periodic position wrapping, and device-reduced WCSPH adaptive timestep factors.
 - Next kernel family decision: move add/remove/extract/append growth internals from host-side NumPy concatenation to fully device-side Warp kernels.
 - Tutorial documentation added at `docs/source/tutorial/warp_particle_array.rst`.
 - Adaptive timestep reductions currently transfer only the final scalar `dt`
-  back to Python because launch parameters remain host scalars.
+  back to Python because launch parameters remain host scalars. Runner-level
+  damping and checkpoint caps are scalar-only policy operations.
 - The PySPH Application parity step uses device-side saved state plus
   continuity-density PEC stages; the original summation-density KDK path remains
   the compatibility default.

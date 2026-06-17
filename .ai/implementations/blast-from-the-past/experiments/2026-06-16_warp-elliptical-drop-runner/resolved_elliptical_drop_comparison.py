@@ -33,6 +33,25 @@ def _checkpoint_label(t):
     return f't{t:.7f}'.replace('.', 'p')
 
 
+def _pysph_damping_factor(count, n_damp):
+    if count < n_damp and n_damp > 0:
+        fraction = (count + 1) / float(n_damp)
+        return 0.5 * (np.sin(np.pi * (-0.5 + fraction)) + 1.0)
+    return 1.0
+
+
+def _warp_timestep_controls(args, t, target, step):
+    remaining = target - t
+    if args.warp_timestep_policy == 'current':
+        return min(args.dt, remaining), 1.0, np.inf
+    if args.warp_timestep_policy != 'pysph':
+        raise ValueError(
+            "warp_timestep_policy must be 'current' or 'pysph'"
+        )
+    damping = _pysph_damping_factor(step, args.n_damp)
+    return args.warp_dt_max, damping, remaining
+
+
 def _metrics_from_arrays(arrays, solver_time, dt_history=None):
     x = arrays['x']
     y = arrays['y']
@@ -105,7 +124,7 @@ def _run_warp(args, out_dir, output_times):
         p0=args.p0, hdx=args.hdx, alpha=args.alpha, beta=args.beta,
         eos='tait', gamma=args.gamma, kernel='gaussian', xsph_eps=args.xsph_eps,
         adaptive_dt=True, cfl=args.cfl, dt_min=args.dt_min,
-        dt_max=args.dt, density_mode=args.warp_density_mode,
+        dt_max=args.warp_dt_max, density_mode=args.warp_density_mode,
     )
     pa = runner.create_particles()
     nnps = UniformGridWarpNNPS(
@@ -127,13 +146,16 @@ def _run_warp(args, out_dir, output_times):
             checkpoints[label] = {'path': str(path), 'metrics': metrics}
             target_index += 1
             continue
-        dt_cap = min(args.dt, remaining)
+        dt_cap, dt_scale, step_dt_max = _warp_timestep_controls(
+            args, t, target, step
+        )
         _result, dt_used = wc_sph_leapfrog_step(
             nnps, dt=args.dt, rho0=args.rho0, c0=args.c0, p0=args.p0,
             alpha=args.alpha, beta=args.beta, eos='tait', gamma=args.gamma,
             kernel='gaussian', xsph_eps=args.xsph_eps, adaptive_dt=True,
             cfl=args.cfl, dt_min=args.dt_min, dt_max=dt_cap, return_dt=True,
-            density_mode=args.warp_density_mode
+            density_mode=args.warp_density_mode,
+            adaptive_dt_scale=dt_scale, step_dt_max=step_dt_max,
         )
         dt_history.append(dt_used)
         t += dt_used
@@ -340,6 +362,7 @@ def _parse_args():
     parser.add_argument('--n-damp', type=int, default=50)
     parser.add_argument('--dt', type=float, default=None)
     parser.add_argument('--dt-min', type=float, default=1.0e-10)
+    parser.add_argument('--warp-dt-max', type=float, default=np.inf)
     parser.add_argument('--output-times', default='0.0008,0.0038')
     parser.add_argument('--output-tolerance', type=float, default=1.0e-10)
     parser.add_argument('--time-epsilon', type=float, default=1.0e-14)
@@ -349,6 +372,8 @@ def _parse_args():
     parser.add_argument('--warp-density-mode',
                         choices=('continuity', 'summation'),
                         default='continuity')
+    parser.add_argument('--warp-timestep-policy',
+                        choices=('pysph', 'current'), default='pysph')
     parser.add_argument('--skip-pysph-application', action='store_true')
     return parser.parse_args()
 
@@ -381,7 +406,9 @@ def main():
             'cfl': args.cfl,
             'n_damp': args.n_damp,
             'dt': args.dt,
+            'warp_dt_max': args.warp_dt_max,
             'warp_density_mode': args.warp_density_mode,
+            'warp_timestep_policy': args.warp_timestep_policy,
             'output_times': output_times,
         },
         'hardware': _hardware_summary(),
