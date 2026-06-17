@@ -26,7 +26,7 @@ class WarpEllipticalDropRunner:
                  p0=0.0, hdx=1.3, alpha=0.1, beta=0.0, eos='tait',
                  gamma=7.0, kernel='gaussian', radius_scale=None,
                  xsph_eps=0.5, adaptive_dt=False, cfl=0.25, dt_min=0.0,
-                 dt_max=None, output=None):
+                 dt_max=None, density_mode='summation', output=None):
         self.nx = int(nx)
         self.steps = int(steps)
         self.dt = float(dt)
@@ -49,6 +49,7 @@ class WarpEllipticalDropRunner:
         self.cfl = float(cfl)
         self.dt_min = float(dt_min)
         self.dt_max = self.dt if dt_max is None else float(dt_max)
+        self.density_mode = density_mode
         self.dx = 1.0 / self.nx
         self.output = Path(output) if output is not None else None
         self.dt_history = []
@@ -73,10 +74,23 @@ class WarpEllipticalDropRunner:
         au = np.zeros_like(x)
         av = np.zeros_like(x)
         aw = np.zeros_like(x)
+        arho = np.zeros_like(x)
+        ax = np.zeros_like(x)
+        ay = np.zeros_like(x)
+        az = np.zeros_like(x)
+        x0 = np.zeros_like(x)
+        y0 = np.zeros_like(x)
+        z0 = np.zeros_like(x)
+        u0 = np.zeros_like(x)
+        v0 = np.zeros_like(x)
+        w0 = np.zeros_like(x)
+        rho_ref = np.zeros_like(x)
 
         return get_particle_array(
             name='fluid', x=x, y=y, z=z, h=h, m=m, rho=rho, p=p,
-            cs=cs, u=u, v=v, w=w, au=au, av=av, aw=aw, backend='warp'
+            cs=cs, u=u, v=v, w=w, au=au, av=av, aw=aw, arho=arho,
+            ax=ax, ay=ay, az=az, x0=x0, y0=y0, z0=z0, u0=u0, v0=v0,
+            w0=w0, rho0=rho_ref, backend='warp'
         )
 
     def run(self):
@@ -92,7 +106,8 @@ class WarpEllipticalDropRunner:
                 alpha=self.alpha, beta=self.beta, eos=self.eos,
                 gamma=self.gamma, kernel=self.kernel, xsph_eps=self.xsph_eps,
                 adaptive_dt=self.adaptive_dt, cfl=self.cfl,
-                dt_min=self.dt_min, dt_max=self.dt_max, return_dt=True
+                dt_min=self.dt_min, dt_max=self.dt_max, return_dt=True,
+                density_mode=self.density_mode
             )
             self.dt_history.append(dt_used)
             time += dt_used
@@ -100,7 +115,7 @@ class WarpEllipticalDropRunner:
         pull_props = [
             'x', 'y', 'z', 'rho', 'p', 'cs', 'u', 'v', 'w', 'au', 'av', 'aw'
         ]
-        for optional in ('ax', 'ay', 'az', 'dt_cfl', 'dt_force'):
+        for optional in ('ax', 'ay', 'az', 'arho', 'dt_cfl', 'dt_force'):
             if optional in pa.properties:
                 pull_props.append(optional)
         pa.gpu.pull(*pull_props)
@@ -114,7 +129,7 @@ class WarpEllipticalDropRunner:
             'x', 'y', 'z', 'rho', 'p', 'cs', 'u', 'v', 'w', 'au', 'av', 'aw'
         ]
         finite_props.extend(
-            name for name in ('ax', 'ay', 'az', 'dt_cfl', 'dt_force')
+            name for name in ('ax', 'ay', 'az', 'arho', 'dt_cfl', 'dt_force')
             if name in pa.properties
         )
         finite = all(np.all(np.isfinite(getattr(pa, name)))
@@ -142,6 +157,7 @@ class WarpEllipticalDropRunner:
             'radius_scale': self.radius_scale,
             'xsph_eps': self.xsph_eps,
             'adaptive_dt': self.adaptive_dt,
+            'density_mode': self.density_mode,
             'cfl': self.cfl,
             'dt_min': self.dt_min,
             'dt_max': self.dt_max,
@@ -161,7 +177,7 @@ class WarpEllipticalDropRunner:
     def _write_output(self, pa, metrics):
         self.output.parent.mkdir(parents=True, exist_ok=True)
         optional = {}
-        for name in ('ax', 'ay', 'az', 'dt_cfl', 'dt_force'):
+        for name in ('ax', 'ay', 'az', 'arho', 'dt_cfl', 'dt_force'):
             if name in pa.properties:
                 optional[name] = getattr(pa, name)
         np.savez(
@@ -197,6 +213,8 @@ def _parse_args():
     parser.add_argument('--cfl', type=float, default=0.25)
     parser.add_argument('--dt-min', type=float, default=0.0)
     parser.add_argument('--dt-max', type=float, default=None)
+    parser.add_argument('--density-mode', choices=('summation', 'continuity'),
+                        default='summation')
     parser.add_argument('--output', default=None)
     return parser.parse_args()
 
@@ -210,7 +228,8 @@ def main():
         radius_scale=args.radius_scale,
         xsph_eps=None if args.no_xsph else args.xsph_eps,
         adaptive_dt=args.adaptive_dt, cfl=args.cfl, dt_min=args.dt_min,
-        dt_max=args.dt_max, output=args.output
+        dt_max=args.dt_max, density_mode=args.density_mode,
+        output=args.output
     )
     metrics = runner.run()
     print(json.dumps(metrics, indent=2, sort_keys=True))

@@ -153,6 +153,18 @@ Tait EOS proof:
 - Artificial viscosity now consumes `cs` through the same device-resident
   neighbor cache and computes `cij = 0.5*(d_cs + s_cs)`.
 
+Continuity-density repeated-step proof:
+
+- `wc_sph_leapfrog_step(..., density_mode='continuity')` now routes to a
+  PySPH `WCSPHStep`-style PEC path. It saves reference position/velocity/rho
+  state on device, computes Tait EOS, pressure-gradient/artificial-viscosity
+  acceleration, `ContinuityEquation` density rate, and XSPH correction from the
+  device-resident uniform-grid neighbor cache, applies stage1, rebuilds NNPS
+  from device positions, recomputes equations, and applies stage2.
+- The original KDK summation-density step remains the compatibility/default
+  path. The continuity path is the one used for PySPH Application parity in the
+  resolved elliptical-drop comparison.
+
 ## Key sub-topics
 
 - Existing `GPUNeighborCache` behavior.

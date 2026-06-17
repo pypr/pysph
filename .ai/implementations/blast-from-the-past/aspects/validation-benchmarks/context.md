@@ -219,10 +219,30 @@ python -m pytest pysph/base/tests/test_warp_sph.py -q
   particles; CPU `rho_min=0.534595094929311`, Warp
   `rho_min=0.534595251083374`; CPU kinetic energy `8078.179846214378`, Warp
   `8078.179766857993`.
-- This is now a near-formulation smoke/comparison path, but still not a
-  validated published elliptical-drop benchmark. The next validation escalation
-  should use the full PySPH `Application/Solver` outputs at `t=0.0008` and
-  `t=0.0038`.
+- Resolved `nx=100` Application-backed comparison:
+  `resolved_elliptical_drop_comparison.py` runs PySPH's
+  `elliptical_drop_no_scheme.py` Application baseline and the Warp runner at
+  `t=0.0008` and `t=0.0038`, writes side-by-side images with exact ellipse
+  overlays, and records timing/shape/density/energy metrics.
+- The first resolved run used Warp summation density while PySPH evolved
+  density through `ContinuityEquation`/`WCSPHStep`; it is now diagnostic only.
+  That mismatch caused larger density/pressure excursions and many small Warp
+  adaptive substeps: Warp took 4807 steps through `t=0.0038`, with density at
+  `t=0.0008` ranging from `0.9505811929702759` to `1.0439165830612183`.
+- The continuity-density parity run uses the new Warp PEC-style density path
+  (`density_mode='continuity'`). At `nx=100`, 31417 particles, PySPH CPU took
+  `228.25765374601178` s / 1393 steps, and Warp took
+  `30.008050591000938` s / 1804 steps, for `7.606547218180963x` wall-time
+  speedup. At `t=0.0038`, major-axis delta was
+  `1.5947661098358878e-06`, minor-axis delta was
+  `2.1943316564909665e-06`, `rho_min` delta was
+  `-4.816405699936688e-06`, `rho_max` delta was
+  `8.755722542552746e-07`, and kinetic-energy delta was
+  `-0.00043376772100600647`.
+- The remaining step-count difference is now attributed to timestep policy and
+  integrator staging details, especially the Warp comparison runner's explicit
+  `dt` cap to land exactly on requested output times, rather than a
+  density-formulation mismatch.
 
 ## Key sub-topics
 

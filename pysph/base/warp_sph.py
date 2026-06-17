@@ -1043,6 +1043,158 @@ if wp is not None:
 
 
     @wp.kernel
+    def _wcsph_save_state_f64(
+            x: wp.array(dtype=wp.float64),
+            y: wp.array(dtype=wp.float64),
+            z: wp.array(dtype=wp.float64),
+            u: wp.array(dtype=wp.float64),
+            v: wp.array(dtype=wp.float64),
+            w: wp.array(dtype=wp.float64),
+            rho: wp.array(dtype=wp.float64),
+            x0: wp.array(dtype=wp.float64),
+            y0: wp.array(dtype=wp.float64),
+            z0: wp.array(dtype=wp.float64),
+            u0: wp.array(dtype=wp.float64),
+            v0: wp.array(dtype=wp.float64),
+            w0: wp.array(dtype=wp.float64),
+            rho0: wp.array(dtype=wp.float64),
+            dim: wp.int32,
+    ):
+        i = wp.tid()
+        x0[i] = x[i]
+        u0[i] = u[i]
+        rho0[i] = rho[i]
+        if dim > wp.int32(1):
+            y0[i] = y[i]
+            v0[i] = v[i]
+        if dim > wp.int32(2):
+            z0[i] = z[i]
+            w0[i] = w[i]
+
+
+    @wp.kernel
+    def _wcsph_save_state_f32(
+            x: wp.array(dtype=wp.float32),
+            y: wp.array(dtype=wp.float32),
+            z: wp.array(dtype=wp.float32),
+            u: wp.array(dtype=wp.float32),
+            v: wp.array(dtype=wp.float32),
+            w: wp.array(dtype=wp.float32),
+            rho: wp.array(dtype=wp.float32),
+            x0: wp.array(dtype=wp.float32),
+            y0: wp.array(dtype=wp.float32),
+            z0: wp.array(dtype=wp.float32),
+            u0: wp.array(dtype=wp.float32),
+            v0: wp.array(dtype=wp.float32),
+            w0: wp.array(dtype=wp.float32),
+            rho0: wp.array(dtype=wp.float32),
+            dim: wp.int32,
+    ):
+        i = wp.tid()
+        x0[i] = x[i]
+        u0[i] = u[i]
+        rho0[i] = rho[i]
+        if dim > wp.int32(1):
+            y0[i] = y[i]
+            v0[i] = v[i]
+        if dim > wp.int32(2):
+            z0[i] = z[i]
+            w0[i] = w[i]
+
+
+    @wp.kernel
+    def _wcsph_pec_stage_f64(
+            x0: wp.array(dtype=wp.float64),
+            y0: wp.array(dtype=wp.float64),
+            z0: wp.array(dtype=wp.float64),
+            u0: wp.array(dtype=wp.float64),
+            v0: wp.array(dtype=wp.float64),
+            w0: wp.array(dtype=wp.float64),
+            rho0: wp.array(dtype=wp.float64),
+            x: wp.array(dtype=wp.float64),
+            y: wp.array(dtype=wp.float64),
+            z: wp.array(dtype=wp.float64),
+            u: wp.array(dtype=wp.float64),
+            v: wp.array(dtype=wp.float64),
+            w: wp.array(dtype=wp.float64),
+            rho: wp.array(dtype=wp.float64),
+            au: wp.array(dtype=wp.float64),
+            av: wp.array(dtype=wp.float64),
+            aw: wp.array(dtype=wp.float64),
+            ax: wp.array(dtype=wp.float64),
+            ay: wp.array(dtype=wp.float64),
+            az: wp.array(dtype=wp.float64),
+            arho: wp.array(dtype=wp.float64),
+            dt_factor: wp.float64,
+            dim: wp.int32,
+            use_xsph: wp.int32,
+    ):
+        i = wp.tid()
+        adv_x = u[i]
+        adv_y = v[i]
+        adv_z = w[i]
+        if use_xsph:
+            adv_x = adv_x + ax[i]
+            adv_y = adv_y + ay[i]
+            adv_z = adv_z + az[i]
+        u[i] = u0[i] + dt_factor * au[i]
+        rho[i] = rho0[i] + dt_factor * arho[i]
+        x[i] = x0[i] + dt_factor * adv_x
+        if dim > wp.int32(1):
+            v[i] = v0[i] + dt_factor * av[i]
+            y[i] = y0[i] + dt_factor * adv_y
+        if dim > wp.int32(2):
+            w[i] = w0[i] + dt_factor * aw[i]
+            z[i] = z0[i] + dt_factor * adv_z
+
+
+    @wp.kernel
+    def _wcsph_pec_stage_f32(
+            x0: wp.array(dtype=wp.float32),
+            y0: wp.array(dtype=wp.float32),
+            z0: wp.array(dtype=wp.float32),
+            u0: wp.array(dtype=wp.float32),
+            v0: wp.array(dtype=wp.float32),
+            w0: wp.array(dtype=wp.float32),
+            rho0: wp.array(dtype=wp.float32),
+            x: wp.array(dtype=wp.float32),
+            y: wp.array(dtype=wp.float32),
+            z: wp.array(dtype=wp.float32),
+            u: wp.array(dtype=wp.float32),
+            v: wp.array(dtype=wp.float32),
+            w: wp.array(dtype=wp.float32),
+            rho: wp.array(dtype=wp.float32),
+            au: wp.array(dtype=wp.float32),
+            av: wp.array(dtype=wp.float32),
+            aw: wp.array(dtype=wp.float32),
+            ax: wp.array(dtype=wp.float32),
+            ay: wp.array(dtype=wp.float32),
+            az: wp.array(dtype=wp.float32),
+            arho: wp.array(dtype=wp.float32),
+            dt_factor: wp.float32,
+            dim: wp.int32,
+            use_xsph: wp.int32,
+    ):
+        i = wp.tid()
+        adv_x = u[i]
+        adv_y = v[i]
+        adv_z = w[i]
+        if use_xsph:
+            adv_x = adv_x + ax[i]
+            adv_y = adv_y + ay[i]
+            adv_z = adv_z + az[i]
+        u[i] = u0[i] + dt_factor * au[i]
+        rho[i] = rho0[i] + dt_factor * arho[i]
+        x[i] = x0[i] + dt_factor * adv_x
+        if dim > wp.int32(1):
+            v[i] = v0[i] + dt_factor * av[i]
+            y[i] = y0[i] + dt_factor * adv_y
+        if dim > wp.int32(2):
+            w[i] = w0[i] + dt_factor * aw[i]
+            z[i] = z0[i] + dt_factor * adv_z
+
+
+    @wp.kernel
     def _wcsph_dt_factors_f64(
             d_x: wp.array(dtype=wp.float64),
             d_y: wp.array(dtype=wp.float64),
@@ -1837,6 +1989,88 @@ def leapfrog_drift_xsph(pa, dt, dim=3, device=None, push=True):
     return gpu.x, gpu.y, gpu.z
 
 
+def save_wcsph_state(pa, dim=3, device=None, push=True):
+    """Save WCSPH PEC reference position, velocity, and density on device."""
+    if wp is None:  # pragma: no cover
+        raise ImportError("warp is required for save_wcsph_state")
+
+    device = wp.get_device(device)
+    for prop in ('x0', 'y0', 'z0', 'u0', 'v0', 'w0', 'rho0'):
+        _ensure_property(pa, prop, device)
+    if push:
+        pa.gpu.push(
+            'x', 'y', 'z', 'u', 'v', 'w', 'rho',
+            'x0', 'y0', 'z0', 'u0', 'v0', 'w0', 'rho0'
+        )
+    gpu = pa.gpu
+    n = gpu.get_number_of_particles()
+    if gpu.x.dtype == np.float32:
+        kernel = _wcsph_save_state_f32
+    else:
+        kernel = _wcsph_save_state_f64
+    if n > 0:
+        wp.launch(
+            kernel,
+            dim=n,
+            inputs=[
+                gpu.x.dev, gpu.y.dev, gpu.z.dev,
+                gpu.u.dev, gpu.v.dev, gpu.w.dev, gpu.rho.dev,
+                gpu.x0.dev, gpu.y0.dev, gpu.z0.dev,
+                gpu.u0.dev, gpu.v0.dev, gpu.w0.dev, gpu.rho0.dev,
+                np.int32(dim)
+            ],
+            device=device,
+        )
+        wp.synchronize_device(device)
+    return gpu.x0, gpu.u0, gpu.rho0
+
+
+def wcsph_pec_stage(pa, dt, stage=1.0, dim=3, xsph=False, device=None,
+                    push=True):
+    """Apply one PySPH ``WCSPHStep``-style PEC stage on the device."""
+    if wp is None:  # pragma: no cover
+        raise ImportError("warp is required for wcsph_pec_stage")
+
+    device = wp.get_device(device)
+    for prop in (
+            'x0', 'y0', 'z0', 'u0', 'v0', 'w0', 'rho0',
+            'au', 'av', 'aw', 'ax', 'ay', 'az', 'arho',
+    ):
+        _ensure_property(pa, prop, device)
+    if push:
+        pa.gpu.push(
+            'x0', 'y0', 'z0', 'u0', 'v0', 'w0', 'rho0',
+            'x', 'y', 'z', 'u', 'v', 'w', 'rho',
+            'au', 'av', 'aw', 'ax', 'ay', 'az', 'arho'
+        )
+    gpu = pa.gpu
+    n = gpu.get_number_of_particles()
+    use_xsph = np.int32(bool(xsph))
+    if gpu.x.dtype == np.float32:
+        kernel = _wcsph_pec_stage_f32
+        dt_factor = np.float32(dt * stage)
+    else:
+        kernel = _wcsph_pec_stage_f64
+        dt_factor = np.float64(dt * stage)
+    if n > 0:
+        wp.launch(
+            kernel,
+            dim=n,
+            inputs=[
+                gpu.x0.dev, gpu.y0.dev, gpu.z0.dev,
+                gpu.u0.dev, gpu.v0.dev, gpu.w0.dev, gpu.rho0.dev,
+                gpu.x.dev, gpu.y.dev, gpu.z.dev,
+                gpu.u.dev, gpu.v.dev, gpu.w.dev, gpu.rho.dev,
+                gpu.au.dev, gpu.av.dev, gpu.aw.dev,
+                gpu.ax.dev, gpu.ay.dev, gpu.az.dev, gpu.arho.dev,
+                dt_factor, np.int32(dim), use_xsph
+            ],
+            device=device,
+        )
+        wp.synchronize_device(device)
+    return gpu.x, gpu.y, gpu.z, gpu.u, gpu.v, gpu.w, gpu.rho
+
+
 def compute_wcsph_adaptive_timestep(nnps, pa_index=0, c0=20.0, cfl=0.25,
                                     dt_min=0.0, dt_max=np.inf, push=True):
     """Compute WCSPH adaptive timestep with device reductions.
@@ -1997,11 +2231,19 @@ def wrap_periodic(pa, bounds, dim=3, device=None):
 
 
 def _compute_wcsph_acceleration(nnps, pa_index, rho0, c0, p0, alpha, beta,
-                                push, eos, gamma, kernel):
+                                push, eos, gamma, kernel,
+                                density_mode='summation'):
     pa = nnps.particles[pa_index]
-    compute_summation_density(
-        nnps, pa_index, pa_index, push=push, kernel=kernel
-    )
+    if density_mode == 'summation':
+        compute_summation_density(
+            nnps, pa_index, pa_index, push=push, kernel=kernel
+        )
+    elif density_mode == 'continuity':
+        _ensure_property(pa, 'arho', nnps.device)
+        if push:
+            pa.gpu.push('rho', 'arho')
+    else:
+        raise ValueError("density_mode must be 'summation' or 'continuity'")
     if eos == 'isothermal':
         compute_isothermal_eos(
             pa, rho0=rho0, c0=c0, p0=p0, device=nnps.device, push=False
@@ -2022,7 +2264,59 @@ def _compute_wcsph_acceleration(nnps, pa_index, rho0, c0, p0, alpha, beta,
             nnps, pa_index, pa_index, alpha=alpha, beta=beta, c0=c0,
             push=False, kernel=kernel
         )
+    if density_mode == 'continuity':
+        compute_continuity(
+            nnps, pa_index, pa_index, push=False, kernel=kernel
+        )
     return result
+
+
+def _compute_wcsph_xsph(nnps, pa_index, xsph_eps, kernel):
+    if xsph_eps is None or xsph_eps == 0.0:
+        return False
+    compute_xsph_correction(
+        nnps, pa_index, pa_index, eps=xsph_eps, push=False,
+        kernel=kernel
+    )
+    return True
+
+
+def _wc_sph_pec_continuity_step(nnps, pa_index, dt, rho0, c0, p0,
+                                periodic_bounds, push, alpha, beta, eos,
+                                gamma, kernel, xsph_eps, adaptive_dt, cfl,
+                                dt_min, dt_max):
+    pa = nnps.particles[pa_index]
+    if push:
+        nnps.update(push=True)
+    save_wcsph_state(pa, dim=nnps.dim, device=nnps.device, push=push)
+    _compute_wcsph_acceleration(
+        nnps, pa_index, rho0, c0, p0, alpha, beta, push=False,
+        eos=eos, gamma=gamma, kernel=kernel, density_mode='continuity'
+    )
+    if adaptive_dt:
+        dt = compute_wcsph_adaptive_timestep(
+            nnps, pa_index=pa_index, c0=c0, cfl=cfl, dt_min=dt_min,
+            dt_max=dt_max, push=False
+        )
+    use_xsph = _compute_wcsph_xsph(nnps, pa_index, xsph_eps, kernel)
+    wcsph_pec_stage(
+        pa, dt=dt, stage=0.5, dim=nnps.dim, xsph=use_xsph,
+        device=nnps.device, push=False
+    )
+    wrap_periodic(pa, periodic_bounds, dim=nnps.dim, device=nnps.device)
+    nnps.update(push=False)
+    _compute_wcsph_acceleration(
+        nnps, pa_index, rho0, c0, p0, alpha, beta, push=False,
+        eos=eos, gamma=gamma, kernel=kernel, density_mode='continuity'
+    )
+    use_xsph = _compute_wcsph_xsph(nnps, pa_index, xsph_eps, kernel)
+    result = wcsph_pec_stage(
+        pa, dt=dt, stage=1.0, dim=nnps.dim, xsph=use_xsph,
+        device=nnps.device, push=False
+    )
+    wrap_periodic(pa, periodic_bounds, dim=nnps.dim, device=nnps.device)
+    nnps.update(push=False)
+    return result, dt
 
 
 def wc_sph_leapfrog_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
@@ -2030,7 +2324,8 @@ def wc_sph_leapfrog_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
                          push=False, alpha=0.0, beta=0.0,
                          eos='isothermal', gamma=7.0, kernel='cubic',
                          xsph_eps=None, adaptive_dt=False, cfl=0.25,
-                         dt_min=0.0, dt_max=np.inf, return_dt=False):
+                         dt_min=0.0, dt_max=np.inf, return_dt=False,
+                         density_mode='summation'):
     """Run one minimal WCSPH KDK leapfrog step on the device.
 
     ``push`` defaults to ``False`` so repeated calls keep the Warp arrays as the
@@ -2038,11 +2333,22 @@ def wc_sph_leapfrog_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
     intentionally changed before the step.
     """
     pa = nnps.particles[pa_index]
+    if density_mode == 'continuity':
+        result, dt = _wc_sph_pec_continuity_step(
+            nnps, pa_index, dt, rho0, c0, p0, periodic_bounds, push,
+            alpha, beta, eos, gamma, kernel, xsph_eps, adaptive_dt, cfl,
+            dt_min, dt_max
+        )
+        if return_dt:
+            return result, dt
+        return result
+    if density_mode != 'summation':
+        raise ValueError("density_mode must be 'summation' or 'continuity'")
     if push:
         nnps.update(push=True)
     _compute_wcsph_acceleration(
         nnps, pa_index, rho0, c0, p0, alpha, beta, push=push,
-        eos=eos, gamma=gamma, kernel=kernel
+        eos=eos, gamma=gamma, kernel=kernel, density_mode='summation'
     )
     if adaptive_dt:
         dt = compute_wcsph_adaptive_timestep(
@@ -2067,7 +2373,7 @@ def wc_sph_leapfrog_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
     nnps.update(push=False)
     _compute_wcsph_acceleration(
         nnps, pa_index, rho0, c0, p0, alpha, beta, push=False,
-        eos=eos, gamma=gamma, kernel=kernel
+        eos=eos, gamma=gamma, kernel=kernel, density_mode='summation'
     )
     result = leapfrog_kick(pa, dt=0.5*dt, dim=nnps.dim, device=nnps.device,
                            push=False)

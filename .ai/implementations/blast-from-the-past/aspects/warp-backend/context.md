@@ -24,8 +24,8 @@ ADR-0002 accepted the DeviceHelper-like mirror direction. The prototype adds `py
 Warp equation kernels now cover the current elliptical-drop smoke formulation:
 CubicSpline/Gaussian kernel selection, summation density, isothermal/Tait EOS,
 continuity, pressure-gradient acceleration, Monaghan artificial viscosity,
-XSPH drift correction, KDK leapfrog, periodic position wrapping, and
-device-reduced WCSPH adaptive timestep factors.
+XSPH correction, KDK leapfrog, WCSPH PEC-style continuity-density staging,
+periodic position wrapping, and device-reduced WCSPH adaptive timestep factors.
 
 ## Key sub-topics
 
@@ -37,6 +37,9 @@ device-reduced WCSPH adaptive timestep factors.
 - Tutorial documentation added at `docs/source/tutorial/warp_particle_array.rst`.
 - Adaptive timestep reductions currently transfer only the final scalar `dt`
   back to Python because launch parameters remain host scalars.
+- The PySPH Application parity step uses device-side saved state plus
+  continuity-density PEC stages; the original summation-density KDK path remains
+  the compatibility default.
 
 ## References for this aspect
 

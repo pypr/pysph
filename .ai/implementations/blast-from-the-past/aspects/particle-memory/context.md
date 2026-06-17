@@ -31,6 +31,13 @@ adaptive dt pulls only the reduced scalar timestep needed as the next launch
 parameter, and the runner pulls full arrays only for explicit final metrics,
 checkpoint `.npz` output, and side-by-side plots.
 
+The PySPH Application parity path now also keeps density evolution
+device-authoritative. `density_mode='continuity'` stores `x0/y0/z0`,
+`u0/v0/w0`, and `rho0` on device, computes `arho` on device, and updates `rho`
+through WCSPH PEC-style stages without full host pulls/pushes inside the
+repeated stepping loop. The only per-step host handoff remains the scalar
+adaptive timestep.
+
 ## Key sub-topics
 
 - ParticleArray property ownership.

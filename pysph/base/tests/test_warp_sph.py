@@ -18,8 +18,8 @@ from pysph.base.warp_sph import (
     compute_artificial_viscosity, compute_continuity, compute_isothermal_eos,
     compute_pressure_gradient, compute_summation_density, compute_tait_eos,
     compute_wcsph_adaptive_timestep, compute_xsph_correction, euler_step,
-    leapfrog_drift, leapfrog_kick, wc_sph_euler_step, wc_sph_leapfrog_step,
-    wrap_periodic
+    leapfrog_drift, leapfrog_kick, save_wcsph_state, wc_sph_euler_step,
+    wc_sph_leapfrog_step, wcsph_pec_stage, wrap_periodic
 )
 
 
@@ -967,3 +967,130 @@ def test_warp_wc_sph_leapfrog_step_matches_cpu_expected_state():
     assert np.allclose(pa.x, x_np1, rtol=1e-5, atol=1e-5)
     assert np.allclose(pa.y, y_np1, rtol=1e-5, atol=1e-5)
     assert np.allclose(pa.z, z_np1, rtol=1e-5, atol=1e-5)
+
+
+def test_warp_wcsph_pec_stage_uses_saved_density_and_xsph_advection():
+    x = np.asarray([0.0, 0.2, 0.45])
+    y = np.asarray([0.0, 0.1, -0.05])
+    z = np.zeros_like(x)
+    rho = np.asarray([1.0, 1.1, 0.95])
+    u = np.asarray([0.1, -0.05, 0.2])
+    v = np.asarray([0.0, 0.15, -0.1])
+    w = np.zeros_like(x)
+    au = np.asarray([0.3, -0.2, 0.05])
+    av = np.asarray([-0.1, 0.25, 0.4])
+    aw = np.zeros_like(x)
+    ax = np.asarray([0.02, -0.01, 0.03])
+    ay = np.asarray([0.0, 0.015, -0.025])
+    az = np.zeros_like(x)
+    arho = np.asarray([0.4, -0.2, 0.1])
+    dt = 0.01
+    stage = 0.5
+    pa = get_particle_array(
+        name='fluid',
+        x=x.copy(), y=y.copy(), z=z.copy(),
+        u=u.copy(), v=v.copy(), w=w.copy(), rho=rho.copy(),
+        au=au.copy(), av=av.copy(), aw=aw.copy(),
+        ax=ax.copy(), ay=ay.copy(), az=az.copy(), arho=arho.copy(),
+        backend='warp',
+    )
+
+    save_wcsph_state(pa, dim=2)
+    wcsph_pec_stage(pa, dt=dt, stage=stage, dim=2, xsph=True, push=False)
+    pa.gpu.pull('x', 'y', 'rho', 'u', 'v')
+
+    dt_factor = dt * stage
+    assert np.allclose(pa.u, u + dt_factor * au)
+    assert np.allclose(pa.v, v + dt_factor * av)
+    assert np.allclose(pa.rho, rho + dt_factor * arho)
+    assert np.allclose(pa.x, x + dt_factor * (u + ax))
+    assert np.allclose(pa.y, y + dt_factor * (v + ay))
+
+
+def test_warp_wc_sph_leapfrog_continuity_mode_matches_cpu_pec_state():
+    x = np.asarray([0.0, 0.2, 0.45, 1.2])
+    y = np.asarray([0.0, 0.1, -0.05, 0.2])
+    z = np.zeros_like(x)
+    h = np.asarray([0.35, 0.35, 0.4, 0.35])
+    m = np.asarray([1.0, 1.5, 1.2, 0.8])
+    rho = np.asarray([1.0, 1.03, 0.98, 1.01])
+    u = np.asarray([0.1, -0.05, 0.2, 0.0])
+    v = np.asarray([0.0, 0.15, -0.1, 0.05])
+    w = np.zeros_like(x)
+    dt = 1.0e-3
+    rho0 = 1.0
+    c0 = 5.0
+    gamma = 7.0
+    xsph_eps = 0.5
+    pa = get_particle_array(
+        name='fluid',
+        x=x.copy(), y=y.copy(), z=z.copy(), h=h.copy(), m=m.copy(),
+        rho=rho.copy(), p=np.zeros_like(x), cs=np.ones_like(x)*c0,
+        u=u.copy(), v=v.copy(), w=w.copy(),
+        au=np.zeros_like(x), av=np.zeros_like(x), aw=np.zeros_like(x),
+        ax=np.zeros_like(x), ay=np.zeros_like(x), az=np.zeros_like(x),
+        arho=np.zeros_like(x), backend='warp',
+    )
+    p_n, cs_n = _cpu_tait_eos(rho, rho0=rho0, c0=c0, gamma=gamma)
+    cpu_n = get_particle_array(
+        name='cpu_n',
+        x=x.copy(), y=y.copy(), z=z.copy(), h=h.copy(), m=m.copy(),
+        rho=rho.copy(), p=p_n, cs=cs_n,
+        u=u.copy(), v=v.copy(), w=w.copy(), backend='warp',
+    )
+    particles_n = [cpu_n]
+    acc_n = _cpu_pressure_gradient(particles_n, 0, 0, dim=2)
+    arho_n = _cpu_continuity(particles_n, 0, 0, dim=2)
+    xsph_n = _cpu_xsph_correction(
+        particles_n, 0, 0, dim=2, eps=xsph_eps
+    )
+    u_half = u + 0.5 * dt * acc_n[:, 0]
+    v_half = v + 0.5 * dt * acc_n[:, 1]
+    w_half = w + 0.5 * dt * acc_n[:, 2]
+    rho_half = rho + 0.5 * dt * arho_n
+    x_half = x + 0.5 * dt * (u + xsph_n[:, 0])
+    y_half = y + 0.5 * dt * (v + xsph_n[:, 1])
+    z_half = z + 0.5 * dt * (w + xsph_n[:, 2])
+
+    p_half, cs_half = _cpu_tait_eos(
+        rho_half, rho0=rho0, c0=c0, gamma=gamma
+    )
+    cpu_half = get_particle_array(
+        name='cpu_half',
+        x=x_half.copy(), y=y_half.copy(), z=z_half.copy(),
+        h=h.copy(), m=m.copy(), rho=rho_half.copy(), p=p_half,
+        cs=cs_half, u=u_half.copy(), v=v_half.copy(), w=w_half.copy(),
+        backend='warp',
+    )
+    particles_half = [cpu_half]
+    acc_half = _cpu_pressure_gradient(particles_half, 0, 0, dim=2)
+    arho_half = _cpu_continuity(particles_half, 0, 0, dim=2)
+    xsph_half = _cpu_xsph_correction(
+        particles_half, 0, 0, dim=2, eps=xsph_eps
+    )
+    expected_u = u + dt * acc_half[:, 0]
+    expected_v = v + dt * acc_half[:, 1]
+    expected_w = w + dt * acc_half[:, 2]
+    expected_rho = rho + dt * arho_half
+    expected_x = x + dt * (u_half + xsph_half[:, 0])
+    expected_y = y + dt * (v_half + xsph_half[:, 1])
+    expected_z = z + dt * (w_half + xsph_half[:, 2])
+
+    nnps = UniformGridWarpNNPS(dim=2, particles=[pa], radius_scale=2.0)
+    wc_sph_leapfrog_step(
+        nnps, dt=dt, rho0=rho0, c0=c0, gamma=gamma, eos='tait',
+        xsph_eps=xsph_eps, density_mode='continuity'
+    )
+    pa.gpu.pull('x', 'y', 'z', 'rho', 'u', 'v', 'w', 'au', 'av', 'aw', 'arho')
+
+    assert np.allclose(pa.x, expected_x, rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.y, expected_y, rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.z, expected_z, rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.u, expected_u, rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.v, expected_v, rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.w, expected_w, rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.rho, expected_rho, rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.au, acc_half[:, 0], rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.av, acc_half[:, 1], rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.aw, acc_half[:, 2], rtol=1e-5, atol=1e-5)
+    assert np.allclose(pa.arho, arho_half, rtol=1e-5, atol=1e-5)
