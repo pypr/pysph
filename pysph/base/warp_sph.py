@@ -281,43 +281,6 @@ if wp is not None:
 
 
     @wp.kernel
-    def _summation_density_f64(
-            s_x: wp.array(dtype=wp.float64),
-            s_y: wp.array(dtype=wp.float64),
-            s_z: wp.array(dtype=wp.float64),
-            s_h: wp.array(dtype=wp.float64),
-            s_m: wp.array(dtype=wp.float64),
-            d_x: wp.array(dtype=wp.float64),
-            d_y: wp.array(dtype=wp.float64),
-            d_z: wp.array(dtype=wp.float64),
-            d_h: wp.array(dtype=wp.float64),
-            starts: wp.array(dtype=wp.int32),
-            lengths: wp.array(dtype=wp.int32),
-            neighbors: wp.array(dtype=wp.uint32),
-            dim: wp.int32,
-            kernel_id: wp.int32,
-            d_rho: wp.array(dtype=wp.float64),
-    ):
-        i = wp.tid()
-        total = wp.float64(0.0)
-        start = starts[i]
-        stop = start + lengths[i]
-        for pos in range(start, stop):
-            j = wp.int32(neighbors[pos])
-            dx = d_x[i] - s_x[j]
-            dy = wp.float64(0.0)
-            dz = wp.float64(0.0)
-            if dim > wp.int32(1):
-                dy = d_y[i] - s_y[j]
-            if dim > wp.int32(2):
-                dz = d_z[i] - s_z[j]
-            rij = wp.sqrt(dx*dx + dy*dy + dz*dz)
-            hij = wp.float64(0.5) * (d_h[i] + s_h[j])
-            total += s_m[j] * _kernel_value_f64(rij, hij, dim, kernel_id)
-        d_rho[i] = total
-
-
-    @wp.kernel
     def _isothermal_eos_f64(
             rho: wp.array(dtype=wp.float64),
             p: wp.array(dtype=wp.float64),
@@ -379,498 +342,6 @@ if wp is not None:
         tmp = wp.pow(ratio, gamma)
         p[i] = p0 + b * (tmp - wp.float32(1.0))
         cs[i] = c0 * wp.pow(ratio, gamma1)
-
-
-    @wp.kernel
-    def _continuity_f64(
-            s_x: wp.array(dtype=wp.float64),
-            s_y: wp.array(dtype=wp.float64),
-            s_z: wp.array(dtype=wp.float64),
-            s_h: wp.array(dtype=wp.float64),
-            s_m: wp.array(dtype=wp.float64),
-            s_u: wp.array(dtype=wp.float64),
-            s_v: wp.array(dtype=wp.float64),
-            s_w: wp.array(dtype=wp.float64),
-            d_x: wp.array(dtype=wp.float64),
-            d_y: wp.array(dtype=wp.float64),
-            d_z: wp.array(dtype=wp.float64),
-            d_h: wp.array(dtype=wp.float64),
-            d_u: wp.array(dtype=wp.float64),
-            d_v: wp.array(dtype=wp.float64),
-            d_w: wp.array(dtype=wp.float64),
-            starts: wp.array(dtype=wp.int32),
-            lengths: wp.array(dtype=wp.int32),
-            neighbors: wp.array(dtype=wp.uint32),
-            dim: wp.int32,
-            kernel_id: wp.int32,
-            d_arho: wp.array(dtype=wp.float64),
-    ):
-        i = wp.tid()
-        total = wp.float64(0.0)
-        start = starts[i]
-        stop = start + lengths[i]
-        for pos in range(start, stop):
-            j = wp.int32(neighbors[pos])
-            dx = d_x[i] - s_x[j]
-            dy = wp.float64(0.0)
-            dz = wp.float64(0.0)
-            if dim > wp.int32(1):
-                dy = d_y[i] - s_y[j]
-            if dim > wp.int32(2):
-                dz = d_z[i] - s_z[j]
-            rij = wp.sqrt(dx*dx + dy*dy + dz*dz)
-            hij = wp.float64(0.5) * (d_h[i] + s_h[j])
-            tmp = wp.float64(0.0)
-            if rij > wp.float64(1.0e-12):
-                tmp = _kernel_dwdq_f64(rij, hij, dim, kernel_id) / (hij * rij)
-            dwx = tmp * dx
-            dwy = tmp * dy
-            dwz = tmp * dz
-            vijx = d_u[i] - s_u[j]
-            vijy = d_v[i] - s_v[j]
-            vijz = d_w[i] - s_w[j]
-            total += s_m[j] * (vijx*dwx + vijy*dwy + vijz*dwz)
-        d_arho[i] = total
-
-
-    @wp.kernel
-    def _continuity_f32(
-            s_x: wp.array(dtype=wp.float32),
-            s_y: wp.array(dtype=wp.float32),
-            s_z: wp.array(dtype=wp.float32),
-            s_h: wp.array(dtype=wp.float32),
-            s_m: wp.array(dtype=wp.float32),
-            s_u: wp.array(dtype=wp.float32),
-            s_v: wp.array(dtype=wp.float32),
-            s_w: wp.array(dtype=wp.float32),
-            d_x: wp.array(dtype=wp.float32),
-            d_y: wp.array(dtype=wp.float32),
-            d_z: wp.array(dtype=wp.float32),
-            d_h: wp.array(dtype=wp.float32),
-            d_u: wp.array(dtype=wp.float32),
-            d_v: wp.array(dtype=wp.float32),
-            d_w: wp.array(dtype=wp.float32),
-            starts: wp.array(dtype=wp.int32),
-            lengths: wp.array(dtype=wp.int32),
-            neighbors: wp.array(dtype=wp.uint32),
-            dim: wp.int32,
-            kernel_id: wp.int32,
-            d_arho: wp.array(dtype=wp.float32),
-    ):
-        i = wp.tid()
-        total = wp.float32(0.0)
-        start = starts[i]
-        stop = start + lengths[i]
-        for pos in range(start, stop):
-            j = wp.int32(neighbors[pos])
-            dx = d_x[i] - s_x[j]
-            dy = wp.float32(0.0)
-            dz = wp.float32(0.0)
-            if dim > wp.int32(1):
-                dy = d_y[i] - s_y[j]
-            if dim > wp.int32(2):
-                dz = d_z[i] - s_z[j]
-            rij = wp.sqrt(dx*dx + dy*dy + dz*dz)
-            hij = wp.float32(0.5) * (d_h[i] + s_h[j])
-            tmp = wp.float32(0.0)
-            if rij > wp.float32(1.0e-12):
-                tmp = _kernel_dwdq_f32(rij, hij, dim, kernel_id) / (hij * rij)
-            dwx = tmp * dx
-            dwy = tmp * dy
-            dwz = tmp * dz
-            vijx = d_u[i] - s_u[j]
-            vijy = d_v[i] - s_v[j]
-            vijz = d_w[i] - s_w[j]
-            total += s_m[j] * (vijx*dwx + vijy*dwy + vijz*dwz)
-        d_arho[i] = total
-
-
-    @wp.kernel
-    def _pressure_gradient_f64(
-            s_x: wp.array(dtype=wp.float64),
-            s_y: wp.array(dtype=wp.float64),
-            s_z: wp.array(dtype=wp.float64),
-            s_h: wp.array(dtype=wp.float64),
-            s_m: wp.array(dtype=wp.float64),
-            s_rho: wp.array(dtype=wp.float64),
-            s_p: wp.array(dtype=wp.float64),
-            d_x: wp.array(dtype=wp.float64),
-            d_y: wp.array(dtype=wp.float64),
-            d_z: wp.array(dtype=wp.float64),
-            d_h: wp.array(dtype=wp.float64),
-            d_rho: wp.array(dtype=wp.float64),
-            d_p: wp.array(dtype=wp.float64),
-            starts: wp.array(dtype=wp.int32),
-            lengths: wp.array(dtype=wp.int32),
-            neighbors: wp.array(dtype=wp.uint32),
-            dim: wp.int32,
-            kernel_id: wp.int32,
-            d_au: wp.array(dtype=wp.float64),
-            d_av: wp.array(dtype=wp.float64),
-            d_aw: wp.array(dtype=wp.float64),
-    ):
-        i = wp.tid()
-        au = wp.float64(0.0)
-        av = wp.float64(0.0)
-        aw = wp.float64(0.0)
-        rhoi21 = wp.float64(1.0) / (d_rho[i] * d_rho[i])
-        tmpi = d_p[i] * rhoi21
-        start = starts[i]
-        stop = start + lengths[i]
-        for pos in range(start, stop):
-            j = wp.int32(neighbors[pos])
-            dx = d_x[i] - s_x[j]
-            dy = wp.float64(0.0)
-            dz = wp.float64(0.0)
-            if dim > wp.int32(1):
-                dy = d_y[i] - s_y[j]
-            if dim > wp.int32(2):
-                dz = d_z[i] - s_z[j]
-            rij = wp.sqrt(dx*dx + dy*dy + dz*dz)
-            hij = wp.float64(0.5) * (d_h[i] + s_h[j])
-            grad = wp.float64(0.0)
-            if rij > wp.float64(1.0e-12):
-                grad = _kernel_dwdq_f64(rij, hij, dim, kernel_id) / (hij * rij)
-            dwx = grad * dx
-            dwy = grad * dy
-            dwz = grad * dz
-            rhoj21 = wp.float64(1.0) / (s_rho[j] * s_rho[j])
-            tmp = tmpi + s_p[j] * rhoj21
-            fac = -s_m[j] * tmp
-            au += fac * dwx
-            av += fac * dwy
-            aw += fac * dwz
-        d_au[i] = au
-        d_av[i] = av
-        d_aw[i] = aw
-
-
-    @wp.kernel
-    def _pressure_gradient_f32(
-            s_x: wp.array(dtype=wp.float32),
-            s_y: wp.array(dtype=wp.float32),
-            s_z: wp.array(dtype=wp.float32),
-            s_h: wp.array(dtype=wp.float32),
-            s_m: wp.array(dtype=wp.float32),
-            s_rho: wp.array(dtype=wp.float32),
-            s_p: wp.array(dtype=wp.float32),
-            d_x: wp.array(dtype=wp.float32),
-            d_y: wp.array(dtype=wp.float32),
-            d_z: wp.array(dtype=wp.float32),
-            d_h: wp.array(dtype=wp.float32),
-            d_rho: wp.array(dtype=wp.float32),
-            d_p: wp.array(dtype=wp.float32),
-            starts: wp.array(dtype=wp.int32),
-            lengths: wp.array(dtype=wp.int32),
-            neighbors: wp.array(dtype=wp.uint32),
-            dim: wp.int32,
-            kernel_id: wp.int32,
-            d_au: wp.array(dtype=wp.float32),
-            d_av: wp.array(dtype=wp.float32),
-            d_aw: wp.array(dtype=wp.float32),
-    ):
-        i = wp.tid()
-        au = wp.float32(0.0)
-        av = wp.float32(0.0)
-        aw = wp.float32(0.0)
-        rhoi21 = wp.float32(1.0) / (d_rho[i] * d_rho[i])
-        tmpi = d_p[i] * rhoi21
-        start = starts[i]
-        stop = start + lengths[i]
-        for pos in range(start, stop):
-            j = wp.int32(neighbors[pos])
-            dx = d_x[i] - s_x[j]
-            dy = wp.float32(0.0)
-            dz = wp.float32(0.0)
-            if dim > wp.int32(1):
-                dy = d_y[i] - s_y[j]
-            if dim > wp.int32(2):
-                dz = d_z[i] - s_z[j]
-            rij = wp.sqrt(dx*dx + dy*dy + dz*dz)
-            hij = wp.float32(0.5) * (d_h[i] + s_h[j])
-            grad = wp.float32(0.0)
-            if rij > wp.float32(1.0e-12):
-                grad = _kernel_dwdq_f32(rij, hij, dim, kernel_id) / (hij * rij)
-            dwx = grad * dx
-            dwy = grad * dy
-            dwz = grad * dz
-            rhoj21 = wp.float32(1.0) / (s_rho[j] * s_rho[j])
-            tmp = tmpi + s_p[j] * rhoj21
-            fac = -s_m[j] * tmp
-            au += fac * dwx
-            av += fac * dwy
-            aw += fac * dwz
-        d_au[i] = au
-        d_av[i] = av
-        d_aw[i] = aw
-
-
-    @wp.kernel
-    def _artificial_viscosity_f64(
-            s_x: wp.array(dtype=wp.float64),
-            s_y: wp.array(dtype=wp.float64),
-            s_z: wp.array(dtype=wp.float64),
-            s_h: wp.array(dtype=wp.float64),
-            s_m: wp.array(dtype=wp.float64),
-            s_rho: wp.array(dtype=wp.float64),
-            s_cs: wp.array(dtype=wp.float64),
-            s_u: wp.array(dtype=wp.float64),
-            s_v: wp.array(dtype=wp.float64),
-            s_w: wp.array(dtype=wp.float64),
-            d_x: wp.array(dtype=wp.float64),
-            d_y: wp.array(dtype=wp.float64),
-            d_z: wp.array(dtype=wp.float64),
-            d_h: wp.array(dtype=wp.float64),
-            d_rho: wp.array(dtype=wp.float64),
-            d_cs: wp.array(dtype=wp.float64),
-            d_u: wp.array(dtype=wp.float64),
-            d_v: wp.array(dtype=wp.float64),
-            d_w: wp.array(dtype=wp.float64),
-            starts: wp.array(dtype=wp.int32),
-            lengths: wp.array(dtype=wp.int32),
-            neighbors: wp.array(dtype=wp.uint32),
-            dim: wp.int32,
-            kernel_id: wp.int32,
-            alpha: wp.float64,
-            beta: wp.float64,
-            d_au: wp.array(dtype=wp.float64),
-            d_av: wp.array(dtype=wp.float64),
-            d_aw: wp.array(dtype=wp.float64),
-    ):
-        i = wp.tid()
-        au = d_au[i]
-        av = d_av[i]
-        aw = d_aw[i]
-        start = starts[i]
-        stop = start + lengths[i]
-        for pos in range(start, stop):
-            j = wp.int32(neighbors[pos])
-            dx = d_x[i] - s_x[j]
-            dy = wp.float64(0.0)
-            dz = wp.float64(0.0)
-            if dim > wp.int32(1):
-                dy = d_y[i] - s_y[j]
-            if dim > wp.int32(2):
-                dz = d_z[i] - s_z[j]
-            vijx = d_u[i] - s_u[j]
-            vijy = wp.float64(0.0)
-            vijz = wp.float64(0.0)
-            if dim > wp.int32(1):
-                vijy = d_v[i] - s_v[j]
-            if dim > wp.int32(2):
-                vijz = d_w[i] - s_w[j]
-            vdotx = vijx*dx + vijy*dy + vijz*dz
-            if vdotx < wp.float64(0.0):
-                rij2 = dx*dx + dy*dy + dz*dz
-                rij = wp.sqrt(rij2)
-                hij = wp.float64(0.5) * (d_h[i] + s_h[j])
-                grad = wp.float64(0.0)
-                if rij > wp.float64(1.0e-12):
-                    grad = _kernel_dwdq_f64(rij, hij, dim, kernel_id) / (hij * rij)
-                mu = hij * vdotx / (rij2 + wp.float64(0.01)*hij*hij)
-                rhoij1 = wp.float64(2.0) / (d_rho[i] + s_rho[j])
-                cij = wp.float64(0.5) * (d_cs[i] + s_cs[j])
-                piij = (-alpha*cij*mu + beta*mu*mu) * rhoij1
-                fac = -s_m[j] * piij
-                au += fac * grad * dx
-                av += fac * grad * dy
-                aw += fac * grad * dz
-        d_au[i] = au
-        d_av[i] = av
-        d_aw[i] = aw
-
-
-    @wp.kernel
-    def _artificial_viscosity_f32(
-            s_x: wp.array(dtype=wp.float32),
-            s_y: wp.array(dtype=wp.float32),
-            s_z: wp.array(dtype=wp.float32),
-            s_h: wp.array(dtype=wp.float32),
-            s_m: wp.array(dtype=wp.float32),
-            s_rho: wp.array(dtype=wp.float32),
-            s_cs: wp.array(dtype=wp.float32),
-            s_u: wp.array(dtype=wp.float32),
-            s_v: wp.array(dtype=wp.float32),
-            s_w: wp.array(dtype=wp.float32),
-            d_x: wp.array(dtype=wp.float32),
-            d_y: wp.array(dtype=wp.float32),
-            d_z: wp.array(dtype=wp.float32),
-            d_h: wp.array(dtype=wp.float32),
-            d_rho: wp.array(dtype=wp.float32),
-            d_cs: wp.array(dtype=wp.float32),
-            d_u: wp.array(dtype=wp.float32),
-            d_v: wp.array(dtype=wp.float32),
-            d_w: wp.array(dtype=wp.float32),
-            starts: wp.array(dtype=wp.int32),
-            lengths: wp.array(dtype=wp.int32),
-            neighbors: wp.array(dtype=wp.uint32),
-            dim: wp.int32,
-            kernel_id: wp.int32,
-            alpha: wp.float32,
-            beta: wp.float32,
-            d_au: wp.array(dtype=wp.float32),
-            d_av: wp.array(dtype=wp.float32),
-            d_aw: wp.array(dtype=wp.float32),
-    ):
-        i = wp.tid()
-        au = d_au[i]
-        av = d_av[i]
-        aw = d_aw[i]
-        start = starts[i]
-        stop = start + lengths[i]
-        for pos in range(start, stop):
-            j = wp.int32(neighbors[pos])
-            dx = d_x[i] - s_x[j]
-            dy = wp.float32(0.0)
-            dz = wp.float32(0.0)
-            if dim > wp.int32(1):
-                dy = d_y[i] - s_y[j]
-            if dim > wp.int32(2):
-                dz = d_z[i] - s_z[j]
-            vijx = d_u[i] - s_u[j]
-            vijy = wp.float32(0.0)
-            vijz = wp.float32(0.0)
-            if dim > wp.int32(1):
-                vijy = d_v[i] - s_v[j]
-            if dim > wp.int32(2):
-                vijz = d_w[i] - s_w[j]
-            vdotx = vijx*dx + vijy*dy + vijz*dz
-            if vdotx < wp.float32(0.0):
-                rij2 = dx*dx + dy*dy + dz*dz
-                rij = wp.sqrt(rij2)
-                hij = wp.float32(0.5) * (d_h[i] + s_h[j])
-                grad = wp.float32(0.0)
-                if rij > wp.float32(1.0e-12):
-                    grad = _kernel_dwdq_f32(rij, hij, dim, kernel_id) / (hij * rij)
-                mu = hij * vdotx / (rij2 + wp.float32(0.01)*hij*hij)
-                rhoij1 = wp.float32(2.0) / (d_rho[i] + s_rho[j])
-                cij = wp.float32(0.5) * (d_cs[i] + s_cs[j])
-                piij = (-alpha*cij*mu + beta*mu*mu) * rhoij1
-                fac = -s_m[j] * piij
-                au += fac * grad * dx
-                av += fac * grad * dy
-                aw += fac * grad * dz
-        d_au[i] = au
-        d_av[i] = av
-        d_aw[i] = aw
-
-
-    @wp.kernel
-    def _xsph_correction_f64(
-            s_x: wp.array(dtype=wp.float64),
-            s_y: wp.array(dtype=wp.float64),
-            s_z: wp.array(dtype=wp.float64),
-            s_h: wp.array(dtype=wp.float64),
-            s_m: wp.array(dtype=wp.float64),
-            s_rho: wp.array(dtype=wp.float64),
-            s_u: wp.array(dtype=wp.float64),
-            s_v: wp.array(dtype=wp.float64),
-            s_w: wp.array(dtype=wp.float64),
-            d_x: wp.array(dtype=wp.float64),
-            d_y: wp.array(dtype=wp.float64),
-            d_z: wp.array(dtype=wp.float64),
-            d_h: wp.array(dtype=wp.float64),
-            d_rho: wp.array(dtype=wp.float64),
-            d_u: wp.array(dtype=wp.float64),
-            d_v: wp.array(dtype=wp.float64),
-            d_w: wp.array(dtype=wp.float64),
-            starts: wp.array(dtype=wp.int32),
-            lengths: wp.array(dtype=wp.int32),
-            neighbors: wp.array(dtype=wp.uint32),
-            dim: wp.int32,
-            kernel_id: wp.int32,
-            eps: wp.float64,
-            d_ax: wp.array(dtype=wp.float64),
-            d_ay: wp.array(dtype=wp.float64),
-            d_az: wp.array(dtype=wp.float64),
-    ):
-        i = wp.tid()
-        ax = wp.float64(0.0)
-        ay = wp.float64(0.0)
-        az = wp.float64(0.0)
-        start = starts[i]
-        stop = start + lengths[i]
-        for pos in range(start, stop):
-            j = wp.int32(neighbors[pos])
-            dx = d_x[i] - s_x[j]
-            dy = wp.float64(0.0)
-            dz = wp.float64(0.0)
-            if dim > wp.int32(1):
-                dy = d_y[i] - s_y[j]
-            if dim > wp.int32(2):
-                dz = d_z[i] - s_z[j]
-            rij = wp.sqrt(dx*dx + dy*dy + dz*dz)
-            hij = wp.float64(0.5) * (d_h[i] + s_h[j])
-            wij = _kernel_value_f64(rij, hij, dim, kernel_id)
-            rhoij1 = wp.float64(2.0) / (d_rho[i] + s_rho[j])
-            tmp = -eps * s_m[j] * wij * rhoij1
-            ax += tmp * (d_u[i] - s_u[j])
-            if dim > wp.int32(1):
-                ay += tmp * (d_v[i] - s_v[j])
-            if dim > wp.int32(2):
-                az += tmp * (d_w[i] - s_w[j])
-        d_ax[i] = ax
-        d_ay[i] = ay
-        d_az[i] = az
-
-
-    @wp.kernel
-    def _xsph_correction_f32(
-            s_x: wp.array(dtype=wp.float32),
-            s_y: wp.array(dtype=wp.float32),
-            s_z: wp.array(dtype=wp.float32),
-            s_h: wp.array(dtype=wp.float32),
-            s_m: wp.array(dtype=wp.float32),
-            s_rho: wp.array(dtype=wp.float32),
-            s_u: wp.array(dtype=wp.float32),
-            s_v: wp.array(dtype=wp.float32),
-            s_w: wp.array(dtype=wp.float32),
-            d_x: wp.array(dtype=wp.float32),
-            d_y: wp.array(dtype=wp.float32),
-            d_z: wp.array(dtype=wp.float32),
-            d_h: wp.array(dtype=wp.float32),
-            d_rho: wp.array(dtype=wp.float32),
-            d_u: wp.array(dtype=wp.float32),
-            d_v: wp.array(dtype=wp.float32),
-            d_w: wp.array(dtype=wp.float32),
-            starts: wp.array(dtype=wp.int32),
-            lengths: wp.array(dtype=wp.int32),
-            neighbors: wp.array(dtype=wp.uint32),
-            dim: wp.int32,
-            kernel_id: wp.int32,
-            eps: wp.float32,
-            d_ax: wp.array(dtype=wp.float32),
-            d_ay: wp.array(dtype=wp.float32),
-            d_az: wp.array(dtype=wp.float32),
-    ):
-        i = wp.tid()
-        ax = wp.float32(0.0)
-        ay = wp.float32(0.0)
-        az = wp.float32(0.0)
-        start = starts[i]
-        stop = start + lengths[i]
-        for pos in range(start, stop):
-            j = wp.int32(neighbors[pos])
-            dx = d_x[i] - s_x[j]
-            dy = wp.float32(0.0)
-            dz = wp.float32(0.0)
-            if dim > wp.int32(1):
-                dy = d_y[i] - s_y[j]
-            if dim > wp.int32(2):
-                dz = d_z[i] - s_z[j]
-            rij = wp.sqrt(dx*dx + dy*dy + dz*dz)
-            hij = wp.float32(0.5) * (d_h[i] + s_h[j])
-            wij = _kernel_value_f32(rij, hij, dim, kernel_id)
-            rhoij1 = wp.float32(2.0) / (d_rho[i] + s_rho[j])
-            tmp = -eps * s_m[j] * wij * rhoij1
-            ax += tmp * (d_u[i] - s_u[j])
-            if dim > wp.int32(1):
-                ay += tmp * (d_v[i] - s_v[j])
-            if dim > wp.int32(2):
-                az += tmp * (d_w[i] - s_w[j])
-        d_ax[i] = ax
-        d_ay[i] = ay
-        d_az[i] = az
 
 
     @wp.kernel
@@ -1196,254 +667,6 @@ if wp is not None:
 
 
     @wp.kernel
-    def _wcsph_dt_factors_f64(
-            d_x: wp.array(dtype=wp.float64),
-            d_y: wp.array(dtype=wp.float64),
-            d_z: wp.array(dtype=wp.float64),
-            d_h: wp.array(dtype=wp.float64),
-            d_u: wp.array(dtype=wp.float64),
-            d_v: wp.array(dtype=wp.float64),
-            d_w: wp.array(dtype=wp.float64),
-            d_au: wp.array(dtype=wp.float64),
-            d_av: wp.array(dtype=wp.float64),
-            d_aw: wp.array(dtype=wp.float64),
-            starts: wp.array(dtype=wp.int32),
-            lengths: wp.array(dtype=wp.int32),
-            neighbors: wp.array(dtype=wp.uint32),
-            dim: wp.int32,
-            c0: wp.float64,
-            d_dt_cfl: wp.array(dtype=wp.float64),
-            d_dt_force: wp.array(dtype=wp.float64),
-    ):
-        i = wp.tid()
-        cfl_fac = wp.float64(0.0)
-        start = starts[i]
-        stop = start + lengths[i]
-        for pos in range(start, stop):
-            j = wp.int32(neighbors[pos])
-            dx = d_x[i] - d_x[j]
-            dy = wp.float64(0.0)
-            dz = wp.float64(0.0)
-            vijx = d_u[i] - d_u[j]
-            vijy = wp.float64(0.0)
-            vijz = wp.float64(0.0)
-            if dim > wp.int32(1):
-                dy = d_y[i] - d_y[j]
-                vijy = d_v[i] - d_v[j]
-            if dim > wp.int32(2):
-                dz = d_z[i] - d_z[j]
-                vijz = d_w[i] - d_w[j]
-            rij2 = dx*dx + dy*dy + dz*dz
-            if rij2 > wp.float64(1.0e-12):
-                hij = wp.float64(0.5) * (d_h[i] + d_h[j])
-                vdotx = vijx*dx + vijy*dy + vijz*dz
-                factor = wp.abs(hij * vdotx / rij2) + c0
-                cfl_fac = wp.max(cfl_fac, factor)
-        d_dt_cfl[i] = cfl_fac
-        d_dt_force[i] = d_au[i]*d_au[i] + d_av[i]*d_av[i] + d_aw[i]*d_aw[i]
-
-
-    @wp.kernel
-    def _wcsph_dt_factors_f32(
-            d_x: wp.array(dtype=wp.float32),
-            d_y: wp.array(dtype=wp.float32),
-            d_z: wp.array(dtype=wp.float32),
-            d_h: wp.array(dtype=wp.float32),
-            d_u: wp.array(dtype=wp.float32),
-            d_v: wp.array(dtype=wp.float32),
-            d_w: wp.array(dtype=wp.float32),
-            d_au: wp.array(dtype=wp.float32),
-            d_av: wp.array(dtype=wp.float32),
-            d_aw: wp.array(dtype=wp.float32),
-            starts: wp.array(dtype=wp.int32),
-            lengths: wp.array(dtype=wp.int32),
-            neighbors: wp.array(dtype=wp.uint32),
-            dim: wp.int32,
-            c0: wp.float32,
-            d_dt_cfl: wp.array(dtype=wp.float32),
-            d_dt_force: wp.array(dtype=wp.float32),
-    ):
-        i = wp.tid()
-        cfl_fac = wp.float32(0.0)
-        start = starts[i]
-        stop = start + lengths[i]
-        for pos in range(start, stop):
-            j = wp.int32(neighbors[pos])
-            dx = d_x[i] - d_x[j]
-            dy = wp.float32(0.0)
-            dz = wp.float32(0.0)
-            vijx = d_u[i] - d_u[j]
-            vijy = wp.float32(0.0)
-            vijz = wp.float32(0.0)
-            if dim > wp.int32(1):
-                dy = d_y[i] - d_y[j]
-                vijy = d_v[i] - d_v[j]
-            if dim > wp.int32(2):
-                dz = d_z[i] - d_z[j]
-                vijz = d_w[i] - d_w[j]
-            rij2 = dx*dx + dy*dy + dz*dz
-            if rij2 > wp.float32(1.0e-12):
-                hij = wp.float32(0.5) * (d_h[i] + d_h[j])
-                vdotx = vijx*dx + vijy*dy + vijz*dz
-                factor = wp.abs(hij * vdotx / rij2) + c0
-                cfl_fac = wp.max(cfl_fac, factor)
-        d_dt_cfl[i] = cfl_fac
-        d_dt_force[i] = d_au[i]*d_au[i] + d_av[i]*d_av[i] + d_aw[i]*d_aw[i]
-
-
-    @wp.kernel
-    def _wcsph_dt_factors_grid_f64(
-            d_x: wp.array(dtype=wp.float64),
-            d_y: wp.array(dtype=wp.float64),
-            d_z: wp.array(dtype=wp.float64),
-            d_h: wp.array(dtype=wp.float64),
-            d_u: wp.array(dtype=wp.float64),
-            d_v: wp.array(dtype=wp.float64),
-            d_w: wp.array(dtype=wp.float64),
-            d_au: wp.array(dtype=wp.float64),
-            d_av: wp.array(dtype=wp.float64),
-            d_aw: wp.array(dtype=wp.float64),
-            cell_starts: wp.array(dtype=wp.int32),
-            cell_counts: wp.array(dtype=wp.int32),
-            cell_particles: wp.array(dtype=wp.uint32),
-            xmin: wp.float64,
-            ymin: wp.float64,
-            zmin: wp.float64,
-            cell_size: wp.float64,
-            nx: wp.int32,
-            ny: wp.int32,
-            nz: wp.int32,
-            ncells: wp.int32,
-            radius_scale: wp.float64,
-            dim: wp.int32,
-            c0: wp.float64,
-            d_dt_cfl: wp.array(dtype=wp.float64),
-            d_dt_force: wp.array(dtype=wp.float64),
-    ):
-        i = wp.tid()
-        cfl_fac = wp.float64(0.0)
-        ix0 = wp.int32(wp.floor((d_x[i] - xmin) / cell_size))
-        iy0 = wp.int32(0)
-        iz0 = wp.int32(0)
-        if dim > wp.int32(1):
-            iy0 = wp.int32(wp.floor((d_y[i] - ymin) / cell_size))
-        if dim > wp.int32(2):
-            iz0 = wp.int32(wp.floor((d_z[i] - zmin) / cell_size))
-        for dzc in range(-1, 2):
-            for dyc in range(-1, 2):
-                for dxc in range(-1, 2):
-                    ix = ix0 + wp.int32(dxc)
-                    iy = iy0 + wp.int32(dyc)
-                    iz = iz0 + wp.int32(dzc)
-                    if ix >= 0 and ix < nx and iy >= 0 and iy < ny and iz >= 0 and iz < nz:
-                        cid = ix + iy * nx + iz * nx * ny
-                        if cid >= 0 and cid < ncells:
-                            start = cell_starts[cid]
-                            stop = start + cell_counts[cid]
-                            for pos in range(start, stop):
-                                j = wp.int32(cell_particles[pos])
-                                dx = d_x[i] - d_x[j]
-                                dy = wp.float64(0.0)
-                                dz = wp.float64(0.0)
-                                vijx = d_u[i] - d_u[j]
-                                vijy = wp.float64(0.0)
-                                vijz = wp.float64(0.0)
-                                if dim > wp.int32(1):
-                                    dy = d_y[i] - d_y[j]
-                                    vijy = d_v[i] - d_v[j]
-                                if dim > wp.int32(2):
-                                    dz = d_z[i] - d_z[j]
-                                    vijz = d_w[i] - d_w[j]
-                                rij2 = dx*dx + dy*dy + dz*dz
-                                hi_ = radius_scale * d_h[i]
-                                hj_ = radius_scale * d_h[j]
-                                if rij2 < hi_*hi_ or rij2 < hj_*hj_:
-                                    if rij2 > wp.float64(1.0e-12):
-                                        hij = wp.float64(0.5) * (d_h[i] + d_h[j])
-                                        vdotx = vijx*dx + vijy*dy + vijz*dz
-                                        factor = wp.abs(hij * vdotx / rij2) + c0
-                                        cfl_fac = wp.max(cfl_fac, factor)
-        d_dt_cfl[i] = cfl_fac
-        d_dt_force[i] = d_au[i]*d_au[i] + d_av[i]*d_av[i] + d_aw[i]*d_aw[i]
-
-
-    @wp.kernel
-    def _wcsph_dt_factors_grid_f32(
-            d_x: wp.array(dtype=wp.float32),
-            d_y: wp.array(dtype=wp.float32),
-            d_z: wp.array(dtype=wp.float32),
-            d_h: wp.array(dtype=wp.float32),
-            d_u: wp.array(dtype=wp.float32),
-            d_v: wp.array(dtype=wp.float32),
-            d_w: wp.array(dtype=wp.float32),
-            d_au: wp.array(dtype=wp.float32),
-            d_av: wp.array(dtype=wp.float32),
-            d_aw: wp.array(dtype=wp.float32),
-            cell_starts: wp.array(dtype=wp.int32),
-            cell_counts: wp.array(dtype=wp.int32),
-            cell_particles: wp.array(dtype=wp.uint32),
-            xmin: wp.float32,
-            ymin: wp.float32,
-            zmin: wp.float32,
-            cell_size: wp.float32,
-            nx: wp.int32,
-            ny: wp.int32,
-            nz: wp.int32,
-            ncells: wp.int32,
-            radius_scale: wp.float32,
-            dim: wp.int32,
-            c0: wp.float32,
-            d_dt_cfl: wp.array(dtype=wp.float32),
-            d_dt_force: wp.array(dtype=wp.float32),
-    ):
-        i = wp.tid()
-        cfl_fac = wp.float32(0.0)
-        ix0 = wp.int32(wp.floor((d_x[i] - xmin) / cell_size))
-        iy0 = wp.int32(0)
-        iz0 = wp.int32(0)
-        if dim > wp.int32(1):
-            iy0 = wp.int32(wp.floor((d_y[i] - ymin) / cell_size))
-        if dim > wp.int32(2):
-            iz0 = wp.int32(wp.floor((d_z[i] - zmin) / cell_size))
-        for dzc in range(-1, 2):
-            for dyc in range(-1, 2):
-                for dxc in range(-1, 2):
-                    ix = ix0 + wp.int32(dxc)
-                    iy = iy0 + wp.int32(dyc)
-                    iz = iz0 + wp.int32(dzc)
-                    if ix >= 0 and ix < nx and iy >= 0 and iy < ny and iz >= 0 and iz < nz:
-                        cid = ix + iy * nx + iz * nx * ny
-                        if cid >= 0 and cid < ncells:
-                            start = cell_starts[cid]
-                            stop = start + cell_counts[cid]
-                            for pos in range(start, stop):
-                                j = wp.int32(cell_particles[pos])
-                                dx = d_x[i] - d_x[j]
-                                dy = wp.float32(0.0)
-                                dz = wp.float32(0.0)
-                                vijx = d_u[i] - d_u[j]
-                                vijy = wp.float32(0.0)
-                                vijz = wp.float32(0.0)
-                                if dim > wp.int32(1):
-                                    dy = d_y[i] - d_y[j]
-                                    vijy = d_v[i] - d_v[j]
-                                if dim > wp.int32(2):
-                                    dz = d_z[i] - d_z[j]
-                                    vijz = d_w[i] - d_w[j]
-                                rij2 = dx*dx + dy*dy + dz*dz
-                                hi_ = radius_scale * d_h[i]
-                                hj_ = radius_scale * d_h[j]
-                                if rij2 < hi_*hi_ or rij2 < hj_*hj_:
-                                    if rij2 > wp.float32(1.0e-12):
-                                        hij = wp.float32(0.5) * (d_h[i] + d_h[j])
-                                        vdotx = vijx*dx + vijy*dy + vijz*dz
-                                        factor = wp.abs(hij * vdotx / rij2) + c0
-                                        cfl_fac = wp.max(cfl_fac, factor)
-        d_dt_cfl[i] = cfl_fac
-        d_dt_force[i] = d_au[i]*d_au[i] + d_av[i]*d_av[i] + d_aw[i]*d_aw[i]
-
-
-    @wp.kernel
     def _wcsph_dt_init_f64(
             max_cfl: wp.array(dtype=wp.float64),
             max_force: wp.array(dtype=wp.float64),
@@ -1613,43 +836,6 @@ if wp is not None:
             z[i] = _wrap_value_f32(z[i], zmin, zmax)
 
 
-    @wp.kernel
-    def _summation_density_f32(
-            s_x: wp.array(dtype=wp.float32),
-            s_y: wp.array(dtype=wp.float32),
-            s_z: wp.array(dtype=wp.float32),
-            s_h: wp.array(dtype=wp.float32),
-            s_m: wp.array(dtype=wp.float32),
-            d_x: wp.array(dtype=wp.float32),
-            d_y: wp.array(dtype=wp.float32),
-            d_z: wp.array(dtype=wp.float32),
-            d_h: wp.array(dtype=wp.float32),
-            starts: wp.array(dtype=wp.int32),
-            lengths: wp.array(dtype=wp.int32),
-            neighbors: wp.array(dtype=wp.uint32),
-            dim: wp.int32,
-            kernel_id: wp.int32,
-            d_rho: wp.array(dtype=wp.float32),
-    ):
-        i = wp.tid()
-        total = wp.float32(0.0)
-        start = starts[i]
-        stop = start + lengths[i]
-        for pos in range(start, stop):
-            j = wp.int32(neighbors[pos])
-            dx = d_x[i] - s_x[j]
-            dy = wp.float32(0.0)
-            dz = wp.float32(0.0)
-            if dim > wp.int32(1):
-                dy = d_y[i] - s_y[j]
-            if dim > wp.int32(2):
-                dz = d_z[i] - s_z[j]
-            rij = wp.sqrt(dx*dx + dy*dy + dz*dz)
-            hij = wp.float32(0.5) * (d_h[i] + s_h[j])
-            total += s_m[j] * _kernel_value_f32(rij, hij, dim, kernel_id)
-        d_rho[i] = total
-
-
 if wp is not None:
     # Device wp.func objects referenced by generated group kernels. Seeded into
     # the generated kernels' namespace so Warp can resolve them (ADR-0003).
@@ -1762,6 +948,89 @@ _WCSPH_CONTINUITY_BLOCKS = (
 )
 
 
+class SummationDensity(WarpEquation):
+    """PySPH ``SummationDensity`` as a composable Warp block."""
+    src_arrays = ('m',)
+    out_arrays = ('rho',)
+    requires = ('rij', 'hij', 'wij')
+
+    def loop(self):
+        return "        _acc_rho += s_m[j] * wij"
+
+
+class WcsphCflFactor(WarpEquation):
+    """WCSPH adaptive-timestep per-particle factors as a Warp block.
+
+    ``dt_cfl`` is the neighbor max-reduction of the viscous CFL factor
+    ``|hij * (vij . xij) / rij^2| + c0`` (expressed via a free-form ``wp.max``
+    accumulation, valid because the factor is non-negative so a zero seed is the
+    max identity); ``dt_force`` is the neighbor-independent squared acceleration,
+    written in ``post_loop``. Replaces the hand-written ``_wcsph_dt_factors``
+    kernels (both flat and grid, via ``neighbor_mode``).
+    """
+    dst_arrays = ('au', 'av', 'aw')
+    out_arrays = ('dt_cfl', 'dt_force')
+    scalars = ('c0',)
+    requires = ('dx', 'dy', 'dz', 'rij2', 'hij', 'vijx', 'vijy', 'vijz')
+
+    def loop(self):
+        return (
+            "        if rij2 > TYPE(1.0e-12):\n"
+            "            cfl_vdotx_ = vijx*dx + vijy*dy + vijz*dz\n"
+            "            cfl_factor_ = wp.abs(hij * cfl_vdotx_ / rij2) + c0\n"
+            "            _acc_dt_cfl = wp.max(_acc_dt_cfl, cfl_factor_)"
+        )
+
+    def post_loop(self):
+        return (
+            "    d_dt_force[i] = d_au[i]*d_au[i] + d_av[i]*d_av[i]"
+            " + d_aw[i]*d_aw[i]"
+        )
+
+
+def _run_equation_group(nnps, src_index, dst_index, blocks, scalar_values=None,
+                        kernel='cubic', cache=None, neighbor_mode='flat',
+                        accumulate_outputs=False):
+    """Build (or fetch) the generated group kernel for ``blocks`` and launch it.
+
+    Binds device arrays/scalars in the generator's canonical order and writes
+    into the destination ``out_arrays``. ``neighbor_mode='grid'`` walks the
+    uniform-grid cell list (ignores ``cache``); ``'flat'`` uses the CSR cache
+    (built here if ``None``). ``accumulate_outputs=True`` adds to the existing
+    destination arrays (read-modify-write). Self- and cross-array (``src !=
+    dst``) are both supported because the generator emits ``s_``/``d_`` arrays
+    separately. EOS / property / push handling stays with the caller.
+    """
+    if wp is None:  # pragma: no cover
+        raise ImportError("warp is required for _run_equation_group")
+    scalar_values = scalar_values or {}
+    src = nnps.particles[src_index].gpu
+    dst = nnps.particles[dst_index].gpu
+    ndst = dst.get_number_of_particles()
+    if ndst <= 0:
+        return
+    dtype = np.float32 if src.x.dtype == np.float32 else np.float64
+    group = build_group_kernel(
+        blocks, dtype, _WARP_DEVICE_FUNCS, neighbor_mode=neighbor_mode,
+        accumulate_outputs=accumulate_outputs,
+    )
+    inputs = [src.get_device_array(n).dev for n in group.src_names]
+    inputs += [dst.get_device_array(n).dev for n in group.dst_names]
+    if neighbor_mode == 'grid':
+        inputs += _grid_launch_args(nnps, src_index, dtype)
+    else:
+        if cache is None:
+            cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
+        inputs += [
+            cache['starts_dev'], cache['lengths_dev'], cache['neighbors_dev'],
+        ]
+    inputs += [np.int32(nnps.dim), _kernel_id(kernel)]
+    inputs += [dtype(scalar_values[n]) for n in group.scalar_names]
+    inputs += [dst.get_device_array(n).dev for n in group.out_names]
+    wp.launch(group.kernel, dim=ndst, inputs=inputs, device=nnps.device)
+    wp.synchronize_device(nnps.device)
+
+
 def _ensure_warp_helper(pa, device):
     if pa.gpu is None or getattr(pa.gpu, 'backend', None) != 'warp':
         pa.set_device_helper(WarpDeviceHelper(pa, backend='warp',
@@ -1809,6 +1078,11 @@ def compute_summation_density(nnps, src_index=0, dst_index=0,
     """
     if wp is None:  # pragma: no cover
         raise ImportError("warp is required for compute_summation_density")
+    if out_prop != 'rho':
+        raise ValueError(
+            "compute_summation_density writes the generated SummationDensity "
+            "block's canonical 'rho' array; a custom out_prop is not supported."
+        )
 
     src_pa = nnps.particles[src_index]
     dst_pa = nnps.particles[dst_index]
@@ -1817,33 +1091,11 @@ def compute_summation_density(nnps, src_index=0, dst_index=0,
     if push:
         src_pa.gpu.push('x', 'y', 'z', 'h', 'm')
         dst_pa.gpu.push('x', 'y', 'z', 'h', out_prop)
-    if cache is None:
-        cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
-    src = src_pa.gpu
-    dst = dst_pa.gpu
-    out = dst.get_device_array(out_prop)
-    ndst = dst.get_number_of_particles()
-    kernel_id = _kernel_id(kernel)
-
-    if src.x.dtype == np.float32:
-        equation_kernel = _summation_density_f32
-    else:
-        equation_kernel = _summation_density_f64
-
-    if ndst > 0:
-        wp.launch(
-            equation_kernel,
-            dim=ndst,
-            inputs=[
-                src.x.dev, src.y.dev, src.z.dev, src.h.dev, src.m.dev,
-                dst.x.dev, dst.y.dev, dst.z.dev, dst.h.dev,
-                cache['starts_dev'], cache['lengths_dev'],
-                cache['neighbors_dev'], np.int32(nnps.dim), kernel_id, out.dev
-            ],
-            device=nnps.device,
-        )
-        wp.synchronize_device(nnps.device)
-    return out
+    _run_equation_group(
+        nnps, src_index, dst_index, [SummationDensity()],
+        kernel=kernel, cache=cache,
+    )
+    return dst_pa.gpu.get_device_array(out_prop)
 
 
 def compute_isothermal_eos(pa, rho0, c0, p0=0.0, out_prop='p',
@@ -1932,6 +1184,11 @@ def compute_continuity(nnps, src_index=0, dst_index=0, out_prop='arho',
     """Compute PySPH ``ContinuityEquation`` with Warp."""
     if wp is None:  # pragma: no cover
         raise ImportError("warp is required for compute_continuity")
+    if out_prop != 'arho':
+        raise ValueError(
+            "compute_continuity writes the generated ContinuityEquation "
+            "block's canonical 'arho' array; a custom out_prop is not supported."
+        )
 
     src_pa = nnps.particles[src_index]
     dst_pa = nnps.particles[dst_index]
@@ -1940,34 +1197,11 @@ def compute_continuity(nnps, src_index=0, dst_index=0, out_prop='arho',
     if push:
         src_pa.gpu.push('x', 'y', 'z', 'h', 'm', 'u', 'v', 'w')
         dst_pa.gpu.push('x', 'y', 'z', 'h', 'u', 'v', 'w', out_prop)
-    if cache is None:
-        cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
-    src = src_pa.gpu
-    dst = dst_pa.gpu
-    out = dst.get_device_array(out_prop)
-    ndst = dst.get_number_of_particles()
-    kernel_id = _kernel_id(kernel)
-    if src.x.dtype == np.float32:
-        equation_kernel = _continuity_f32
-    else:
-        equation_kernel = _continuity_f64
-
-    if ndst > 0:
-        wp.launch(
-            equation_kernel,
-            dim=ndst,
-            inputs=[
-                src.x.dev, src.y.dev, src.z.dev, src.h.dev, src.m.dev,
-                src.u.dev, src.v.dev, src.w.dev,
-                dst.x.dev, dst.y.dev, dst.z.dev, dst.h.dev,
-                dst.u.dev, dst.v.dev, dst.w.dev,
-                cache['starts_dev'], cache['lengths_dev'],
-                cache['neighbors_dev'], np.int32(nnps.dim), kernel_id, out.dev
-            ],
-            device=nnps.device,
-        )
-        wp.synchronize_device(nnps.device)
-    return out
+    _run_equation_group(
+        nnps, src_index, dst_index, [ContinuityEquation()],
+        kernel=kernel, cache=cache,
+    )
+    return dst_pa.gpu.get_device_array(out_prop)
 
 
 def compute_pressure_gradient(nnps, src_index=0, dst_index=0,
@@ -1976,6 +1210,11 @@ def compute_pressure_gradient(nnps, src_index=0, dst_index=0,
     """Compute the inviscid pressure-gradient part of WCSPH momentum."""
     if wp is None:  # pragma: no cover
         raise ImportError("warp is required for compute_pressure_gradient")
+    if tuple(out_props) != ('au', 'av', 'aw'):
+        raise ValueError(
+            "compute_pressure_gradient writes the generated PressureGradient "
+            "block's canonical ('au','av','aw'); custom out_props unsupported."
+        )
 
     src_pa = nnps.particles[src_index]
     dst_pa = nnps.particles[dst_index]
@@ -1985,37 +1224,16 @@ def compute_pressure_gradient(nnps, src_index=0, dst_index=0,
     if push:
         src_pa.gpu.push('x', 'y', 'z', 'h', 'm', 'rho', 'p')
         dst_pa.gpu.push('x', 'y', 'z', 'h', 'rho', 'p', *out_props)
-    if cache is None:
-        cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
-    src = src_pa.gpu
+    _run_equation_group(
+        nnps, src_index, dst_index, [PressureGradient()],
+        kernel=kernel, cache=cache,
+    )
     dst = dst_pa.gpu
-    au = dst.get_device_array(out_props[0])
-    av = dst.get_device_array(out_props[1])
-    aw = dst.get_device_array(out_props[2])
-    ndst = dst.get_number_of_particles()
-    kernel_id = _kernel_id(kernel)
-    if src.x.dtype == np.float32:
-        equation_kernel = _pressure_gradient_f32
-    else:
-        equation_kernel = _pressure_gradient_f64
-
-    if ndst > 0:
-        wp.launch(
-            equation_kernel,
-            dim=ndst,
-            inputs=[
-                src.x.dev, src.y.dev, src.z.dev, src.h.dev, src.m.dev,
-                src.rho.dev, src.p.dev,
-                dst.x.dev, dst.y.dev, dst.z.dev, dst.h.dev,
-                dst.rho.dev, dst.p.dev,
-                cache['starts_dev'], cache['lengths_dev'],
-                cache['neighbors_dev'], np.int32(nnps.dim), kernel_id,
-                au.dev, av.dev, aw.dev
-            ],
-            device=nnps.device,
-        )
-        wp.synchronize_device(nnps.device)
-    return au, av, aw
+    return (
+        dst.get_device_array(out_props[0]),
+        dst.get_device_array(out_props[1]),
+        dst.get_device_array(out_props[2]),
+    )
 
 
 def compute_artificial_viscosity(nnps, src_index=0, dst_index=0, alpha=0.1,
@@ -2025,6 +1243,12 @@ def compute_artificial_viscosity(nnps, src_index=0, dst_index=0, alpha=0.1,
     """Add Monaghan artificial viscosity to WCSPH acceleration arrays."""
     if wp is None:  # pragma: no cover
         raise ImportError("warp is required for compute_artificial_viscosity")
+    if tuple(out_props) != ('au', 'av', 'aw'):
+        raise ValueError(
+            "compute_artificial_viscosity writes the generated "
+            "ArtificialViscosity block's canonical ('au','av','aw'); custom "
+            "out_props unsupported."
+        )
 
     src_pa = nnps.particles[src_index]
     dst_pa = nnps.particles[dst_index]
@@ -2039,41 +1263,20 @@ def compute_artificial_viscosity(nnps, src_index=0, dst_index=0, alpha=0.1,
         dst_pa.gpu.push(
             'x', 'y', 'z', 'h', 'rho', 'cs', 'u', 'v', 'w', *out_props
         )
-    if cache is None:
-        cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
-    src = src_pa.gpu
+    # Monaghan viscosity composes onto any prior pressure-gradient
+    # acceleration, so the generated group must add to the existing au/av/aw
+    # (read-modify-write) rather than overwrite -- matching the hand kernel.
+    _run_equation_group(
+        nnps, src_index, dst_index, [ArtificialViscosity()],
+        scalar_values={'alpha': alpha, 'beta': beta},
+        kernel=kernel, cache=cache, accumulate_outputs=True,
+    )
     dst = dst_pa.gpu
-    au = dst.get_device_array(out_props[0])
-    av = dst.get_device_array(out_props[1])
-    aw = dst.get_device_array(out_props[2])
-    ndst = dst.get_number_of_particles()
-    kernel_id = _kernel_id(kernel)
-    if src.x.dtype == np.float32:
-        equation_kernel = _artificial_viscosity_f32
-        alpha = np.float32(alpha)
-        beta = np.float32(beta)
-    else:
-        equation_kernel = _artificial_viscosity_f64
-        alpha = np.float64(alpha)
-        beta = np.float64(beta)
-
-    if ndst > 0:
-        wp.launch(
-            equation_kernel,
-            dim=ndst,
-            inputs=[
-                src.x.dev, src.y.dev, src.z.dev, src.h.dev, src.m.dev,
-                src.rho.dev, src.cs.dev, src.u.dev, src.v.dev, src.w.dev,
-                dst.x.dev, dst.y.dev, dst.z.dev, dst.h.dev,
-                dst.rho.dev, dst.cs.dev, dst.u.dev, dst.v.dev, dst.w.dev,
-                cache['starts_dev'], cache['lengths_dev'],
-                cache['neighbors_dev'], np.int32(nnps.dim), kernel_id,
-                alpha, beta, au.dev, av.dev, aw.dev
-            ],
-            device=nnps.device,
-        )
-        wp.synchronize_device(nnps.device)
-    return au, av, aw
+    return (
+        dst.get_device_array(out_props[0]),
+        dst.get_device_array(out_props[1]),
+        dst.get_device_array(out_props[2]),
+    )
 
 
 def compute_xsph_correction(nnps, src_index=0, dst_index=0, eps=0.5,
@@ -2082,6 +1285,11 @@ def compute_xsph_correction(nnps, src_index=0, dst_index=0, eps=0.5,
     """Compute PySPH leapfrog XSPH position correction on the device."""
     if wp is None:  # pragma: no cover
         raise ImportError("warp is required for compute_xsph_correction")
+    if tuple(out_props) != ('ax', 'ay', 'az'):
+        raise ValueError(
+            "compute_xsph_correction writes the generated XSPHCorrection "
+            "block's canonical ('ax','ay','az'); custom out_props unsupported."
+        )
 
     src_pa = nnps.particles[src_index]
     dst_pa = nnps.particles[dst_index]
@@ -2093,39 +1301,16 @@ def compute_xsph_correction(nnps, src_index=0, dst_index=0, eps=0.5,
         dst_pa.gpu.push(
             'x', 'y', 'z', 'h', 'rho', 'u', 'v', 'w', *out_props
         )
-    if cache is None:
-        cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
-    src = src_pa.gpu
+    _run_equation_group(
+        nnps, src_index, dst_index, [XSPHCorrection()],
+        scalar_values={'eps': eps}, kernel=kernel, cache=cache,
+    )
     dst = dst_pa.gpu
-    ax = dst.get_device_array(out_props[0])
-    ay = dst.get_device_array(out_props[1])
-    az = dst.get_device_array(out_props[2])
-    ndst = dst.get_number_of_particles()
-    kernel_id = _kernel_id(kernel)
-    if src.x.dtype == np.float32:
-        equation_kernel = _xsph_correction_f32
-        eps = np.float32(eps)
-    else:
-        equation_kernel = _xsph_correction_f64
-        eps = np.float64(eps)
-
-    if ndst > 0:
-        wp.launch(
-            equation_kernel,
-            dim=ndst,
-            inputs=[
-                src.x.dev, src.y.dev, src.z.dev, src.h.dev, src.m.dev,
-                src.rho.dev, src.u.dev, src.v.dev, src.w.dev,
-                dst.x.dev, dst.y.dev, dst.z.dev, dst.h.dev,
-                dst.rho.dev, dst.u.dev, dst.v.dev, dst.w.dev,
-                cache['starts_dev'], cache['lengths_dev'],
-                cache['neighbors_dev'], np.int32(nnps.dim), kernel_id, eps,
-                ax.dev, ay.dev, az.dev
-            ],
-            device=nnps.device,
-        )
-        wp.synchronize_device(nnps.device)
-    return ax, ay, az
+    return (
+        dst.get_device_array(out_props[0]),
+        dst.get_device_array(out_props[1]),
+        dst.get_device_array(out_props[2]),
+    )
 
 
 def euler_step(pa, dt, dim=3, device=None, push=True):
@@ -2377,29 +1562,17 @@ def compute_wcsph_adaptive_timestep(nnps, pa_index=0, c0=20.0, cfl=0.25,
     dt_force = gpu.get_device_array('dt_force')
     if gpu.x.dtype == np.float32:
         dtype = wp.float32
-        np_dtype = np.float32
-        factors_kernel = (
-            _wcsph_dt_factors_grid_f32 if neighbor_mode == 'grid'
-            else _wcsph_dt_factors_f32
-        )
         init_kernel = _wcsph_dt_init_f32
         reduce_kernel = _wcsph_dt_reduce_f32
         finalize_kernel = _wcsph_dt_finalize_f32
-        c0 = np.float32(c0)
         cfl = np.float32(cfl)
         dt_min = np.float32(dt_min)
         dt_max = np.float32(dt_max)
     else:
         dtype = wp.float64
-        np_dtype = np.float64
-        factors_kernel = (
-            _wcsph_dt_factors_grid_f64 if neighbor_mode == 'grid'
-            else _wcsph_dt_factors_f64
-        )
         init_kernel = _wcsph_dt_init_f64
         reduce_kernel = _wcsph_dt_reduce_f64
         finalize_kernel = _wcsph_dt_finalize_f64
-        c0 = np.float64(c0)
         cfl = np.float64(cfl)
         dt_min = np.float64(dt_min)
         dt_max = np.float64(dt_max)
@@ -2409,26 +1582,12 @@ def compute_wcsph_adaptive_timestep(nnps, pa_index=0, c0=20.0, cfl=0.25,
     min_h = wp.zeros(1, dtype=dtype, device=nnps.device)
     out_dt = wp.zeros(1, dtype=dtype, device=nnps.device)
     if n > 0:
-        factor_inputs = [
-            gpu.x.dev, gpu.y.dev, gpu.z.dev, gpu.h.dev,
-            gpu.u.dev, gpu.v.dev, gpu.w.dev,
-            gpu.au.dev, gpu.av.dev, gpu.aw.dev,
-        ]
-        if neighbor_mode == 'grid':
-            factor_inputs += _grid_launch_args(nnps, pa_index, np_dtype)
-        else:
-            factor_inputs += [
-                cache['starts_dev'], cache['lengths_dev'],
-                cache['neighbors_dev'],
-            ]
-        factor_inputs += [
-            np.int32(nnps.dim), c0, dt_cfl.dev, dt_force.dev
-        ]
-        wp.launch(
-            factors_kernel,
-            dim=n,
-            inputs=factor_inputs,
-            device=nnps.device,
+        # Per-particle CFL/force factors via the generated WcsphCflFactor group
+        # (flat or grid). dt_cfl is a neighbor max-reduction, dt_force a
+        # per-particle term; both written into pa's dt_cfl/dt_force arrays.
+        _run_equation_group(
+            nnps, pa_index, pa_index, [WcsphCflFactor()],
+            scalar_values={'c0': c0}, cache=cache, neighbor_mode=neighbor_mode,
         )
         wp.launch(
             init_kernel,
@@ -2602,37 +1761,14 @@ def compute_wcsph_accel_continuity(nnps, src_index=0, dst_index=0, alpha=0.1,
             'x', 'y', 'z', 'h', 'rho', 'p', 'cs', 'u', 'v', 'w',
             'au', 'av', 'aw', 'arho', 'ax', 'ay', 'az'
         )
-    src = src_pa.gpu
     dst = dst_pa.gpu
-    ndst = dst.get_number_of_particles()
-    if ndst <= 0:
+    if dst.get_number_of_particles() <= 0:
         return None
-    kernel_id = _kernel_id(kernel)
-    dtype = np.float32 if src.x.dtype == np.float32 else np.float64
-
-    group = build_group_kernel(
-        _WCSPH_CONTINUITY_BLOCKS, dtype, _WARP_DEVICE_FUNCS,
-        neighbor_mode=neighbor_mode,
+    _run_equation_group(
+        nnps, src_index, dst_index, _WCSPH_CONTINUITY_BLOCKS,
+        scalar_values={'alpha': alpha, 'beta': beta, 'eps': eps},
+        kernel=kernel, cache=cache, neighbor_mode=neighbor_mode,
     )
-    scalar_values = {
-        'alpha': dtype(alpha), 'beta': dtype(beta), 'eps': dtype(eps),
-    }
-    inputs = [src.get_device_array(n).dev for n in group.src_names]
-    inputs += [dst.get_device_array(n).dev for n in group.dst_names]
-    if neighbor_mode == 'grid':
-        inputs += _grid_launch_args(nnps, src_index, dtype)
-    else:
-        if cache is None:
-            cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
-        inputs += [
-            cache['starts_dev'], cache['lengths_dev'], cache['neighbors_dev'],
-        ]
-    inputs += [np.int32(nnps.dim), kernel_id]
-    inputs += [scalar_values[n] for n in group.scalar_names]
-    inputs += [dst.get_device_array(n).dev for n in group.out_names]
-
-    wp.launch(group.kernel, dim=ndst, inputs=inputs, device=nnps.device)
-    wp.synchronize_device(nnps.device)
     return (
         dst.get_device_array('au'), dst.get_device_array('av'),
         dst.get_device_array('aw'),

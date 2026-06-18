@@ -3,7 +3,7 @@ aspect: warp-backend
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-18T10:45:00 CEST
+last_reviewed: 2026-06-18T13:30:00 CEST
 status: active
 ---
 
@@ -77,6 +77,21 @@ device-resident.
   flat CSR neighbor list; `neighbor_mode='flat'` is retained for the oracle and
   host-query paths. This is the gpu-nnps cache-build optimization landing on the
   backend; see the gpu-nnps aspect for the parity/perf evidence.
+- ADR-0003 follow-up (generator migration): `warp_codegen` is now the single
+  source for every neighbor-loop kernel; the ~14 duplicated hand `@wp.kernel`s
+  (`_summation_density`, `_continuity`, `_pressure_gradient`,
+  `_artificial_viscosity`, `_xsph_correction`, `_wcsph_dt_factors{,_grid}`,
+  f32+f64) are retired. New: `accumulate_outputs` (seed `_acc_<out>` from the
+  existing `d_<out>[i]` for read-modify-write composition, used by the standalone
+  additive viscosity); `SummationDensity` and `WcsphCflFactor` blocks (the CFL
+  `dt_cfl` is a free-form `wp.max` neighbor reduction, `dt_force` a per-particle
+  `post_loop`); a shared `_run_equation_group` launcher (flat/grid, accumulate,
+  cross-array). The standalone helpers keep their signatures/cross-array and now
+  reject non-canonical `out_prop`/`out_props`. The generated kernel `func_name`
+  is now a deterministic md5 of the structural cache key (was
+  `len(_KERNEL_CACHE)`), so the source is byte-stable across runs and Warp's
+  on-disk kernel cache hits instead of recompiling cold every session. EOS,
+  integrator, and dt init/reduce/finalize reduction kernels are unchanged.
 
 ## References for this aspect
 

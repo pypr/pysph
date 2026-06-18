@@ -745,7 +745,28 @@ def test_warp_continuity_step_builds_no_flat_neighbor_cache(monkeypatch):
     assert len(grid_calls) >= 2
 
 
+def test_warp_equation_helpers_reject_custom_output_names():
+    # The generator-backed helpers write the block's canonical output arrays;
+    # a non-default out_prop/out_props can no longer be honored, so it must
+    # fail fast rather than silently writing the wrong array. The guard runs
+    # before any device work, so nnps is never dereferenced here.
+    with pytest.raises(ValueError):
+        compute_summation_density(None, out_prop='rho_custom')
+    with pytest.raises(ValueError):
+        compute_continuity(None, out_prop='arho_custom')
+    with pytest.raises(ValueError):
+        compute_pressure_gradient(None, out_props=('bu', 'bv', 'bw'))
+    with pytest.raises(ValueError):
+        compute_artificial_viscosity(None, out_props=('bu', 'bv', 'bw'))
+    with pytest.raises(ValueError):
+        compute_xsph_correction(None, out_props=('bx', 'by', 'bz'))
+
+
 def test_warp_fused_accel_matches_separate_helpers():
+    # Fusion-consistency check: after the generator migration both sides are
+    # generator-backed (the fused 4-equation group vs the four single-block
+    # helpers), so this asserts that fusing N blocks equals running them
+    # separately and composing (pressure gradient overwrite, viscosity add).
     def make_pa():
         x = np.asarray([0.0, 0.2, 0.45, 0.7, 1.1])
         y = np.asarray([0.0, 0.03, -0.02, 0.1, -0.15])

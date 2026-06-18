@@ -218,6 +218,35 @@ def test_grid_mode_kernel_sum_matches_reference_single_cell():
     assert np.allclose(wsum, [expected, expected], rtol=1e-5, atol=1e-6)
 
 
+def test_accumulate_outputs_adds_to_existing_output():
+    # accumulate_outputs=True seeds _acc from the existing d_<out>[i] so the
+    # group adds to (read-modify-writes) the destination arrays instead of
+    # overwriting; it is a distinct cached kernel from the overwrite variant.
+    clear_kernel_cache()
+    overwrite = build_group_kernel(
+        [_SumMass()], np.float32, ws._WARP_DEVICE_FUNCS,
+        accumulate_outputs=False,
+    )
+    accumulate = build_group_kernel(
+        [_SumMass()], np.float32, ws._WARP_DEVICE_FUNCS,
+        accumulate_outputs=True,
+    )
+    assert accumulate is not overwrite
+
+    # 3 particles, each neighboring all three; sum of masses is 6. Seed the
+    # output with 10 so accumulate yields 16 (overwrite would yield 6).
+    arrays = {
+        's_m': _arr([1.0, 2.0, 3.0], np.float32),
+        'starts': _arr([0, 3, 6], np.int32),
+        'lengths': _arr([3, 3, 3], np.int32),
+        'neighbors': _arr([0, 1, 2, 0, 1, 2, 0, 1, 2], np.uint32),
+        'd_total': _arr([10.0, 10.0, 10.0], np.float32),
+        '_n': 3,
+    }
+    _launch_manual(accumulate, arrays, dim=2, kernel_id=0)
+    assert np.allclose(arrays['d_total'].numpy(), [16.0, 16.0, 16.0])
+
+
 def test_unknown_shared_quantity_is_rejected():
     class _Bad(WarpEquation):
         out_arrays = ('q',)

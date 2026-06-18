@@ -3,7 +3,7 @@ aspect: gpu-nnps
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-18T10:45:00 CEST
+last_reviewed: 2026-06-18T13:30:00 CEST
 status: active
 ---
 
@@ -184,6 +184,13 @@ Grid-direct neighbor traversal proof (ADR-0004):
   was ~45-50% of the step and is gone; the equation kernel absorbed the single
   cutoff traversal). Adaptive `nx=100` resolved kept exactly `1393` steps with
   fp32-scale deltas, validating both grid-direct consumers over a long run.
+- ADR-0003 follow-up (generator migration): the duplicated flat/grid
+  `_wcsph_dt_factors` hand kernels are de-duplicated into one generated
+  `WcsphCflFactor` block (flat+grid via `neighbor_mode`), and the standalone
+  equation/summation-density helpers are generator-backed too. The grid-direct
+  continuity path is byte-identical (same fused grid kernel), so this is
+  perf-neutral; the flat `build_neighbor_cache_gpu` still backs the host query
+  API, the summation path, and `compute_neighbor_sum`.
 
 ## Key sub-topics
 

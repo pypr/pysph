@@ -20,6 +20,7 @@ cached by structural signature ``(ordered equation signatures, dtype)`` so each
 unique group compiles only once.
 """
 
+import hashlib
 import linecache
 
 import numpy as np
@@ -247,7 +248,7 @@ def _emit_geometry(requires, type_token, func_suffix, phase='all'):
 
 
 def generate_group_source(equations, dtype, func_name='_warp_group_kernel',
-                           neighbor_mode='flat'):
+                           neighbor_mode='flat', accumulate_outputs=False):
     """Generate the Warp kernel source for a group of equations.
 
     ``neighbor_mode`` selects the neighbor source: ``flat`` reads a prebuilt CSR
@@ -256,6 +257,13 @@ def generate_group_source(equations, dtype, func_name='_warp_group_kernel',
     support cutoff inline so it visits exactly the flat list's neighbor set
     (ADR-0004). The per-pair geometry and every equation snippet are identical
     across modes -- only the loop that produces ``j`` differs.
+
+    ``accumulate_outputs`` controls how the shared accumulators are seeded: when
+    ``False`` (default) each ``_acc_<out>`` starts at zero and the destination
+    arrays are overwritten; when ``True`` each starts from the existing
+    ``d_<out>[i]`` so the group adds to the destination arrays (read-modify-write,
+    e.g. a standalone artificial-viscosity term composed onto a prior
+    pressure-gradient acceleration).
 
     Returns ``(source, src_names, dst_names, scalar_names, out_names)``.
     """
@@ -306,7 +314,10 @@ def generate_group_source(equations, dtype, func_name='_warp_group_kernel',
     # --- per-particle preamble ---
     L("    i = wp.tid()")
     for n in out_names:
-        L("    _acc_%s = %s(0.0)" % (n, type_token))
+        if accumulate_outputs:
+            L("    _acc_%s = d_%s[i]" % (n, n))
+        else:
+            L("    _acc_%s = %s(0.0)" % (n, type_token))
     for eq in equations:
         snippet = eq.initialize()
         if snippet:
@@ -380,15 +391,17 @@ def generate_group_source(equations, dtype, func_name='_warp_group_kernel',
 _KERNEL_CACHE = {}
 
 
-def _cache_key(equations, dtype, neighbor_mode='flat'):
+def _cache_key(equations, dtype, neighbor_mode='flat',
+               accumulate_outputs=False):
     type_token, _, _ = _dtype_tokens(dtype)
     return (
-        tuple(eq.signature() for eq in equations), type_token, neighbor_mode
+        tuple(eq.signature() for eq in equations), type_token, neighbor_mode,
+        bool(accumulate_outputs),
     )
 
 
 def build_group_kernel(equations, dtype, device_funcs, key=None,
-                       neighbor_mode='flat'):
+                       neighbor_mode='flat', accumulate_outputs=False):
     """Generate (or fetch from cache) the fused kernel for ``equations``.
 
     ``device_funcs`` maps the device ``wp.func`` names referenced by the
@@ -403,21 +416,29 @@ def build_group_kernel(equations, dtype, device_funcs, key=None,
     if wp is None:  # pragma: no cover
         raise ImportError("warp is required for build_group_kernel")
 
-    cache_key = _cache_key(equations, dtype, neighbor_mode)
+    cache_key = _cache_key(equations, dtype, neighbor_mode, accumulate_outputs)
     cached = _KERNEL_CACHE.get(cache_key)
     if cached is not None:
         return cached
 
     if key is None:
         type_token, func_suffix, _ = _dtype_tokens(dtype)
-        key = "warp_group_%s_%s_%d" % (
-            func_suffix, neighbor_mode, len(_KERNEL_CACHE)
+        # Deterministic, call-order-independent name derived from the structural
+        # cache key, so the generated source -- and therefore Warp's on-disk
+        # kernel cache hash -- is stable across runs/sessions. A name that
+        # depends on build order (e.g. len(_KERNEL_CACHE)) changes the source
+        # whenever the order shifts and forces a cold recompile every session.
+        digest = hashlib.md5(repr(cache_key).encode('utf-8')).hexdigest()[:12]
+        key = "warp_group_%s_%s%s_%s" % (
+            func_suffix, neighbor_mode,
+            "_acc" if accumulate_outputs else "", digest
         )
     func_name = key
 
     source, src_names, dst_names, scalar_names, out_names = (
         generate_group_source(
-            equations, dtype, func_name=func_name, neighbor_mode=neighbor_mode
+            equations, dtype, func_name=func_name, neighbor_mode=neighbor_mode,
+            accumulate_outputs=accumulate_outputs,
         )
     )
 
