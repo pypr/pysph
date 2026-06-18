@@ -41,6 +41,24 @@ card's knee:
 
 ![per-step vs particles](perstep_vs_particles.png)
 
+### Cost-of-compute lens ($)
+
+The figures above measure *speed*; these measure *price of the work done*, using
+the NVIDIA Brev on-demand hourly rates (USD/hr, 2026-06-18): B300 $9.49, RTX PRO
+6000 $2.63, L40S $1.06, RTX 5090 $0.78. The metric is **$ per billion
+particle-steps** = `($/hr) / (throughput x 3600) x 1e9` -- lower is cheaper. The
+4060 is a laptop GPU (no cloud rate) and is excluded.
+
+**Cost of compute @ 1M particles** -- the cheap cards win the $/work race; B300 is
+~6x the cost per unit work:
+
+![cost per billion particle-steps at 1M](cost_per_billion_1M.png)
+
+**Cost of compute vs particle count** -- cheapest in each card's plateau, then
+rises sharply past its knee (you pay for idle silicon once throughput drops):
+
+![cost per billion particle-steps vs particles](cost_per_billion_vs_particles.png)
+
 ## Full sweep -- NVIDIA L40S (sm_89, 44 GiB usable)
 
 | nx | particles | per-step (s) | throughput (particle-steps/s) | finite |
@@ -140,6 +158,27 @@ on the same host) corroborate the column: 4060 **57.6x** (CPU 3.445 / Warp
 100-step fixed run). The single-thread CPU step is O(N) like the GPU, so the
 speedup is roughly flat with particle count **until the GPU knee**, past which it
 falls (e.g. B300 at 10M: CPU ~35 s/step vs Warp 0.128 s -> ~273x).
+
+### Cost of compute at 1M ($ lens)
+
+Same 1M anchor, priced by NVIDIA Brev on-demand rates (2026-06-18). `$ per
+billion particle-steps` = `($/hr) / (throughput x 3600) x 1e9` -- the dollar cost
+of the actual numerical work, independent of wall-clock.
+
+| GPU | $/hr (Brev) | throughput @1M (p-steps/s) | $ per billion particle-steps | vs cheapest |
+|---|---:|---:|---:|---:|
+| RTX 5090 | $0.78 | 6.74e7 | **$0.0032** | 1.0x |
+| L40S | $1.06 | 9.19e7 | **$0.0032** | 1.0x |
+| RTX PRO 6000 Blackwell | $2.63 | 1.22e8 | **$0.0060** | 1.9x |
+| B300 SXM6 | $9.49 | 1.41e8 | **$0.0187** | 5.8x |
+
+The two cheap cards (5090 / L40S) do the same SPH work for **~6x less money**
+than the B300, and ~3x less than the RTX PRO 6000. The expensive datacenter cards
+do **not** win on cost-per-work on this fp32 SPH step -- their value is **scale
+and latency**: the B300 fits 78.5M particles in one box and finishes any single
+step ~2x faster than the 5090, but you pay a large premium for that wall-clock.
+**Pick by constraint:** lowest $/work for throughput-bound batch jobs -> RTX 5090
+/ L40S; largest single problem or fastest turnaround -> B300 / RTX PRO 6000.
 
 Peak / sustained throughput and the super-linear knee:
 

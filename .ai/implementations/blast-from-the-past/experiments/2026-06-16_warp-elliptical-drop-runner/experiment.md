@@ -632,7 +632,19 @@ non-monotonic with VRAM (RTX PRO 6000 95 GiB knees at 6M; B300 268 GiB at 10M;
 an algorithmic/grid effect to profile (grid-build vs equation time). All sweep
 points finite.
 
+**Cost-of-compute lens ($)**: priced by NVIDIA Brev on-demand rates (2026-06-18:
+B300 $9.49/hr, RTX PRO 6000 $2.63, L40S $1.06, RTX 5090 $0.78). `$ per billion
+particle-steps` = `($/hr) / (throughput x 3600) x 1e9` at 1M: RTX 5090 **$0.0032**
+(1.0x) ~= L40S **$0.0032** (1.0x) < RTX PRO 6000 **$0.0060** (1.9x) < B300
+**$0.0187** (5.8x). The cheap cards do the same SPH work for **~6x less money**
+than the B300 -- the datacenter cards buy **scale and latency** (78.5M particles
+in one box; ~2x faster single step), not cost-per-work. Pick by constraint:
+throughput-bound batch -> RTX 5090 / L40S; biggest problem or fastest turnaround
+-> B300 / RTX PRO 6000.
+
 Figures (`gpu-sweep/plot_gpu_sweep.py`, pure matplotlib from the JSONs):
+
+_Performance lens:_
 
 ![Speedup vs 1 CPU core @ 1M particles](gpu-sweep/speedup_vs_cpu_1M.png)
 
@@ -640,10 +652,16 @@ Figures (`gpu-sweep/plot_gpu_sweep.py`, pure matplotlib from the JSONs):
 
 ![Per-step wall time vs particle count](gpu-sweep/perstep_vs_particles.png)
 
+_Cost-of-compute lens ($):_
+
+![Cost per billion particle-steps @ 1M](gpu-sweep/cost_per_billion_1M.png)
+
+![Cost per billion particle-steps vs particle count](gpu-sweep/cost_per_billion_vs_particles.png)
+
 ```text
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/gpu-sweep/README.md
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/gpu-sweep/sweep-{l40s,rtx5090,rtxpro6000,b300}.json
-.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/gpu-sweep/{throughput_vs_particles,perstep_vs_particles,speedup_vs_cpu_1M}.png
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/gpu-sweep/{throughput_vs_particles,perstep_vs_particles,speedup_vs_cpu_1M,cost_per_billion_1M,cost_per_billion_vs_particles}.png
 ```
 
 ## Interpretation
