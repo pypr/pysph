@@ -42,6 +42,23 @@ PYTHONPATH=$R python $R/generate_results_report.py \
   that this machine is for.
 - Writes `results-report/RESULTS_REPORT.md` plus the raw summary JSONs.
 
+## Cross-GPU performance sweep
+
+To compare GPUs, run `gpu_perf_sweep.py` on each one and paste the JSON block it
+prints. It sweeps particle count (via `nx`) and reports the steady per-step wall
+time and throughput (particle-steps/s) for the grid-direct continuity PEC step;
+it's GPU-only (fast), warms the kernel once, and catches OOM per point so it
+finds the capacity ceiling.
+
+```bash
+PYTHONPATH=$R python $R/gpu_perf_sweep.py --label "<GPU name>" --output sweep-<gpu>.json
+# custom: --nx-list 100,200,400,565,1000,1400,1800,2600 --steps 16 --warmup 6
+```
+
+`nx` maps to particle count via the disk fill (~`pi*nx^2`): nx=100 ~ 31k,
+565 ~ 1.0M, 1000 ~ 3.1M, 1800 ~ 10M. The collected per-GPU JSONs become the
+cross-GPU performance artifact.
+
 ## Notes
 
 - The CPU baseline is the real single-threaded PySPH Cython Application; report
