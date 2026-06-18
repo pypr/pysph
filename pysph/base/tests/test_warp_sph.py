@@ -691,7 +691,11 @@ def test_warp_equation_helpers_accept_prebuilt_neighbor_cache(monkeypatch):
     assert calls == [(0, 0)]
 
 
-def test_warp_continuity_step_reuses_one_neighbor_cache_per_stage(monkeypatch):
+def test_warp_continuity_step_builds_no_flat_neighbor_cache(monkeypatch):
+    # ADR-0004: both neighbor consumers (fused equations + adaptive CFL
+    # dt-factors) walk the cell list directly, so the continuity step never
+    # materializes a flat CSR neighbor list. adaptive_dt=True exercises both
+    # consumers; the grid itself is still built (via _build_grid).
     x = np.asarray([0.0, 0.2, 0.45, 1.2])
     y = np.asarray([0.0, 0.1, -0.05, 0.2])
     z = np.zeros_like(x)
@@ -713,13 +717,20 @@ def test_warp_continuity_step_reuses_one_neighbor_cache_per_stage(monkeypatch):
     )
     nnps = UniformGridWarpNNPS(dim=2, particles=[pa], radius_scale=2.0)
     original = nnps.build_neighbor_cache_gpu
+    grid_original = nnps._build_grid
     calls = []
+    grid_calls = []
 
     def counted_cache(src_index, dst_index):
         calls.append((src_index, dst_index))
         return original(src_index, dst_index)
 
+    def counted_grid(src_index):
+        grid_calls.append(src_index)
+        return grid_original(src_index)
+
     monkeypatch.setattr(nnps, 'build_neighbor_cache_gpu', counted_cache)
+    monkeypatch.setattr(nnps, '_build_grid', counted_grid)
 
     wc_sph_leapfrog_step(
         nnps, dt=1.0e-3, rho0=1.0, c0=5.0, alpha=0.1, beta=0.0,
@@ -728,7 +739,10 @@ def test_warp_continuity_step_reuses_one_neighbor_cache_per_stage(monkeypatch):
         density_mode='continuity'
     )
 
-    assert calls == [(0, 0), (0, 0)]
+    # No flat neighbor cache anywhere on the continuity path, and the grid is
+    # consulted (built once per half-stage, reused by both consumers).
+    assert calls == []
+    assert len(grid_calls) >= 2
 
 
 def test_warp_fused_accel_matches_separate_helpers():
@@ -792,6 +806,55 @@ def test_warp_fused_accel_matches_separate_helpers():
     for name in ('au', 'av', 'aw', 'arho', 'ax', 'ay', 'az'):
         assert np.allclose(
             getattr(pa_sep, name), getattr(pa_fused, name),
+            rtol=1e-5, atol=1e-6
+        ), name
+
+
+def test_warp_grid_direct_accel_matches_flat_fused():
+    # ADR-0004: the grid-direct fused kernel must visit exactly the neighbor
+    # set the flat CSR list contained (same support cutoff), so its result
+    # matches the flat fused kernel to fp32 reordering scale. This isolates the
+    # neighbor-mode change from the equation math.
+    def make_pa():
+        x = np.asarray([0.0, 0.2, 0.45, 0.7, 1.1, 0.15, 0.9])
+        y = np.asarray([0.0, 0.03, -0.02, 0.1, -0.15, 0.25, 0.18])
+        z = np.zeros_like(x)
+        return get_particle_array(
+            name='fluid', x=x.copy(), y=y.copy(), z=z.copy(),
+            h=np.asarray([0.35, 0.35, 0.4, 0.35, 0.38, 0.36, 0.34]),
+            m=np.asarray([1.0, 1.5, 1.2, 0.8, 1.1, 0.95, 1.05]),
+            rho=np.asarray([1.0, 1.1, 0.9, 1.2, 1.05, 0.97, 1.03]),
+            p=np.asarray([2.0, 3.0, 1.5, 0.5, 1.2, 0.8, 1.7]),
+            cs=np.ones_like(x) * 5.0,
+            u=np.asarray([1.0, -1.0, -0.2, 0.0, 0.3, 0.4, -0.3]),
+            v=np.asarray([0.0, 0.05, -0.1, 0.0, 0.2, -0.15, 0.1]),
+            w=z.copy(),
+            au=np.zeros_like(x), av=np.zeros_like(x), aw=np.zeros_like(x),
+            arho=np.zeros_like(x), ax=np.zeros_like(x), ay=np.zeros_like(x),
+            az=np.zeros_like(x), backend='warp',
+        )
+
+    alpha, beta, eps, kernel = 0.15, 0.05, 0.5, 'gaussian'
+
+    pa_flat = make_pa()
+    nnps_flat = UniformGridWarpNNPS(dim=2, particles=[pa_flat], radius_scale=3.0)
+    compute_wcsph_accel_continuity(
+        nnps_flat, 0, 0, alpha=alpha, beta=beta, eps=eps, kernel=kernel,
+        push=True, neighbor_mode='flat'
+    )
+    pa_flat.gpu.pull('au', 'av', 'aw', 'arho', 'ax', 'ay', 'az')
+
+    pa_grid = make_pa()
+    nnps_grid = UniformGridWarpNNPS(dim=2, particles=[pa_grid], radius_scale=3.0)
+    compute_wcsph_accel_continuity(
+        nnps_grid, 0, 0, alpha=alpha, beta=beta, eps=eps, kernel=kernel,
+        push=True, neighbor_mode='grid'
+    )
+    pa_grid.gpu.pull('au', 'av', 'aw', 'arho', 'ax', 'ay', 'az')
+
+    for name in ('au', 'av', 'aw', 'arho', 'ax', 'ay', 'az'):
+        assert np.allclose(
+            getattr(pa_flat, name), getattr(pa_grid, name),
             rtol=1e-5, atol=1e-6
         ), name
 

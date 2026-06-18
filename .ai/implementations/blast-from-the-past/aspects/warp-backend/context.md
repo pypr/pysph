@@ -3,7 +3,7 @@ aspect: warp-backend
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-17T18:45:00 CEST
+last_reviewed: 2026-06-18T10:45:00 CEST
 status: active
 ---
 
@@ -64,8 +64,19 @@ device-resident.
   `_WCSPH_CONTINUITY_BLOCKS`) into one generated kernel via
   `compute_wcsph_accel_continuity`. The summation-density path, the Euler step,
   the standalone per-equation helpers (kept as the trusted oracle), and the
-  adaptive `_wcsph_dt_factors` traversal are unchanged; migrating them onto the
-  generator is the ADR-0003 follow-up.
+  flat adaptive `_wcsph_dt_factors` traversal are unchanged; migrating them onto
+  the generator is the ADR-0003 follow-up.
+- ADR-0004 adds `neighbor_mode='grid'` to the generator: the same fused kernel
+  body, but the flat `starts/lengths/neighbors` loop is replaced by a direct
+  uniform-grid cell-list walk with the support cutoff inline (geometry split
+  pre/post cutoff; the cell-block walk wraps the equation snippets via
+  `_reindent`; `neighbor_mode` is part of the structural cache key). The
+  continuity hot path (`compute_wcsph_accel_continuity` and
+  `compute_wcsph_adaptive_timestep` via hand-written grid-direct
+  `_wcsph_dt_factors_grid_{f32,f64}`) now defaults to grid mode and builds no
+  flat CSR neighbor list; `neighbor_mode='flat'` is retained for the oracle and
+  host-query paths. This is the gpu-nnps cache-build optimization landing on the
+  backend; see the gpu-nnps aspect for the parity/perf evidence.
 
 ## References for this aspect
 

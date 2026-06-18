@@ -9,6 +9,16 @@
       "from": "ADR-0003",
       "to": "ADR-0002",
       "type": "relates_to"
+    },
+    {
+      "from": "ADR-0004",
+      "to": "ADR-0003",
+      "type": "relates_to"
+    },
+    {
+      "from": "ADR-0004",
+      "to": "ADR-0003",
+      "type": "depends_on"
     }
   ],
   "nodes": [
@@ -31,6 +41,13 @@
       "file": "decisions/2026-06-17_adr-0003_adopt-dynamic-warp-equation-group-code-generation.md",
       "id": "ADR-0003",
       "scope": "warp-backend",
+      "status": "Accepted"
+    },
+    {
+      "date": "2026-06-18",
+      "file": "decisions/2026-06-18_adr-0004_grid-direct-neighbor-traversal-for-wcsph-continuity-hot-path.md",
+      "id": "ADR-0004",
+      "scope": "gpu-nnps",
       "status": "Accepted"
     }
   ]

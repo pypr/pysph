@@ -3,7 +3,7 @@ aspect: gpu-nnps
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-15T14:25:00 CET
+last_reviewed: 2026-06-18T10:45:00 CEST
 status: active
 ---
 
@@ -165,6 +165,26 @@ Continuity-density repeated-step proof:
   path. The continuity path is the one used for PySPH Application parity in the
   resolved elliptical-drop comparison.
 
+Grid-direct neighbor traversal proof (ADR-0004):
+
+- The WCSPH continuity hot path no longer materializes a flat CSR neighbor list.
+  `compute_wcsph_accel_continuity` (fused equations) and the adaptive CFL
+  `_wcsph_dt_factors` kernel now walk the uniform-grid cell list directly,
+  applying the support cutoff (`rij2 < (radius_scale*h_i)^2 or
+  rij2 < (radius_scale*h_j)^2`) inline so they visit exactly the neighbor set
+  the flat list contained. `build_neighbor_cache_gpu` is never called on the
+  continuity path; only the cheap `_build_grid` cell list remains.
+- The generator gained `neighbor_mode='grid'` (signature swaps
+  `starts/lengths/neighbors` for the cell list + bounds + `radius_scale`; the
+  geometry is split pre/post cutoff; the cell-block walk wraps the equation
+  snippets). `neighbor_mode='flat'` (default in the generator) is unchanged and
+  still backs the host `get_nearest_particles` query API, the per-equation
+  oracle, summation density, and `compute_neighbor_sum`.
+- Million-particle (`nx=565`) per-step wall fell ~25-35% (the flat cache build
+  was ~45-50% of the step and is gone; the equation kernel absorbed the single
+  cutoff traversal). Adaptive `nx=100` resolved kept exactly `1393` steps with
+  fp32-scale deltas, validating both grid-direct consumers over a long run.
+
 ## Key sub-topics
 
 - Existing `GPUNeighborCache` behavior.
@@ -182,6 +202,7 @@ Continuity-density repeated-step proof:
 - Minimal KDK leapfrog step and periodic position wrapping.
 - Additive artificial-viscosity momentum term.
 - Tait EOS and per-particle sound-speed path.
+- Grid-direct neighbor traversal on the WCSPH continuity hot path (ADR-0004).
 
 ## References for this aspect
 

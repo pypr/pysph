@@ -70,6 +70,25 @@ def _launch_manual(group, arrays, dim, kernel_id, scalars=None):
     wp.synchronize_device(_device())
 
 
+def _launch_grid_manual(group, arrays, dim, kernel_id, scalars=None):
+    """Bind device arrays/scalars for a ``grid`` kernel in canonical order."""
+    scalars = scalars or {}
+    inputs = [arrays['s_' + n] for n in group.src_names]
+    inputs += [arrays['d_' + n] for n in group.dst_names]
+    inputs += [
+        arrays['cell_starts'], arrays['cell_counts'], arrays['cell_particles'],
+        group.dtype(arrays['xmin']), group.dtype(arrays['ymin']),
+        group.dtype(arrays['zmin']), group.dtype(arrays['cell_size']),
+        np.int32(arrays['nx']), np.int32(arrays['ny']), np.int32(arrays['nz']),
+        np.int32(arrays['ncells']), group.dtype(arrays['radius_scale']),
+    ]
+    inputs += [np.int32(dim), np.int32(kernel_id)]
+    inputs += [group.dtype(scalars[n]) for n in group.scalar_names]
+    inputs += [arrays['d_' + n] for n in group.out_names]
+    wp.launch(group.kernel, dim=arrays['_n'], inputs=inputs, device=_device())
+    wp.synchronize_device(_device())
+
+
 def test_generated_group_kernel_compiles_runs_and_is_cached():
     clear_kernel_cache()
     group = build_group_kernel([_SumMass()], np.float32, ws._WARP_DEVICE_FUNCS)
@@ -141,6 +160,62 @@ def test_generator_unions_signature_and_scalars_in_order():
     for name in ('x', 'y', 'z', 'h', 'u', 'v', 'w', 'm', 'rho', 'p', 'cs'):
         assert name in group.src_names
     assert len(group.src_names) == len(set(group.src_names))
+
+
+def test_grid_neighbor_mode_caches_distinctly_and_forces_geometry():
+    # ADR-0004: grid mode is part of the structural cache key (distinct from
+    # flat) and forces positions + h into the signature even for a block that
+    # declares no geometry, because the support cutoff needs them.
+    clear_kernel_cache()
+    flat = build_group_kernel(
+        [_SumMass()], np.float32, ws._WARP_DEVICE_FUNCS, neighbor_mode='flat'
+    )
+    grid = build_group_kernel(
+        [_SumMass()], np.float32, ws._WARP_DEVICE_FUNCS, neighbor_mode='grid'
+    )
+    assert flat.neighbor_mode == 'flat'
+    assert grid.neighbor_mode == 'grid'
+    assert grid is not flat
+    for n in ('x', 'y', 'z', 'h'):
+        assert n in grid.src_names and n in grid.dst_names
+    assert 'x' not in flat.src_names  # flat keeps the minimal signature
+    grid2 = build_group_kernel(
+        [_SumMass()], np.float32, ws._WARP_DEVICE_FUNCS, neighbor_mode='grid'
+    )
+    assert grid2 is grid
+
+
+def test_grid_mode_kernel_sum_matches_reference_single_cell():
+    # A grid kernel over a single cell holding both particles must visit each
+    # particle's self-pair and its in-cutoff neighbor, calling the device
+    # kernel-value wp.func through the post-cutoff geometry.
+    clear_kernel_cache()
+    group = build_group_kernel(
+        [_KernelSum()], np.float32, ws._WARP_DEVICE_FUNCS, neighbor_mode='grid'
+    )
+    r = 0.3
+    h = 0.35
+    arrays = {
+        's_x': _arr([0.0, r], np.float32), 's_y': _arr([0.0, 0.0], np.float32),
+        's_z': _arr([0.0, 0.0], np.float32), 's_h': _arr([h, h], np.float32),
+        'd_x': _arr([0.0, r], np.float32), 'd_y': _arr([0.0, 0.0], np.float32),
+        'd_z': _arr([0.0, 0.0], np.float32), 'd_h': _arr([h, h], np.float32),
+        'cell_starts': _arr([0], np.int32),
+        'cell_counts': _arr([2], np.int32),
+        'cell_particles': _arr([0, 1], np.uint32),
+        'xmin': -1.0, 'ymin': -1.0, 'zmin': -1.0, 'cell_size': 10.0,
+        'nx': 1, 'ny': 1, 'nz': 1, 'ncells': 1, 'radius_scale': 2.0,
+        'd_wsum': wp.zeros(2, dtype=wp.float32, device=_device()),
+        '_n': 2,
+    }
+    _launch_grid_manual(group, arrays, dim=2, kernel_id=0)
+    wsum = arrays['d_wsum'].numpy()
+
+    cpu = CubicSpline(dim=2)
+    w_self = cpu.kernel([0.0, 0.0, 0.0], 0.0, h)
+    w_pair = cpu.kernel([r, 0.0, 0.0], r, h)
+    expected = w_self + w_pair
+    assert np.allclose(wsum, [expected, expected], rtol=1e-5, atol=1e-6)
 
 
 def test_unknown_shared_quantity_is_rejected():

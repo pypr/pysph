@@ -1292,6 +1292,158 @@ if wp is not None:
 
 
     @wp.kernel
+    def _wcsph_dt_factors_grid_f64(
+            d_x: wp.array(dtype=wp.float64),
+            d_y: wp.array(dtype=wp.float64),
+            d_z: wp.array(dtype=wp.float64),
+            d_h: wp.array(dtype=wp.float64),
+            d_u: wp.array(dtype=wp.float64),
+            d_v: wp.array(dtype=wp.float64),
+            d_w: wp.array(dtype=wp.float64),
+            d_au: wp.array(dtype=wp.float64),
+            d_av: wp.array(dtype=wp.float64),
+            d_aw: wp.array(dtype=wp.float64),
+            cell_starts: wp.array(dtype=wp.int32),
+            cell_counts: wp.array(dtype=wp.int32),
+            cell_particles: wp.array(dtype=wp.uint32),
+            xmin: wp.float64,
+            ymin: wp.float64,
+            zmin: wp.float64,
+            cell_size: wp.float64,
+            nx: wp.int32,
+            ny: wp.int32,
+            nz: wp.int32,
+            ncells: wp.int32,
+            radius_scale: wp.float64,
+            dim: wp.int32,
+            c0: wp.float64,
+            d_dt_cfl: wp.array(dtype=wp.float64),
+            d_dt_force: wp.array(dtype=wp.float64),
+    ):
+        i = wp.tid()
+        cfl_fac = wp.float64(0.0)
+        ix0 = wp.int32(wp.floor((d_x[i] - xmin) / cell_size))
+        iy0 = wp.int32(0)
+        iz0 = wp.int32(0)
+        if dim > wp.int32(1):
+            iy0 = wp.int32(wp.floor((d_y[i] - ymin) / cell_size))
+        if dim > wp.int32(2):
+            iz0 = wp.int32(wp.floor((d_z[i] - zmin) / cell_size))
+        for dzc in range(-1, 2):
+            for dyc in range(-1, 2):
+                for dxc in range(-1, 2):
+                    ix = ix0 + wp.int32(dxc)
+                    iy = iy0 + wp.int32(dyc)
+                    iz = iz0 + wp.int32(dzc)
+                    if ix >= 0 and ix < nx and iy >= 0 and iy < ny and iz >= 0 and iz < nz:
+                        cid = ix + iy * nx + iz * nx * ny
+                        if cid >= 0 and cid < ncells:
+                            start = cell_starts[cid]
+                            stop = start + cell_counts[cid]
+                            for pos in range(start, stop):
+                                j = wp.int32(cell_particles[pos])
+                                dx = d_x[i] - d_x[j]
+                                dy = wp.float64(0.0)
+                                dz = wp.float64(0.0)
+                                vijx = d_u[i] - d_u[j]
+                                vijy = wp.float64(0.0)
+                                vijz = wp.float64(0.0)
+                                if dim > wp.int32(1):
+                                    dy = d_y[i] - d_y[j]
+                                    vijy = d_v[i] - d_v[j]
+                                if dim > wp.int32(2):
+                                    dz = d_z[i] - d_z[j]
+                                    vijz = d_w[i] - d_w[j]
+                                rij2 = dx*dx + dy*dy + dz*dz
+                                hi_ = radius_scale * d_h[i]
+                                hj_ = radius_scale * d_h[j]
+                                if rij2 < hi_*hi_ or rij2 < hj_*hj_:
+                                    if rij2 > wp.float64(1.0e-12):
+                                        hij = wp.float64(0.5) * (d_h[i] + d_h[j])
+                                        vdotx = vijx*dx + vijy*dy + vijz*dz
+                                        factor = wp.abs(hij * vdotx / rij2) + c0
+                                        cfl_fac = wp.max(cfl_fac, factor)
+        d_dt_cfl[i] = cfl_fac
+        d_dt_force[i] = d_au[i]*d_au[i] + d_av[i]*d_av[i] + d_aw[i]*d_aw[i]
+
+
+    @wp.kernel
+    def _wcsph_dt_factors_grid_f32(
+            d_x: wp.array(dtype=wp.float32),
+            d_y: wp.array(dtype=wp.float32),
+            d_z: wp.array(dtype=wp.float32),
+            d_h: wp.array(dtype=wp.float32),
+            d_u: wp.array(dtype=wp.float32),
+            d_v: wp.array(dtype=wp.float32),
+            d_w: wp.array(dtype=wp.float32),
+            d_au: wp.array(dtype=wp.float32),
+            d_av: wp.array(dtype=wp.float32),
+            d_aw: wp.array(dtype=wp.float32),
+            cell_starts: wp.array(dtype=wp.int32),
+            cell_counts: wp.array(dtype=wp.int32),
+            cell_particles: wp.array(dtype=wp.uint32),
+            xmin: wp.float32,
+            ymin: wp.float32,
+            zmin: wp.float32,
+            cell_size: wp.float32,
+            nx: wp.int32,
+            ny: wp.int32,
+            nz: wp.int32,
+            ncells: wp.int32,
+            radius_scale: wp.float32,
+            dim: wp.int32,
+            c0: wp.float32,
+            d_dt_cfl: wp.array(dtype=wp.float32),
+            d_dt_force: wp.array(dtype=wp.float32),
+    ):
+        i = wp.tid()
+        cfl_fac = wp.float32(0.0)
+        ix0 = wp.int32(wp.floor((d_x[i] - xmin) / cell_size))
+        iy0 = wp.int32(0)
+        iz0 = wp.int32(0)
+        if dim > wp.int32(1):
+            iy0 = wp.int32(wp.floor((d_y[i] - ymin) / cell_size))
+        if dim > wp.int32(2):
+            iz0 = wp.int32(wp.floor((d_z[i] - zmin) / cell_size))
+        for dzc in range(-1, 2):
+            for dyc in range(-1, 2):
+                for dxc in range(-1, 2):
+                    ix = ix0 + wp.int32(dxc)
+                    iy = iy0 + wp.int32(dyc)
+                    iz = iz0 + wp.int32(dzc)
+                    if ix >= 0 and ix < nx and iy >= 0 and iy < ny and iz >= 0 and iz < nz:
+                        cid = ix + iy * nx + iz * nx * ny
+                        if cid >= 0 and cid < ncells:
+                            start = cell_starts[cid]
+                            stop = start + cell_counts[cid]
+                            for pos in range(start, stop):
+                                j = wp.int32(cell_particles[pos])
+                                dx = d_x[i] - d_x[j]
+                                dy = wp.float32(0.0)
+                                dz = wp.float32(0.0)
+                                vijx = d_u[i] - d_u[j]
+                                vijy = wp.float32(0.0)
+                                vijz = wp.float32(0.0)
+                                if dim > wp.int32(1):
+                                    dy = d_y[i] - d_y[j]
+                                    vijy = d_v[i] - d_v[j]
+                                if dim > wp.int32(2):
+                                    dz = d_z[i] - d_z[j]
+                                    vijz = d_w[i] - d_w[j]
+                                rij2 = dx*dx + dy*dy + dz*dz
+                                hi_ = radius_scale * d_h[i]
+                                hj_ = radius_scale * d_h[j]
+                                if rij2 < hi_*hi_ or rij2 < hj_*hj_:
+                                    if rij2 > wp.float32(1.0e-12):
+                                        hij = wp.float32(0.5) * (d_h[i] + d_h[j])
+                                        vdotx = vijx*dx + vijy*dy + vijz*dz
+                                        factor = wp.abs(hij * vdotx / rij2) + c0
+                                        cfl_fac = wp.max(cfl_fac, factor)
+        d_dt_cfl[i] = cfl_fac
+        d_dt_force[i] = d_au[i]*d_au[i] + d_av[i]*d_av[i] + d_aw[i]*d_aw[i]
+
+
+    @wp.kernel
     def _wcsph_dt_init_f64(
             max_cfl: wp.array(dtype=wp.float64),
             max_force: wp.array(dtype=wp.float64),
@@ -2192,11 +2344,19 @@ def wcsph_pec_stage(pa, dt, stage=1.0, dim=3, xsph=False, device=None,
 
 def compute_wcsph_adaptive_timestep(nnps, pa_index=0, c0=20.0, cfl=0.25,
                                     dt_min=0.0, dt_max=np.inf, push=True,
-                                    cache=None):
+                                    cache=None, neighbor_mode='flat'):
     """Compute WCSPH adaptive timestep with device reductions.
 
     Only the final scalar timestep is copied back to the host. Per-particle
     ``dt_cfl`` and ``dt_force`` remain on the device unless explicitly pulled.
+
+    ``neighbor_mode`` defaults to ``'flat'`` so callers (including the
+    summation-density leapfrog path) keep the prebuilt CSR ``cache`` behavior
+    unchanged. The continuity-density PEC step passes ``'grid'`` (ADR-0004) to
+    walk the uniform-grid cell list directly for the CFL viscous factor and
+    avoid building a flat list; in that mode ``cache`` is ignored. Both modes
+    visit the same neighbor set, and the CFL factor is an order-independent
+    ``max`` reduction, so the resulting timestep matches to fp32 scale.
     """
     if wp is None:  # pragma: no cover
         raise ImportError("warp is required for compute_wcsph_adaptive_timestep")
@@ -2209,7 +2369,7 @@ def compute_wcsph_adaptive_timestep(nnps, pa_index=0, c0=20.0, cfl=0.25,
             'x', 'y', 'z', 'h', 'u', 'v', 'w', 'au', 'av', 'aw',
             'dt_cfl', 'dt_force'
         )
-    if cache is None:
+    if cache is None and neighbor_mode == 'flat':
         cache = nnps.build_neighbor_cache_gpu(pa_index, pa_index)
     gpu = pa.gpu
     n = gpu.get_number_of_particles()
@@ -2217,7 +2377,11 @@ def compute_wcsph_adaptive_timestep(nnps, pa_index=0, c0=20.0, cfl=0.25,
     dt_force = gpu.get_device_array('dt_force')
     if gpu.x.dtype == np.float32:
         dtype = wp.float32
-        factors_kernel = _wcsph_dt_factors_f32
+        np_dtype = np.float32
+        factors_kernel = (
+            _wcsph_dt_factors_grid_f32 if neighbor_mode == 'grid'
+            else _wcsph_dt_factors_f32
+        )
         init_kernel = _wcsph_dt_init_f32
         reduce_kernel = _wcsph_dt_reduce_f32
         finalize_kernel = _wcsph_dt_finalize_f32
@@ -2227,7 +2391,11 @@ def compute_wcsph_adaptive_timestep(nnps, pa_index=0, c0=20.0, cfl=0.25,
         dt_max = np.float32(dt_max)
     else:
         dtype = wp.float64
-        factors_kernel = _wcsph_dt_factors_f64
+        np_dtype = np.float64
+        factors_kernel = (
+            _wcsph_dt_factors_grid_f64 if neighbor_mode == 'grid'
+            else _wcsph_dt_factors_f64
+        )
         init_kernel = _wcsph_dt_init_f64
         reduce_kernel = _wcsph_dt_reduce_f64
         finalize_kernel = _wcsph_dt_finalize_f64
@@ -2241,17 +2409,25 @@ def compute_wcsph_adaptive_timestep(nnps, pa_index=0, c0=20.0, cfl=0.25,
     min_h = wp.zeros(1, dtype=dtype, device=nnps.device)
     out_dt = wp.zeros(1, dtype=dtype, device=nnps.device)
     if n > 0:
+        factor_inputs = [
+            gpu.x.dev, gpu.y.dev, gpu.z.dev, gpu.h.dev,
+            gpu.u.dev, gpu.v.dev, gpu.w.dev,
+            gpu.au.dev, gpu.av.dev, gpu.aw.dev,
+        ]
+        if neighbor_mode == 'grid':
+            factor_inputs += _grid_launch_args(nnps, pa_index, np_dtype)
+        else:
+            factor_inputs += [
+                cache['starts_dev'], cache['lengths_dev'],
+                cache['neighbors_dev'],
+            ]
+        factor_inputs += [
+            np.int32(nnps.dim), c0, dt_cfl.dev, dt_force.dev
+        ]
         wp.launch(
             factors_kernel,
             dim=n,
-            inputs=[
-                gpu.x.dev, gpu.y.dev, gpu.z.dev, gpu.h.dev,
-                gpu.u.dev, gpu.v.dev, gpu.w.dev,
-                gpu.au.dev, gpu.av.dev, gpu.aw.dev,
-                cache['starts_dev'], cache['lengths_dev'],
-                cache['neighbors_dev'], np.int32(nnps.dim), c0,
-                dt_cfl.dev, dt_force.dev
-            ],
+            inputs=factor_inputs,
             device=nnps.device,
         )
         wp.launch(
@@ -2370,9 +2546,28 @@ def _apply_wcsph_eos(nnps, pa, rho0, c0, p0, eos, gamma):
         raise ValueError("EOS must be 'isothermal' or 'tait'")
 
 
+def _grid_launch_args(nnps, src_index, dtype):
+    """Ordered grid-query launch inputs for a grid-direct kernel (ADR-0004).
+
+    Mirrors the signature emitted by ``warp_codegen`` in ``grid`` mode and the
+    hand-written grid-direct kernels: the device cell list from ``_build_grid``
+    (reused per ``update()``) followed by the grid bounds and ``radius_scale``.
+    """
+    grid = nnps._build_grid(src_index)
+    b = nnps._bounds
+    return [
+        grid['starts'], grid['counts'], grid['cell_particles'],
+        dtype(b['xmin']), dtype(b['ymin']), dtype(b['zmin']),
+        dtype(nnps.cell_size),
+        np.int32(b['nx']), np.int32(b['ny']), np.int32(b['nz']),
+        np.int32(b['ncells']),
+        dtype(nnps.radius_scale),
+    ]
+
+
 def compute_wcsph_accel_continuity(nnps, src_index=0, dst_index=0, alpha=0.1,
                                    beta=0.0, eps=0.5, c0=20.0, kernel='cubic',
-                                   cache=None, push=True):
+                                   cache=None, push=True, neighbor_mode='grid'):
     """Fused continuity-density acceleration via a generated group kernel.
 
     One neighbor traversal computes ``ContinuityEquation`` (``arho``), the
@@ -2380,6 +2575,11 @@ def compute_wcsph_accel_continuity(nnps, src_index=0, dst_index=0, alpha=0.1,
     (``au, av, aw``), and the XSPH correction (``ax, ay, az``), replacing four
     separate launches over the same neighbor cache (ADR-0003). EOS must have
     been applied beforehand because the kernel reads ``p`` and ``cs``.
+
+    ``neighbor_mode='grid'`` (default, ADR-0004) walks the uniform-grid cell
+    list directly and ignores ``cache``, so no flat neighbor list is built;
+    ``'flat'`` reads the prebuilt CSR ``cache`` (built here if ``None``) and is
+    retained for the oracle/host-query path and parity tests.
     """
     if wp is None:  # pragma: no cover
         raise ImportError(
@@ -2402,9 +2602,6 @@ def compute_wcsph_accel_continuity(nnps, src_index=0, dst_index=0, alpha=0.1,
             'x', 'y', 'z', 'h', 'rho', 'p', 'cs', 'u', 'v', 'w',
             'au', 'av', 'aw', 'arho', 'ax', 'ay', 'az'
         )
-    if cache is None:
-        cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
-
     src = src_pa.gpu
     dst = dst_pa.gpu
     ndst = dst.get_number_of_particles()
@@ -2414,17 +2611,23 @@ def compute_wcsph_accel_continuity(nnps, src_index=0, dst_index=0, alpha=0.1,
     dtype = np.float32 if src.x.dtype == np.float32 else np.float64
 
     group = build_group_kernel(
-        _WCSPH_CONTINUITY_BLOCKS, dtype, _WARP_DEVICE_FUNCS
+        _WCSPH_CONTINUITY_BLOCKS, dtype, _WARP_DEVICE_FUNCS,
+        neighbor_mode=neighbor_mode,
     )
     scalar_values = {
         'alpha': dtype(alpha), 'beta': dtype(beta), 'eps': dtype(eps),
     }
     inputs = [src.get_device_array(n).dev for n in group.src_names]
     inputs += [dst.get_device_array(n).dev for n in group.dst_names]
-    inputs += [
-        cache['starts_dev'], cache['lengths_dev'], cache['neighbors_dev'],
-        np.int32(nnps.dim), kernel_id,
-    ]
+    if neighbor_mode == 'grid':
+        inputs += _grid_launch_args(nnps, src_index, dtype)
+    else:
+        if cache is None:
+            cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
+        inputs += [
+            cache['starts_dev'], cache['lengths_dev'], cache['neighbors_dev'],
+        ]
+    inputs += [np.int32(nnps.dim), kernel_id]
     inputs += [scalar_values[n] for n in group.scalar_names]
     inputs += [dst.get_device_array(n).dev for n in group.out_names]
 
@@ -2478,17 +2681,19 @@ def _wc_sph_pec_continuity_step(nnps, pa_index, dt, rho0, c0, p0,
         nnps.update(push=True)
     save_wcsph_state(pa, dim=nnps.dim, device=nnps.device, push=push)
 
-    stage_cache = nnps.build_neighbor_cache_gpu(pa_index, pa_index)
+    # ADR-0004: both neighbor consumers walk the cell list directly, so the
+    # grid is the only spatial index built per half-stage (cached per update);
+    # no flat CSR neighbor list is materialized on the continuity hot path.
     _ensure_property(pa, 'arho', nnps.device)
     _apply_wcsph_eos(nnps, pa, rho0, c0, p0, eos, gamma)
     compute_wcsph_accel_continuity(
         nnps, pa_index, pa_index, alpha=alpha, beta=beta, eps=eps, c0=c0,
-        kernel=kernel, cache=stage_cache, push=False
+        kernel=kernel, push=False
     )
     if adaptive_dt:
         dt = compute_wcsph_adaptive_timestep(
             nnps, pa_index=pa_index, c0=c0, cfl=cfl, dt_min=dt_min,
-            dt_max=dt_max, push=False, cache=stage_cache
+            dt_max=dt_max, push=False, neighbor_mode='grid'
         )
         dt = min(float(dt) * float(adaptive_dt_scale), float(step_dt_max))
     wcsph_pec_stage(
@@ -2498,11 +2703,10 @@ def _wc_sph_pec_continuity_step(nnps, pa_index, dt, rho0, c0, p0,
     wrap_periodic(pa, periodic_bounds, dim=nnps.dim, device=nnps.device)
     nnps.update(push=False)
 
-    stage_cache = nnps.build_neighbor_cache_gpu(pa_index, pa_index)
     _apply_wcsph_eos(nnps, pa, rho0, c0, p0, eos, gamma)
     compute_wcsph_accel_continuity(
         nnps, pa_index, pa_index, alpha=alpha, beta=beta, eps=eps, c0=c0,
-        kernel=kernel, cache=stage_cache, push=False
+        kernel=kernel, push=False
     )
     result = wcsph_pec_stage(
         pa, dt=dt, stage=1.0, dim=nnps.dim, xsph=use_xsph,

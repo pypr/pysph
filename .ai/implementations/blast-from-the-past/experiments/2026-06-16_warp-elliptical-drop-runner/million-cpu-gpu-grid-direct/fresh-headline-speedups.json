@@ -1,0 +1,34 @@
+{
+  "note": "Fresh, same-session, same-machine CPU-vs-Warp speedups for the grid-direct (ADR-0004) path. No numbers reused. CPU = single-threaded PySPH Cython Application (pysph/examples/elliptical_drop_no_scheme.py: Gaussian/TaitEOS/ContinuityEquation/MomentumEquation/XSPHCorrection/WCSPHStep). Warp = grid-direct WCSPH continuity path on RTX 4060 (fp32). Measured 2026-06-18.",
+  "hardware": {"gpu": "NVIDIA GeForce RTX 4060 Laptop GPU", "cpu_threads": 1, "warp": "1.14.0"},
+  "nx100_apples_to_apples": {
+    "description": "resolved elliptical drop, continuity density, PySPH timestep policy (adaptive), identical step count both sides",
+    "particles": 31417,
+    "steps_cpu": 1393,
+    "steps_warp": 1393,
+    "cpu_wall_s": 160.099,
+    "cpu_s_per_step": 0.11493,
+    "warp_wall_s": 6.781,
+    "warp_s_per_step": 0.00487,
+    "speedup_wall": 23.61,
+    "final_state_deltas_vs_cpu": "fp32 scale (~1e-6/1e-7); KE delta ~2e-4 absolute",
+    "source": "fresh-nx100-cpu-vs-warp-summary.json"
+  },
+  "million_100step_fixed": {
+    "description": "1M-particle elliptical drop, 100 fixed undamped steps (n_damp=0), identical dt both sides",
+    "particles": 1002885,
+    "steps": 100,
+    "dt": 3.732778967800475e-07,
+    "cpu_total_wall_s": 344.50,
+    "cpu_s_per_step": 3.4450,
+    "warp_setup_s": 2.39,
+    "warp_steps_s": 5.976,
+    "warp_total_wall_s": 8.367,
+    "warp_s_per_step": 0.05976,
+    "speedup_total_wall": 41.17,
+    "speedup_per_step_compute": 57.64,
+    "kinetic_energy_rel_delta": 1.64e-09,
+    "all_finite": true,
+    "source": "fresh-million-100step-cpu-vs-warp.json"
+  }
+}

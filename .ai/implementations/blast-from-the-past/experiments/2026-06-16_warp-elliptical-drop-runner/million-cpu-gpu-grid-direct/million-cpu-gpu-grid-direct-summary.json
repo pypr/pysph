@@ -1,0 +1,70 @@
+{
+  "case": {
+    "optimization": "ADR-0004 grid-direct neighbor traversal; the fused continuity-density equation kernel and the adaptive CFL dt-factors kernel walk the uniform-grid cell list directly with the support cutoff inline, so the WCSPH continuity hot path builds no flat CSR neighbor list",
+    "baseline_commit": "429fa23e (ADR-0003 fused-equation, flat CSR neighbor cache)",
+    "dtype": "fp32 (compyle use_double=False)",
+    "kernel": "gaussian",
+    "density_mode": "continuity",
+    "radius_scale": 3.0
+  },
+  "million_segmented_profile": {
+    "nx": 565,
+    "particles": 1002885,
+    "steps": 12,
+    "warmup_discarded": 2,
+    "dt": 3.732778967800475e-07,
+    "mode": "fixed timestep",
+    "all_finite": true,
+    "flat_cache_builds_total": 0,
+    "grid_builds_per_step": 2.0,
+    "equation_launches_per_step": 2,
+    "step_wall_s_steady_range": [0.059156, 0.063873],
+    "grid_build_s_steady_range": [0.000379, 0.000692],
+    "equation_launch_s_steady_range_per_launch": [0.022992, 0.025071],
+    "kinetic_energy": 7854.127631112813,
+    "note": "build_neighbor_cache_gpu is never called on the continuity path; the only spatial index is the cheap cell-list build (~0.0005 s). The fused equation kernel absorbed the single neighbor traversal (cutoff walk), so its per-launch time rose vs the flat fused kernel, but eliminating the two flat build-traversals + readback + alloc nets a lower per-step wall."
+  },
+  "comparison_vs_committed_flat_fused_429fa23e": {
+    "cache_builds_per_step": {"flat": 2, "grid_direct": 0},
+    "flat_cache_build_s_per_step_range": [0.033743, 0.045973],
+    "grid_build_s_per_step_range_grid_direct": [0.000758, 0.001384],
+    "equation_kernel_s_per_step_range": {"flat_fused": [0.011272, 0.014], "grid_direct": [0.045984, 0.050142]},
+    "step_wall_s_steady_range": {"flat_fused": [0.075883, 0.097561], "grid_direct": [0.059156, 0.063873]},
+    "step_wall_reduction_approx": "~25-35%",
+    "kinetic_energy_delta_vs_flat_fused": -1.9917e-06,
+    "note": "Neighbor work goes from 3 traversals/half-stage (count + fill build, then 1 equation read) to 1 (the equation cutoff walk). Per-step wall is the meaningful metric; equation per-launch time rises because it now does the traversal that the flat build used to do separately."
+  },
+  "adaptive_guard_nx100_resolved": {
+    "particles": 31417,
+    "warp_timestep_policy": "pysph",
+    "density_mode": "continuity",
+    "output_time": 0.0038,
+    "committed_steps": 1393,
+    "grid_direct_steps": 1393,
+    "grid_direct_all_finite": true,
+    "committed_warp_wall_s": 23.629107111992198,
+    "grid_direct_warp_wall_s": 7.824439332005568,
+    "deltas_vs_committed_warp_final_t0p0038": {
+      "kinetic_energy": 1.1933e-04,
+      "kinetic_energy_relative": 1.53e-08,
+      "axis_major": 2.384e-07,
+      "axis_minor": 6.557e-07,
+      "rho_min": -8.941e-07,
+      "rho_max": 2.384e-07
+    },
+    "note": "Step count identical to committed (1393); all deltas at fp32 reordering scale. Validates the grid-direct fused equation kernel AND the grid-direct dt-factors kernel over a long adaptive run. The grid dt-factors keeps the rij2>1e-12 inner guard and adds the support cutoff to reproduce the flat neighbor set."
+  },
+  "tests": {
+    "focused_suite": "50 passed (test_warp_codegen.py + test_warp_sph.py + test_warp_nnps.py)",
+    "new_tests": [
+      "test_grid_neighbor_mode_caches_distinctly_and_forces_geometry",
+      "test_grid_mode_kernel_sum_matches_reference_single_cell",
+      "test_warp_grid_direct_accel_matches_flat_fused",
+      "test_warp_continuity_step_builds_no_flat_neighbor_cache (repurposed)"
+    ]
+  },
+  "hardware": {
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU (8 GiB, sm_89)",
+    "warp": "1.14.0"
+  }
+}

@@ -518,9 +518,76 @@ Ramp output files:
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/results-tait-nx16-steps5.npz
 ```
 
+### Grid-direct neighbor traversal (ADR-0004)
+
+Per ADR-0004 the WCSPH continuity hot path stops materializing a flat CSR
+neighbor list. The fused equation kernel (and the adaptive CFL dt-factors
+kernel) walk the uniform-grid cell list directly with the support cutoff
+inline, so `build_neighbor_cache_gpu` is never called on the continuity path;
+the only spatial index that remains is the cheap cell-list build (`_build_grid`).
+
+Segmented per-step profile (`nx=565`, 1,002,885 particles, 12 fixed steps,
+2 warmup discarded, via `profile_grid_direct_neighbors.py`):
+
+```text
+$ PYTHONPATH=.ai/.../2026-06-16_warp-elliptical-drop-runner \
+  python .ai/.../2026-06-16_warp-elliptical-drop-runner/profile_grid_direct_neighbors.py --nx 565 --steps 12 --warmup 2
+flat_cache_builds_total: 0          (was 2 builds/step under the flat fused path)
+grid_builds_per_step:    2.0        (cheap cell list; ~0.0004-0.0007 s each)
+equation_launches/step:  2          (per-launch 0.023-0.025 s; absorbs the neighbor traversal)
+step_wall_s steady:      0.059-0.064 (was 0.076-0.098 flat fused; ~25-35% lower)
+kinetic_energy:          7854.1276  (delta vs flat fused -1.99e-06; all_finite True)
+```
+
+Neighbor work drops from three traversals per half-stage (count + fill to build
+the flat list, then one equation read) to one (the equation cutoff walk). The
+equation kernel's per-launch time rises because it now does the traversal that
+the flat build used to do separately, but eliminating the two build traversals
+plus the host readback and the large allocation nets a lower per-step wall.
+
+Adaptive `nx=100` resolved guard (Warp-only, pysph timestep policy) with the
+grid-direct path reached `t=0.0038` in `1393` steps -- identical to the
+committed run -- all finite, with shape deltas `~2.4e-07/6.6e-07`, density
+deltas `~9e-07`, and a kinetic-energy delta `1.19e-04` (relative `~1.5e-08`)
+versus the committed Warp metrics. The Warp wall fell to `7.82 s` (committed
+`23.63 s`; prior fused `10.83-14.33 s`), the cache-build removal compounding
+over 1393 steps. The grid-direct dt-factors kernel keeps the `rij2>1e-12` inner
+guard and adds the support cutoff to reproduce the flat neighbor set exactly,
+which is what holds the substep count at `1393`.
+
+Fresh same-session CPU-vs-Warp headlines (no reused numbers; CPU =
+single-threaded PySPH Cython Application via `headline_million_100step.py`/the
+resolved harness, Warp = grid-direct on RTX 4060 fp32):
+
+```text
+nx=100 resolved (real PySPH Application vs Warp, adaptive, identical 1393 steps):
+  CPU 160.10 s (0.1149 s/step) | Warp 6.78 s (0.00487 s/step) | speedup 23.6x
+1M particles, 100 fixed steps (n_damp=0, identical dt both sides):
+  CPU 344.50 s (3.445 s/step) | Warp 8.37 s total (2.39 setup + 5.98 step; 0.0598 s/step)
+  speedup 41.2x wall / 57.6x per-step | KE rel delta 1.6e-09 | all_finite True
+```
+
+The 1M / 100-step ratio is the more representative throughput number: at scale
+the GPU parallelism dominates, and 100 steps dilute the one-time setup (Warp
+setup is ~29% of its 8.37 s; pure stepping is 5.98 s). The earlier `~30x` figure
+was an artifact of mixing a fresh Warp wall with a stale CPU baseline; these
+same-session ratios supersede it.
+
+Output:
+
+```text
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-grid-direct/million-cpu-gpu-grid-direct-summary.json
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-grid-direct/million-segmented-grid-direct-profile.json
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-grid-direct/adaptive-nx100-grid-direct-summary.json
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-grid-direct/fresh-headline-speedups.json
+```
+
 ## Interpretation
 
 The resolved `nx=100` timestep-policy run is now an apples-to-apples
+Application-backed comparison for the current prototype. Warp keeps the repeated
+state device-authoritative, evolves density through `arho`, follows PySPH's
+early `n_damp` timestep growth policy, and matches the PySPH CPU Application's
 Application-backed comparison for the current prototype. Warp keeps the repeated
 state device-authoritative, evolves density through `arho`, follows PySPH's
 early `n_damp` timestep growth policy, and matches the PySPH CPU Application's

@@ -3,7 +3,7 @@ aspect: validation-benchmarks
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-15T23:27:00 CET
+last_reviewed: 2026-06-18T11:00:00 CEST
 status: active
 ---
 
@@ -305,6 +305,20 @@ python -m pytest pysph/base/tests/test_warp_sph.py -q
   fell from the committed `23.63 s` to `10.83-14.33 s` (cross-session, same step
   count) -- a cleaner demonstration of the fusion because that run is
   per-step-compute-bound.
+- Grid-direct neighbor traversal slice (ADR-0004): the continuity hot path
+  stops materializing a flat CSR neighbor list; both consumers walk the cell
+  list directly. Segmented million-particle (`nx=565`) profile via
+  `profile_grid_direct_neighbors.py`: `build_neighbor_cache_gpu` called 0 times
+  on the continuity path; the dominant flat-cache-build term (~0.034-0.046
+  s/step) is gone; grid build now ~0.0004-0.0007 s; equation kernel rises
+  0.011-0.014 -> 0.023-0.025 s/launch (it absorbs the single cutoff traversal);
+  step wall (steady) 0.076-0.098 -> 0.059-0.064 s (~25-35% lower); KE delta vs
+  flat fused `-1.99e-06`, all finite. Adaptive `nx=100` resolved guard kept
+  exactly `1393` steps with fp32-scale deltas (KE relative `1.5e-08`, shape
+  `~2.4e-7/6.6e-7`, density `~9e-7`) and Warp wall `7.82 s`. Focused suite
+  `50 passed` (adds grid-vs-flat fused parity, grid cache-distinct + single-cell
+  numeric parity, and a zero-flat-cache-build assertion). Summary folder
+  `million-cpu-gpu-grid-direct/`.
 
 ## Key sub-topics
 
