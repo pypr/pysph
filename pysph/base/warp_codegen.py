@@ -200,7 +200,8 @@ def _reindent(text, extra):
     )
 
 
-def _emit_geometry(requires, type_token, func_suffix, phase='all'):
+def _emit_geometry(requires, type_token, func_suffix, phase='all',
+                   periodic=False):
     """Emit the shared per-pair geometry lines requested by the group.
 
     ``phase`` controls which lines are emitted, so the grid-direct loop can
@@ -208,6 +209,11 @@ def _emit_geometry(requires, type_token, func_suffix, phase='all'):
     (``post``) inside it. ``all`` emits the full sequence in the original order
     (used by the flat path, byte-identical to before this split). All lines are
     emitted at the flat 8-space loop indent; the grid path reindents them.
+
+    When ``periodic`` is set (grid mode only) the per-pair separations are
+    minimum-image corrected per dimension, guarded by the runtime
+    ``periodic_{x,y,z}`` flags, so a wrapped neighbor's distance is the shortest
+    image (ADR-0004 periodic follow-up).
     """
     emit_pre = phase in ('all', 'pre')
     emit_post = phase in ('all', 'post')
@@ -216,12 +222,21 @@ def _emit_geometry(requires, type_token, func_suffix, phase='all'):
     needs_pos = requires & {'dx', 'dy', 'dz', 'rij2', 'rij', 'grad', 'wij'}
     if emit_pre and needs_pos:
         L("        dx = d_x[i] - s_x[j]")
+        if periodic:
+            L("        if periodic_x == wp.int32(1):")
+            L("            dx = dx - box_lx * wp.round(dx / box_lx)")
         L("        dy = %s(0.0)" % type_token)
         L("        dz = %s(0.0)" % type_token)
         L("        if dim > wp.int32(1):")
         L("            dy = d_y[i] - s_y[j]")
+        if periodic:
+            L("            if periodic_y == wp.int32(1):")
+            L("                dy = dy - box_ly * wp.round(dy / box_ly)")
         L("        if dim > wp.int32(2):")
         L("            dz = d_z[i] - s_z[j]")
+        if periodic:
+            L("            if periodic_z == wp.int32(1):")
+            L("                dz = dz - box_lz * wp.round(dz / box_lz)")
     if emit_pre and (requires & {'rij2', 'rij', 'grad', 'wij'}):
         L("        rij2 = dx*dx + dy*dy + dz*dz")
     if emit_post and (requires & {'rij', 'grad', 'wij'}):
@@ -248,7 +263,8 @@ def _emit_geometry(requires, type_token, func_suffix, phase='all'):
 
 
 def generate_group_source(equations, dtype, func_name='_warp_group_kernel',
-                           neighbor_mode='flat', accumulate_outputs=False):
+                           neighbor_mode='flat', accumulate_outputs=False,
+                           periodic=False):
     """Generate the Warp kernel source for a group of equations.
 
     ``neighbor_mode`` selects the neighbor source: ``flat`` reads a prebuilt CSR
@@ -269,6 +285,8 @@ def generate_group_source(equations, dtype, func_name='_warp_group_kernel',
     """
     if neighbor_mode not in ('flat', 'grid'):
         raise ValueError("neighbor_mode must be 'flat' or 'grid'")
+    if periodic and neighbor_mode != 'grid':
+        raise ValueError("periodic minimum-image requires neighbor_mode='grid'")
     type_token, func_suffix, _ = _dtype_tokens(dtype)
     src_names, dst_names, scalar_names, out_names, requires = _collect(
         equations, neighbor_mode=neighbor_mode
@@ -303,6 +321,13 @@ def generate_group_source(equations, dtype, func_name='_warp_group_kernel',
         L("        nz: wp.int32,")
         L("        ncells: wp.int32,")
         L("        radius_scale: %s," % type_token)
+        if periodic:
+            L("        box_lx: %s," % type_token)
+            L("        box_ly: %s," % type_token)
+            L("        box_lz: %s," % type_token)
+            L("        periodic_x: wp.int32,")
+            L("        periodic_y: wp.int32,")
+            L("        periodic_z: wp.int32,")
     L("        dim: wp.int32,")
     L("        kernel_id: wp.int32,")
     for n in scalar_names:
@@ -353,15 +378,38 @@ def generate_group_source(equations, dtype, func_name='_warp_group_kernel',
         L("                ix = ix0 + wp.int32(dxc)")
         L("                iy = iy0 + wp.int32(dyc)")
         L("                iz = iz0 + wp.int32(dzc)")
-        L("                if ix >= 0 and ix < nx and iy >= 0 and iy < ny"
-          " and iz >= 0 and iz < nz:")
+        if periodic:
+            # Per-dim: wrap the cell index when that dim is periodic
+            # (always in-bounds), else keep the bounds check. ny/nz == 1 for
+            # lower dims makes the non-periodic check select only index 0.
+            L("                cell_ok = True")
+            L("                if periodic_x == wp.int32(1):")
+            L("                    ix = ((ix % nx) + nx) % nx")
+            L("                else:")
+            L("                    if ix < 0 or ix >= nx:")
+            L("                        cell_ok = False")
+            L("                if periodic_y == wp.int32(1):")
+            L("                    iy = ((iy % ny) + ny) % ny")
+            L("                else:")
+            L("                    if iy < 0 or iy >= ny:")
+            L("                        cell_ok = False")
+            L("                if periodic_z == wp.int32(1):")
+            L("                    iz = ((iz % nz) + nz) % nz")
+            L("                else:")
+            L("                    if iz < 0 or iz >= nz:")
+            L("                        cell_ok = False")
+            L("                if cell_ok:")
+        else:
+            L("                if ix >= 0 and ix < nx and iy >= 0 and iy < ny"
+              " and iz >= 0 and iz < nz:")
         L("                    cid = ix + iy * nx + iz * nx * ny")
         L("                    if cid >= 0 and cid < ncells:")
         L("                        c_start_ = cell_starts[cid]")
         L("                        c_stop_ = c_start_ + cell_counts[cid]")
         L("                        for pos in range(c_start_, c_stop_):")
         L("                            j = wp.int32(cell_particles[pos])")
-        pre = _emit_geometry(requires, type_token, func_suffix, phase='pre')
+        pre = _emit_geometry(requires, type_token, func_suffix, phase='pre',
+                             periodic=periodic)
         for line in pre:
             L(_reindent(line, 20))
         L("                            hi_ = radius_scale * d_h[i]")
@@ -392,16 +440,23 @@ _KERNEL_CACHE = {}
 
 
 def _cache_key(equations, dtype, neighbor_mode='flat',
-               accumulate_outputs=False):
+               accumulate_outputs=False, periodic=False):
     type_token, _, _ = _dtype_tokens(dtype)
-    return (
+    key = (
         tuple(eq.signature() for eq in equations), type_token, neighbor_mode,
         bool(accumulate_outputs),
     )
+    # Append the periodic marker only when set, so non-periodic kernels keep
+    # their exact prior structural key (and md5-derived name / Warp disk-cache
+    # hash) -- they neither change nor recompile when periodic support is added.
+    if periodic:
+        key = key + ('periodic',)
+    return key
 
 
 def build_group_kernel(equations, dtype, device_funcs, key=None,
-                       neighbor_mode='flat', accumulate_outputs=False):
+                       neighbor_mode='flat', accumulate_outputs=False,
+                       periodic=False):
     """Generate (or fetch from cache) the fused kernel for ``equations``.
 
     ``device_funcs`` maps the device ``wp.func`` names referenced by the
@@ -409,14 +464,18 @@ def build_group_kernel(equations, dtype, device_funcs, key=None,
     objects; these seed the namespace the generated function executes in so
     Warp can resolve them. ``neighbor_mode`` (``flat``/``grid``) selects the
     neighbor source and is part of the structural cache key, so the two
-    variants of a group compile independently (ADR-0004).
+    variants of a group compile independently (ADR-0004). ``periodic`` (grid
+    only) compiles a minimum-image / wrapped-cell-walk variant, also part of the
+    cache key, so the non-periodic kernels are byte-identical and untouched.
 
     Returns a :class:`GroupKernel`.
     """
     if wp is None:  # pragma: no cover
         raise ImportError("warp is required for build_group_kernel")
 
-    cache_key = _cache_key(equations, dtype, neighbor_mode, accumulate_outputs)
+    cache_key = _cache_key(
+        equations, dtype, neighbor_mode, accumulate_outputs, periodic
+    )
     cached = _KERNEL_CACHE.get(cache_key)
     if cached is not None:
         return cached
@@ -429,16 +488,17 @@ def build_group_kernel(equations, dtype, device_funcs, key=None,
         # depends on build order (e.g. len(_KERNEL_CACHE)) changes the source
         # whenever the order shifts and forces a cold recompile every session.
         digest = hashlib.md5(repr(cache_key).encode('utf-8')).hexdigest()[:12]
-        key = "warp_group_%s_%s%s_%s" % (
+        key = "warp_group_%s_%s%s%s_%s" % (
             func_suffix, neighbor_mode,
-            "_acc" if accumulate_outputs else "", digest
+            "_acc" if accumulate_outputs else "",
+            "_per" if periodic else "", digest
         )
     func_name = key
 
     source, src_names, dst_names, scalar_names, out_names = (
         generate_group_source(
             equations, dtype, func_name=func_name, neighbor_mode=neighbor_mode,
-            accumulate_outputs=accumulate_outputs,
+            accumulate_outputs=accumulate_outputs, periodic=periodic,
         )
     )
 

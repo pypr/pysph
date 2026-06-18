@@ -239,6 +239,9 @@ if wp is not None:
             ny: wp.int32,
             nz: wp.int32,
             dim: wp.int32,
+            periodic_x: wp.int32,
+            periodic_y: wp.int32,
+            periodic_z: wp.int32,
             cell_ids: wp.array(dtype=wp.int32),
             counts: wp.array(dtype=wp.int32),
     ):
@@ -250,9 +253,21 @@ if wp is not None:
             iy = wp.int32(wp.floor((y[i] - ymin) / cell_size))
         if dim > 2:
             iz = wp.int32(wp.floor((z[i] - zmin) / cell_size))
-        ix = wp.clamp(ix, wp.int32(0), nx - wp.int32(1))
-        iy = wp.clamp(iy, wp.int32(0), ny - wp.int32(1))
-        iz = wp.clamp(iz, wp.int32(0), nz - wp.int32(1))
+        # Periodic dims wrap into the canonical [0, n) cell (so positions just
+        # outside the box bin into their periodic image cell, consistent with
+        # the wrapped cell walk); non-periodic dims clamp to the edge cell.
+        if periodic_x == wp.int32(1):
+            ix = ((ix % nx) + nx) % nx
+        else:
+            ix = wp.clamp(ix, wp.int32(0), nx - wp.int32(1))
+        if periodic_y == wp.int32(1):
+            iy = ((iy % ny) + ny) % ny
+        else:
+            iy = wp.clamp(iy, wp.int32(0), ny - wp.int32(1))
+        if periodic_z == wp.int32(1):
+            iz = ((iz % nz) + nz) % nz
+        else:
+            iz = wp.clamp(iz, wp.int32(0), nz - wp.int32(1))
         cid = ix + iy * nx + iz * nx * ny
         cell_ids[i] = cid
         wp.atomic_add(counts, cid, wp.int32(1))
@@ -271,6 +286,9 @@ if wp is not None:
             ny: wp.int32,
             nz: wp.int32,
             dim: wp.int32,
+            periodic_x: wp.int32,
+            periodic_y: wp.int32,
+            periodic_z: wp.int32,
             cell_ids: wp.array(dtype=wp.int32),
             counts: wp.array(dtype=wp.int32),
     ):
@@ -282,9 +300,21 @@ if wp is not None:
             iy = wp.int32(wp.floor((y[i] - ymin) / cell_size))
         if dim > 2:
             iz = wp.int32(wp.floor((z[i] - zmin) / cell_size))
-        ix = wp.clamp(ix, wp.int32(0), nx - wp.int32(1))
-        iy = wp.clamp(iy, wp.int32(0), ny - wp.int32(1))
-        iz = wp.clamp(iz, wp.int32(0), nz - wp.int32(1))
+        # Periodic dims wrap into the canonical [0, n) cell (so positions just
+        # outside the box bin into their periodic image cell, consistent with
+        # the wrapped cell walk); non-periodic dims clamp to the edge cell.
+        if periodic_x == wp.int32(1):
+            ix = ((ix % nx) + nx) % nx
+        else:
+            ix = wp.clamp(ix, wp.int32(0), nx - wp.int32(1))
+        if periodic_y == wp.int32(1):
+            iy = ((iy % ny) + ny) % ny
+        else:
+            iy = wp.clamp(iy, wp.int32(0), ny - wp.int32(1))
+        if periodic_z == wp.int32(1):
+            iz = ((iz % nz) + nz) % nz
+        else:
+            iz = wp.clamp(iz, wp.int32(0), nz - wp.int32(1))
         cid = ix + iy * nx + iz * nx * ny
         cell_ids[i] = cid
         wp.atomic_add(counts, cid, wp.int32(1))
@@ -808,6 +838,7 @@ class UniformGridWarpNNPS(BruteForceWarpNNPS):
         self._grid = {}
         self._bounds = None
         self.cell_size = 1.0
+        self._periodic_box = None
         super(UniformGridWarpNNPS, self).__init__(
             dim=dim, particles=particles, radius_scale=radius_scale,
             ghost_layers=ghost_layers, domain=domain, cache=cache,
@@ -828,6 +859,30 @@ class UniformGridWarpNNPS(BruteForceWarpNNPS):
         if not use_cache:
             raise ValueError("UniformGridWarpNNPS requires cached queries")
         self.use_cache = True
+
+    def set_periodic_box(self, bounds):
+        """Set the periodic domain box for minimum-image neighbor handling.
+
+        ``bounds`` is a dict with ``xmin``/``xmax`` (and ``ymin``/``ymax``,
+        ``zmin``/``zmax``) plus optional ``periodic_in_{x,y,z}`` flags (a dim is
+        periodic by default if both its min/max are present), or ``None`` to
+        disable. In periodic dimensions the grid tiles the box exactly so the
+        cell-index wrap is consistent; the MVP requires equal-length periodic
+        dimensions (a cubic periodic box). Recomputed on the next ``update()``.
+        """
+        self._periodic_box = bounds
+        self._grid.clear()
+        if self._bounds is not None:
+            self._compute_bounds_and_cell_size()
+
+    def _periodic_flag(self, axis, dim_ok):
+        box = self._periodic_box
+        if box is None:
+            return False
+        key = 'periodic_in_' + axis
+        if key in box:
+            return bool(box[key]) and dim_ok
+        return (axis + 'min' in box and axis + 'max' in box) and dim_ok
 
     def _compute_bounds_and_cell_size(self):
         xmin = ymin = zmin = np.inf
@@ -857,30 +912,91 @@ class UniformGridWarpNNPS(BruteForceWarpNNPS):
         if not np.isfinite(xmin):
             xmin = ymin = zmin = -0.5
             xmax = ymax = zmax = 0.5
-        self.cell_size = self.radius_scale * hmax
-        if self.cell_size <= 1e-14:
-            self.cell_size = 1.0
+        cell_min = self.radius_scale * hmax
+        if cell_min <= 1e-14:
+            cell_min = 1.0
 
-        pad = self.cell_size
-        xmin -= pad
-        xmax += pad
-        ymin -= pad
-        ymax += pad
-        zmin -= pad
-        zmax += pad
+        box = self._periodic_box
+        px = self._periodic_flag('x', True)
+        py = self._periodic_flag('y', self.dim > 1)
+        pz = self._periodic_flag('z', self.dim > 2)
 
-        nx = max(1, int(np.ceil((xmax - xmin) / self.cell_size)))
+        # A periodic dim must supply its min/max so the box can tile.
+        for axis, p in (('x', px), ('y', py), ('z', pz)):
+            if p and not (axis + 'min' in box and axis + 'max' in box):
+                raise ValueError(
+                    "periodic_in_%s is set but %smin/%smax are missing from "
+                    "the periodic box" % (axis, axis, axis)
+                )
+
+        # A single cell size is used for binning in all dimensions; periodic
+        # dimensions must tile their box exactly with it. Requirements:
+        # equal-length periodic dims (one cell size tiles them), and
+        # n = floor(L/cell_min) >= 3 -- so cell_size = L/n >= cell_min (the
+        # 3-cell stencil covers the support) and L >= 3*support > 2*support (so
+        # minimum image is unique). Otherwise raise rather than silently clamp.
+        periodic_lengths = []
+        if px:
+            periodic_lengths.append(float(box['xmax']) - float(box['xmin']))
+        if py:
+            periodic_lengths.append(float(box['ymax']) - float(box['ymin']))
+        if pz:
+            periodic_lengths.append(float(box['zmax']) - float(box['zmin']))
+        if periodic_lengths:
+            if (max(periodic_lengths) - min(periodic_lengths)
+                    > 1e-6 * max(periodic_lengths)):
+                raise ValueError(
+                    "periodic minimum-image requires equal-length periodic "
+                    "dimensions (cubic box); got lengths %r" % periodic_lengths
+                )
+            length = periodic_lengths[0]
+            ncell = int(np.floor(length / cell_min))
+            if ncell < 3:
+                raise ValueError(
+                    "periodic box length %g is too small for support "
+                    "radius_scale*h=%g; minimum-image neighbors need "
+                    "L >= 3*radius_scale*h" % (length, cell_min)
+                )
+            self.cell_size = length / ncell
+        else:
+            self.cell_size = cell_min
+
+        box_lx = box_ly = box_lz = 0.0
+        if px:
+            xmin = float(box['xmin'])
+            box_lx = float(box['xmax']) - xmin
+            nx = max(3, int(round(box_lx / self.cell_size)))
+        else:
+            xmin -= self.cell_size
+            xmax += self.cell_size
+            nx = max(1, int(np.ceil((xmax - xmin) / self.cell_size)))
         ny = 1
-        nz = 1
         if self.dim > 1:
-            ny = max(1, int(np.ceil((ymax - ymin) / self.cell_size)))
+            if py:
+                ymin = float(box['ymin'])
+                box_ly = float(box['ymax']) - ymin
+                ny = max(3, int(round(box_ly / self.cell_size)))
+            else:
+                ymin -= self.cell_size
+                ymax += self.cell_size
+                ny = max(1, int(np.ceil((ymax - ymin) / self.cell_size)))
+        nz = 1
         if self.dim > 2:
-            nz = max(1, int(np.ceil((zmax - zmin) / self.cell_size)))
+            if pz:
+                zmin = float(box['zmin'])
+                box_lz = float(box['zmax']) - zmin
+                nz = max(3, int(round(box_lz / self.cell_size)))
+            else:
+                zmin -= self.cell_size
+                zmax += self.cell_size
+                nz = max(1, int(np.ceil((zmax - zmin) / self.cell_size)))
 
         self._bounds = {
             'xmin': xmin, 'ymin': ymin, 'zmin': zmin,
             'nx': nx, 'ny': ny, 'nz': nz,
             'ncells': nx * ny * nz,
+            'box_lx': box_lx, 'box_ly': box_ly, 'box_lz': box_lz,
+            'periodic_x': px, 'periodic_y': py, 'periodic_z': pz,
         }
 
     def _scalar(self, value, gpu):
@@ -933,8 +1049,11 @@ class UniformGridWarpNNPS(BruteForceWarpNNPS):
                     self._scalar(bounds['zmin'], src),
                     self._scalar(self.cell_size, src),
                     np.int32(bounds['nx']), np.int32(bounds['ny']),
-                    np.int32(bounds['nz']), np.int32(self.dim), cell_ids,
-                    counts
+                    np.int32(bounds['nz']), np.int32(self.dim),
+                    np.int32(1 if bounds.get('periodic_x') else 0),
+                    np.int32(1 if bounds.get('periodic_y') else 0),
+                    np.int32(1 if bounds.get('periodic_z') else 0),
+                    cell_ids, counts
                 ],
                 device=self.device,
             )

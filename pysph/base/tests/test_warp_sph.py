@@ -387,6 +387,105 @@ def test_warp_summation_density_matches_cpu_cross_array_in_3d_and_pulls_rho():
     assert np.allclose(solid.rho, expected)
 
 
+def test_warp_periodic_summation_density_matches_cpu_min_image():
+    # Periodic in x with nx>=4 cells AND an out-of-box source particle (x=1.08,
+    # image at 0.08): exercises both the minimum-image distance and the
+    # wrap-binning of out-of-box positions (a clamped bin would mis-place 1.08
+    # into the edge cell and the query at 0.30 would miss it). Matches a
+    # brute-force CPU min-image summation density.
+    lx = 1.0
+    x = np.array([0.05, 0.30, 0.55, 0.80, 1.08])
+    y = np.zeros_like(x)
+    z = np.zeros_like(x)
+    h = np.ones_like(x) * 0.12   # cell_min=0.24 -> nx=4 (clamp-bug regime)
+    m = np.ones_like(x)
+    pa = get_particle_array(
+        name='fluid', x=x.copy(), y=y.copy(), z=z.copy(), h=h.copy(),
+        m=m.copy(), rho=np.zeros_like(x), backend='warp',
+    )
+    nnps = UniformGridWarpNNPS(dim=2, particles=[pa], radius_scale=2.0)
+    nnps.set_periodic_box({'xmin': 0.0, 'xmax': lx, 'periodic_in_x': True})
+    assert nnps._bounds['periodic_x'] and nnps._bounds['nx'] >= 3
+
+    compute_summation_density(nnps, 0, 0, neighbor_mode='grid')
+    pa.gpu.pull('rho')
+
+    cpu = CubicSpline(dim=2)
+    ref = np.zeros_like(x)
+    for i in range(len(x)):
+        total = 0.0
+        for j in range(len(x)):
+            dx = x[i] - x[j]
+            dx -= lx * np.round(dx / lx)   # minimum image in x
+            rij = abs(dx)
+            hij = 0.5 * (h[i] + h[j])
+            total += m[j] * cpu.kernel(xij=[dx, 0.0, 0.0], rij=rij, h=hij)
+        ref[i] = total
+
+    assert np.allclose(pa.rho, ref, rtol=1e-4, atol=1e-4)
+    # Without the wrap the two edge particles would each miss a neighbor; with
+    # it they pick up the across-boundary contribution (self + >=1 neighbor).
+    assert pa.rho[0] > 1.5 * m[0] * cpu.kernel(xij=[0, 0, 0], rij=0.0, h=h[0])
+
+
+def test_warp_periodic_box_rejects_invalid_setups():
+    # A box too small for the support (L < 3*radius_scale*h) and a periodic flag
+    # without min/max must raise clearly rather than silently clamp or KeyError.
+    x = np.array([0.1, 0.5, 0.9])
+    z = np.zeros_like(x)
+
+    def make(h_val):
+        return get_particle_array(
+            name='fluid', x=x.copy(), y=z.copy(), z=z.copy(),
+            h=np.ones_like(x) * h_val, m=np.ones_like(x),
+            rho=np.zeros_like(x), backend='warp',
+        )
+
+    nnps_small = UniformGridWarpNNPS(dim=2, particles=[make(0.4)],
+                                     radius_scale=2.0)
+    with pytest.raises(ValueError):
+        # support = 2*0.4 = 0.8, L = 1 -> floor(1/0.8) = 1 < 3
+        nnps_small.set_periodic_box(
+            {'xmin': 0.0, 'xmax': 1.0, 'periodic_in_x': True})
+
+    nnps_missing = UniformGridWarpNNPS(dim=2, particles=[make(0.1)],
+                                       radius_scale=2.0)
+    with pytest.raises(ValueError):
+        nnps_missing.set_periodic_box({'periodic_in_x': True})
+
+
+def test_warp_periodic_lattice_density_is_uniform():
+    # A uniform lattice tiling a doubly-periodic box has, by symmetry, the same
+    # density at every particle -- including boundary particles. A non-periodic
+    # neighbor search would show boundary deficiency (lower density at edges).
+    n = 12
+    dx = 1.0 / n
+    coords = (np.arange(n) + 0.5) * dx
+    gx, gy = np.meshgrid(coords, coords)
+    x = gx.ravel()
+    y = gy.ravel()
+    z = np.zeros_like(x)
+    h = np.ones_like(x) * 1.3 * dx
+    m = np.ones_like(x) * dx * dx   # rho0 = 1
+    pa = get_particle_array(
+        name='fluid', x=x.copy(), y=y.copy(), z=z.copy(), h=h.copy(),
+        m=m.copy(), rho=np.zeros_like(x), backend='warp',
+    )
+    nnps = UniformGridWarpNNPS(dim=2, particles=[pa], radius_scale=2.0)
+    nnps.set_periodic_box({
+        'xmin': 0.0, 'xmax': 1.0, 'ymin': 0.0, 'ymax': 1.0,
+        'periodic_in_x': True, 'periodic_in_y': True,
+    })
+    compute_summation_density(nnps, 0, 0, neighbor_mode='grid')
+    pa.gpu.pull('rho')
+
+    mean_rho = float(np.mean(pa.rho))
+    # Uniform to fp32 scale -- no boundary deficiency.
+    assert np.std(pa.rho) < 1e-4 * mean_rho
+    # A well-sampled lattice reproduces rho0 to a few percent.
+    assert abs(mean_rho - 1.0) < 0.05
+
+
 def test_warp_continuity_matches_cpu_in_2d():
     pa = get_particle_array(
         name='fluid',

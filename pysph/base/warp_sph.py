@@ -1010,14 +1010,23 @@ def _run_equation_group(nnps, src_index, dst_index, blocks, scalar_values=None,
     if ndst <= 0:
         return
     dtype = np.float32 if src.x.dtype == np.float32 else np.float64
+    # Periodicity is a property of the NNPS (set_periodic_box): when the grid
+    # bounds carry a periodic dimension, build the minimum-image kernel variant
+    # and pass the box. Only meaningful in grid mode.
+    periodic = bool(
+        neighbor_mode == 'grid' and getattr(nnps, '_bounds', None) and (
+            nnps._bounds.get('periodic_x') or nnps._bounds.get('periodic_y')
+            or nnps._bounds.get('periodic_z')
+        )
+    )
     group = build_group_kernel(
         blocks, dtype, _WARP_DEVICE_FUNCS, neighbor_mode=neighbor_mode,
-        accumulate_outputs=accumulate_outputs,
+        accumulate_outputs=accumulate_outputs, periodic=periodic,
     )
     inputs = [src.get_device_array(n).dev for n in group.src_names]
     inputs += [dst.get_device_array(n).dev for n in group.dst_names]
     if neighbor_mode == 'grid':
-        inputs += _grid_launch_args(nnps, src_index, dtype)
+        inputs += _grid_launch_args(nnps, src_index, dtype, periodic=periodic)
     else:
         if cache is None:
             cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
@@ -1711,16 +1720,18 @@ def _apply_wcsph_eos(nnps, pa, rho0, c0, p0, eos, gamma):
         raise ValueError("EOS must be 'isothermal' or 'tait'")
 
 
-def _grid_launch_args(nnps, src_index, dtype):
+def _grid_launch_args(nnps, src_index, dtype, periodic=False):
     """Ordered grid-query launch inputs for a grid-direct kernel (ADR-0004).
 
-    Mirrors the signature emitted by ``warp_codegen`` in ``grid`` mode and the
-    hand-written grid-direct kernels: the device cell list from ``_build_grid``
-    (reused per ``update()``) followed by the grid bounds and ``radius_scale``.
+    Mirrors the signature emitted by ``warp_codegen`` in ``grid`` mode: the
+    device cell list from ``_build_grid`` (reused per ``update()``) followed by
+    the grid bounds and ``radius_scale``. When ``periodic`` is set, the periodic
+    box lengths and per-dimension periodic flags are appended, matching the
+    minimum-image kernel variant.
     """
     grid = nnps._build_grid(src_index)
     b = nnps._bounds
-    return [
+    args = [
         grid['starts'], grid['counts'], grid['cell_particles'],
         dtype(b['xmin']), dtype(b['ymin']), dtype(b['zmin']),
         dtype(nnps.cell_size),
@@ -1728,6 +1739,14 @@ def _grid_launch_args(nnps, src_index, dtype):
         np.int32(b['ncells']),
         dtype(nnps.radius_scale),
     ]
+    if periodic:
+        args += [
+            dtype(b['box_lx']), dtype(b['box_ly']), dtype(b['box_lz']),
+            np.int32(1 if b['periodic_x'] else 0),
+            np.int32(1 if b['periodic_y'] else 0),
+            np.int32(1 if b['periodic_z'] else 0),
+        ]
+    return args
 
 
 def compute_wcsph_accel_continuity(nnps, src_index=0, dst_index=0, alpha=0.1,

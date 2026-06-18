@@ -3,7 +3,7 @@ aspect: gpu-nnps
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-18T13:30:00 CEST
+last_reviewed: 2026-06-18T16:00:00 CEST
 status: active
 ---
 
@@ -130,8 +130,9 @@ Repeated-step proof:
 - Focused tests compare the KDK step against CPU reference density, EOS,
   pressure-gradient acceleration, and final state. The Warp SPH/NNPS suite
   passes with `29 passed`.
-- Periodic behavior is currently position wrapping only. Minimum-image distance
-  and periodic cell lookup remain open for true periodic neighbor interaction.
+- Periodic behavior was initially position wrapping only; true periodic
+  minimum-image distance + wrapped cell lookup are now implemented for the
+  grid-direct path (see the periodic minimum-image note below).
 
 Artificial-viscosity proof:
 
@@ -197,6 +198,15 @@ Grid-direct neighbor traversal proof (ADR-0004):
   `'grid'`). No device step path builds a flat CSR neighbor cache anymore;
   `build_neighbor_cache_gpu` is now used only by the host `get_nearest_particles`
   query API, `compute_neighbor_sum`, and the flat-mode oracle/cross-array tests.
+- Periodic minimum-image (ADR-0004 follow-up): `UniformGridWarpNNPS.set_periodic_box`
+  tiles a (cubic) periodic box exactly; the cell-id binning kernels wrap (not
+  clamp) the cell index in periodic dims so out-of-box positions bin into their
+  image cell; the generator's `periodic=True` grid variant walks wrapped cells
+  and uses minimum-image separations. `_run_equation_group` auto-detects
+  periodicity from `_bounds`. Validated vs a CPU minimum-image reference
+  (5.5e-6, incl. out-of-box) and by periodic-lattice uniformity; non-periodic
+  path byte-identical. Constraints (raise): equal-length periodic dims,
+  `floor(L/radius_scale*h) >= 3`. The flat host-query path is not yet periodic.
 
 ## Key sub-topics
 

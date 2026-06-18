@@ -247,6 +247,27 @@ def test_accumulate_outputs_adds_to_existing_output():
     assert np.allclose(arrays['d_total'].numpy(), [16.0, 16.0, 16.0])
 
 
+def test_periodic_grid_kernel_compiles_and_is_distinct():
+    # The periodic (minimum-image) variant is a distinct cached kernel from the
+    # non-periodic one and only valid in grid mode.
+    clear_kernel_cache()
+    nonper = build_group_kernel(
+        [_KernelSum()], np.float32, ws._WARP_DEVICE_FUNCS,
+        neighbor_mode='grid', periodic=False,
+    )
+    per = build_group_kernel(
+        [_KernelSum()], np.float32, ws._WARP_DEVICE_FUNCS,
+        neighbor_mode='grid', periodic=True,
+    )
+    assert per is not nonper
+    assert 'box_lx' in per.source and 'box_lx' not in nonper.source
+    with pytest.raises(ValueError):
+        build_group_kernel(
+            [_KernelSum()], np.float32, ws._WARP_DEVICE_FUNCS,
+            neighbor_mode='flat', periodic=True,
+        )
+
+
 def test_unknown_shared_quantity_is_rejected():
     class _Bad(WarpEquation):
         out_arrays = ('q',)
