@@ -4,6 +4,11 @@
       "from": "ADR-0002",
       "to": "ADR-0001",
       "type": "relates_to"
+    },
+    {
+      "from": "ADR-0003",
+      "to": "ADR-0002",
+      "type": "relates_to"
     }
   ],
   "nodes": [
@@ -19,6 +24,13 @@
       "file": "decisions/2026-06-15_adr-0002_propose-warp-device-mirror-for-particle-array.md",
       "id": "ADR-0002",
       "scope": "particle-memory",
+      "status": "Accepted"
+    },
+    {
+      "date": "2026-06-17",
+      "file": "decisions/2026-06-17_adr-0003_adopt-dynamic-warp-equation-group-code-generation.md",
+      "id": "ADR-0003",
+      "scope": "warp-backend",
       "status": "Accepted"
     }
   ]

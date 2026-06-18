@@ -8,6 +8,7 @@ except ImportError:  # pragma: no cover
     wp = None
 
 from pysph.base.warp_device_helper import WarpDeviceHelper
+from pysph.base.warp_codegen import WarpEquation, build_group_kernel
 
 
 if wp is not None:
@@ -1497,6 +1498,118 @@ if wp is not None:
         d_rho[i] = total
 
 
+if wp is not None:
+    # Device wp.func objects referenced by generated group kernels. Seeded into
+    # the generated kernels' namespace so Warp can resolve them (ADR-0003).
+    _WARP_DEVICE_FUNCS = {
+        '_kernel_dwdq_f32': _kernel_dwdq_f32,
+        '_kernel_dwdq_f64': _kernel_dwdq_f64,
+        '_kernel_value_f32': _kernel_value_f32,
+        '_kernel_value_f64': _kernel_value_f64,
+        '_cubic_spline_f32': _cubic_spline_f32,
+        '_cubic_spline_f64': _cubic_spline_f64,
+        '_cubic_dwdq_f32': _cubic_dwdq_f32,
+        '_cubic_dwdq_f64': _cubic_dwdq_f64,
+        '_gaussian_spline_f32': _gaussian_spline_f32,
+        '_gaussian_spline_f64': _gaussian_spline_f64,
+        '_gaussian_dwdq_f32': _gaussian_dwdq_f32,
+        '_gaussian_dwdq_f64': _gaussian_dwdq_f64,
+    }
+else:  # pragma: no cover
+    _WARP_DEVICE_FUNCS = {}
+
+
+class ContinuityEquation(WarpEquation):
+    """PySPH ``ContinuityEquation`` as a composable Warp block."""
+    src_arrays = ('m',)
+    out_arrays = ('arho',)
+    requires = ('dx', 'dy', 'dz', 'grad', 'vijx', 'vijy', 'vijz')
+
+    def loop(self):
+        return (
+            "        _acc_arho += s_m[j] * (vijx*(grad*dx) + vijy*(grad*dy)"
+            " + vijz*(grad*dz))"
+        )
+
+
+class PressureGradient(WarpEquation):
+    """Inviscid WCSPH pressure-gradient acceleration as a Warp block."""
+    src_arrays = ('m', 'rho', 'p')
+    dst_arrays = ('rho', 'p')
+    out_arrays = ('au', 'av', 'aw')
+    requires = ('dx', 'dy', 'dz', 'grad')
+
+    def initialize(self):
+        return (
+            "    rhoi21_ = TYPE(1.0) / (d_rho[i] * d_rho[i])\n"
+            "    tmpi_ = d_p[i] * rhoi21_"
+        )
+
+    def loop(self):
+        return (
+            "        rhoj21_ = TYPE(1.0) / (s_rho[j] * s_rho[j])\n"
+            "        pg_tmp_ = tmpi_ + s_p[j] * rhoj21_\n"
+            "        pg_fac_ = -s_m[j] * pg_tmp_\n"
+            "        _acc_au += pg_fac_ * (grad * dx)\n"
+            "        _acc_av += pg_fac_ * (grad * dy)\n"
+            "        _acc_aw += pg_fac_ * (grad * dz)"
+        )
+
+
+class ArtificialViscosity(WarpEquation):
+    """Monaghan artificial viscosity (pair-averaged ``cs``) as a Warp block."""
+    src_arrays = ('m', 'rho', 'cs')
+    dst_arrays = ('rho', 'cs')
+    out_arrays = ('au', 'av', 'aw')
+    scalars = ('alpha', 'beta')
+    requires = ('dx', 'dy', 'dz', 'rij2', 'hij', 'grad',
+                'vijx', 'vijy', 'vijz')
+
+    def loop(self):
+        return (
+            "        av_vdotx_ = vijx*dx + vijy*dy + vijz*dz\n"
+            "        if av_vdotx_ < TYPE(0.0):\n"
+            "            av_mu_ = hij * av_vdotx_"
+            " / (rij2 + TYPE(0.01)*hij*hij)\n"
+            "            av_rhoij1_ = TYPE(2.0) / (d_rho[i] + s_rho[j])\n"
+            "            av_cij_ = TYPE(0.5) * (d_cs[i] + s_cs[j])\n"
+            "            av_piij_ = (-alpha*av_cij_*av_mu_"
+            " + beta*av_mu_*av_mu_) * av_rhoij1_\n"
+            "            av_fac_ = -s_m[j] * av_piij_\n"
+            "            _acc_au += av_fac_ * grad * dx\n"
+            "            _acc_av += av_fac_ * grad * dy\n"
+            "            _acc_aw += av_fac_ * grad * dz"
+        )
+
+
+class XSPHCorrection(WarpEquation):
+    """PySPH leapfrog XSPH position correction as a Warp block."""
+    src_arrays = ('m', 'rho')
+    dst_arrays = ('rho',)
+    out_arrays = ('ax', 'ay', 'az')
+    scalars = ('eps',)
+    requires = ('rij', 'hij', 'wij', 'vijx', 'vijy', 'vijz')
+
+    def loop(self):
+        return (
+            "        xs_rhoij1_ = TYPE(2.0) / (d_rho[i] + s_rho[j])\n"
+            "        xs_tmp_ = -eps * s_m[j] * wij * xs_rhoij1_\n"
+            "        _acc_ax += xs_tmp_ * vijx\n"
+            "        _acc_ay += xs_tmp_ * vijy\n"
+            "        _acc_az += xs_tmp_ * vijz"
+        )
+
+
+# The fused continuity-density acceleration group: pressure gradient, then
+# Monaghan viscosity (both into au/av/aw), continuity (arho), XSPH (ax/ay/az).
+# Block order fixes the per-pair accumulation order for the shared au/av/aw
+# accumulators (pressure gradient before viscosity).
+_WCSPH_CONTINUITY_BLOCKS = (
+    PressureGradient(), ArtificialViscosity(), ContinuityEquation(),
+    XSPHCorrection(),
+)
+
+
 def _ensure_warp_helper(pa, device):
     if pa.gpu is None or getattr(pa.gpu, 'backend', None) != 'warp':
         pa.set_device_helper(WarpDeviceHelper(pa, backend='warp',
@@ -1534,7 +1647,8 @@ def _kernel_id(kernel):
 
 
 def compute_summation_density(nnps, src_index=0, dst_index=0,
-                              out_prop='rho', push=True, kernel='cubic'):
+                              out_prop='rho', push=True, kernel='cubic',
+                              cache=None):
     """Compute standard SPH summation density with Warp.
 
     This mirrors ``pysph.sph.basic_equations.SummationDensity`` for one
@@ -1551,7 +1665,8 @@ def compute_summation_density(nnps, src_index=0, dst_index=0,
     if push:
         src_pa.gpu.push('x', 'y', 'z', 'h', 'm')
         dst_pa.gpu.push('x', 'y', 'z', 'h', out_prop)
-    cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
+    if cache is None:
+        cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
     src = src_pa.gpu
     dst = dst_pa.gpu
     out = dst.get_device_array(out_prop)
@@ -1661,7 +1776,7 @@ def compute_tait_eos(pa, rho0, c0, gamma=7.0, p0=0.0, out_prop='p',
 
 
 def compute_continuity(nnps, src_index=0, dst_index=0, out_prop='arho',
-                       push=True, kernel='cubic'):
+                       push=True, kernel='cubic', cache=None):
     """Compute PySPH ``ContinuityEquation`` with Warp."""
     if wp is None:  # pragma: no cover
         raise ImportError("warp is required for compute_continuity")
@@ -1673,7 +1788,8 @@ def compute_continuity(nnps, src_index=0, dst_index=0, out_prop='arho',
     if push:
         src_pa.gpu.push('x', 'y', 'z', 'h', 'm', 'u', 'v', 'w')
         dst_pa.gpu.push('x', 'y', 'z', 'h', 'u', 'v', 'w', out_prop)
-    cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
+    if cache is None:
+        cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
     src = src_pa.gpu
     dst = dst_pa.gpu
     out = dst.get_device_array(out_prop)
@@ -1704,7 +1820,7 @@ def compute_continuity(nnps, src_index=0, dst_index=0, out_prop='arho',
 
 def compute_pressure_gradient(nnps, src_index=0, dst_index=0,
                               out_props=('au', 'av', 'aw'), push=True,
-                              kernel='cubic'):
+                              kernel='cubic', cache=None):
     """Compute the inviscid pressure-gradient part of WCSPH momentum."""
     if wp is None:  # pragma: no cover
         raise ImportError("warp is required for compute_pressure_gradient")
@@ -1717,7 +1833,8 @@ def compute_pressure_gradient(nnps, src_index=0, dst_index=0,
     if push:
         src_pa.gpu.push('x', 'y', 'z', 'h', 'm', 'rho', 'p')
         dst_pa.gpu.push('x', 'y', 'z', 'h', 'rho', 'p', *out_props)
-    cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
+    if cache is None:
+        cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
     src = src_pa.gpu
     dst = dst_pa.gpu
     au = dst.get_device_array(out_props[0])
@@ -1752,7 +1869,7 @@ def compute_pressure_gradient(nnps, src_index=0, dst_index=0,
 def compute_artificial_viscosity(nnps, src_index=0, dst_index=0, alpha=0.1,
                                  beta=0.0, c0=20.0,
                                  out_props=('au', 'av', 'aw'), push=True,
-                                 kernel='cubic'):
+                                 kernel='cubic', cache=None):
     """Add Monaghan artificial viscosity to WCSPH acceleration arrays."""
     if wp is None:  # pragma: no cover
         raise ImportError("warp is required for compute_artificial_viscosity")
@@ -1770,7 +1887,8 @@ def compute_artificial_viscosity(nnps, src_index=0, dst_index=0, alpha=0.1,
         dst_pa.gpu.push(
             'x', 'y', 'z', 'h', 'rho', 'cs', 'u', 'v', 'w', *out_props
         )
-    cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
+    if cache is None:
+        cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
     src = src_pa.gpu
     dst = dst_pa.gpu
     au = dst.get_device_array(out_props[0])
@@ -1808,7 +1926,7 @@ def compute_artificial_viscosity(nnps, src_index=0, dst_index=0, alpha=0.1,
 
 def compute_xsph_correction(nnps, src_index=0, dst_index=0, eps=0.5,
                             out_props=('ax', 'ay', 'az'), push=True,
-                            kernel='cubic'):
+                            kernel='cubic', cache=None):
     """Compute PySPH leapfrog XSPH position correction on the device."""
     if wp is None:  # pragma: no cover
         raise ImportError("warp is required for compute_xsph_correction")
@@ -1823,7 +1941,8 @@ def compute_xsph_correction(nnps, src_index=0, dst_index=0, eps=0.5,
         dst_pa.gpu.push(
             'x', 'y', 'z', 'h', 'rho', 'u', 'v', 'w', *out_props
         )
-    cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
+    if cache is None:
+        cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
     src = src_pa.gpu
     dst = dst_pa.gpu
     ax = dst.get_device_array(out_props[0])
@@ -2072,7 +2191,8 @@ def wcsph_pec_stage(pa, dt, stage=1.0, dim=3, xsph=False, device=None,
 
 
 def compute_wcsph_adaptive_timestep(nnps, pa_index=0, c0=20.0, cfl=0.25,
-                                    dt_min=0.0, dt_max=np.inf, push=True):
+                                    dt_min=0.0, dt_max=np.inf, push=True,
+                                    cache=None):
     """Compute WCSPH adaptive timestep with device reductions.
 
     Only the final scalar timestep is copied back to the host. Per-particle
@@ -2089,7 +2209,8 @@ def compute_wcsph_adaptive_timestep(nnps, pa_index=0, c0=20.0, cfl=0.25,
             'x', 'y', 'z', 'h', 'u', 'v', 'w', 'au', 'av', 'aw',
             'dt_cfl', 'dt_force'
         )
-    cache = nnps.build_neighbor_cache_gpu(pa_index, pa_index)
+    if cache is None:
+        cache = nnps.build_neighbor_cache_gpu(pa_index, pa_index)
     gpu = pa.gpu
     n = gpu.get_number_of_particles()
     dt_cfl = gpu.get_device_array('dt_cfl')
@@ -2230,20 +2351,11 @@ def wrap_periodic(pa, bounds, dim=3, device=None):
     return gpu.x, gpu.y, gpu.z
 
 
-def _compute_wcsph_acceleration(nnps, pa_index, rho0, c0, p0, alpha, beta,
-                                push, eos, gamma, kernel,
-                                density_mode='summation'):
-    pa = nnps.particles[pa_index]
-    if density_mode == 'summation':
-        compute_summation_density(
-            nnps, pa_index, pa_index, push=push, kernel=kernel
-        )
-    elif density_mode == 'continuity':
-        _ensure_property(pa, 'arho', nnps.device)
-        if push:
-            pa.gpu.push('rho', 'arho')
-    else:
-        raise ValueError("density_mode must be 'summation' or 'continuity'")
+def _apply_wcsph_eos(nnps, pa, rho0, c0, p0, eos, gamma):
+    """Apply the equation of state (per-particle, no neighbor loop).
+
+    Shared by the summation-density path and the fused continuity path.
+    """
     if eos == 'isothermal':
         compute_isothermal_eos(
             pa, rho0=rho0, c0=c0, p0=p0, device=nnps.device, push=False
@@ -2256,29 +2368,102 @@ def _compute_wcsph_acceleration(nnps, pa_index, rho0, c0, p0, alpha, beta,
         )
     else:
         raise ValueError("EOS must be 'isothermal' or 'tait'")
+
+
+def compute_wcsph_accel_continuity(nnps, src_index=0, dst_index=0, alpha=0.1,
+                                   beta=0.0, eps=0.5, c0=20.0, kernel='cubic',
+                                   cache=None, push=True):
+    """Fused continuity-density acceleration via a generated group kernel.
+
+    One neighbor traversal computes ``ContinuityEquation`` (``arho``), the
+    inviscid pressure gradient plus Monaghan artificial viscosity
+    (``au, av, aw``), and the XSPH correction (``ax, ay, az``), replacing four
+    separate launches over the same neighbor cache (ADR-0003). EOS must have
+    been applied beforehand because the kernel reads ``p`` and ``cs``.
+    """
+    if wp is None:  # pragma: no cover
+        raise ImportError(
+            "warp is required for compute_wcsph_accel_continuity"
+        )
+
+    src_pa = nnps.particles[src_index]
+    dst_pa = nnps.particles[dst_index]
+    _ensure_sound_speed(src_pa, c0, nnps.device)
+    if dst_pa is not src_pa:
+        _ensure_sound_speed(dst_pa, c0, nnps.device)
+    for prop in ('au', 'av', 'aw', 'arho', 'ax', 'ay', 'az'):
+        _ensure_property(dst_pa, prop, nnps.device)
+
+    if push:
+        src_pa.gpu.push(
+            'x', 'y', 'z', 'h', 'm', 'rho', 'p', 'cs', 'u', 'v', 'w'
+        )
+        dst_pa.gpu.push(
+            'x', 'y', 'z', 'h', 'rho', 'p', 'cs', 'u', 'v', 'w',
+            'au', 'av', 'aw', 'arho', 'ax', 'ay', 'az'
+        )
+    if cache is None:
+        cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
+
+    src = src_pa.gpu
+    dst = dst_pa.gpu
+    ndst = dst.get_number_of_particles()
+    if ndst <= 0:
+        return None
+    kernel_id = _kernel_id(kernel)
+    dtype = np.float32 if src.x.dtype == np.float32 else np.float64
+
+    group = build_group_kernel(
+        _WCSPH_CONTINUITY_BLOCKS, dtype, _WARP_DEVICE_FUNCS
+    )
+    scalar_values = {
+        'alpha': dtype(alpha), 'beta': dtype(beta), 'eps': dtype(eps),
+    }
+    inputs = [src.get_device_array(n).dev for n in group.src_names]
+    inputs += [dst.get_device_array(n).dev for n in group.dst_names]
+    inputs += [
+        cache['starts_dev'], cache['lengths_dev'], cache['neighbors_dev'],
+        np.int32(nnps.dim), kernel_id,
+    ]
+    inputs += [scalar_values[n] for n in group.scalar_names]
+    inputs += [dst.get_device_array(n).dev for n in group.out_names]
+
+    wp.launch(group.kernel, dim=ndst, inputs=inputs, device=nnps.device)
+    wp.synchronize_device(nnps.device)
+    return (
+        dst.get_device_array('au'), dst.get_device_array('av'),
+        dst.get_device_array('aw'),
+    )
+
+
+def _compute_wcsph_acceleration(nnps, pa_index, rho0, c0, p0, alpha, beta,
+                                push, eos, gamma, kernel,
+                                density_mode='summation', cache=None):
+    pa = nnps.particles[pa_index]
+    if density_mode == 'summation':
+        compute_summation_density(
+            nnps, pa_index, pa_index, push=push, kernel=kernel, cache=cache
+        )
+    elif density_mode == 'continuity':
+        _ensure_property(pa, 'arho', nnps.device)
+        if push:
+            pa.gpu.push('rho', 'arho')
+    else:
+        raise ValueError("density_mode must be 'summation' or 'continuity'")
+    _apply_wcsph_eos(nnps, pa, rho0, c0, p0, eos, gamma)
     result = compute_pressure_gradient(
-        nnps, pa_index, pa_index, push=False, kernel=kernel
+        nnps, pa_index, pa_index, push=False, kernel=kernel, cache=cache
     )
     if alpha != 0.0 or beta != 0.0:
         result = compute_artificial_viscosity(
             nnps, pa_index, pa_index, alpha=alpha, beta=beta, c0=c0,
-            push=False, kernel=kernel
+            push=False, kernel=kernel, cache=cache
         )
     if density_mode == 'continuity':
         compute_continuity(
-            nnps, pa_index, pa_index, push=False, kernel=kernel
+            nnps, pa_index, pa_index, push=False, kernel=kernel, cache=cache
         )
     return result
-
-
-def _compute_wcsph_xsph(nnps, pa_index, xsph_eps, kernel):
-    if xsph_eps is None or xsph_eps == 0.0:
-        return False
-    compute_xsph_correction(
-        nnps, pa_index, pa_index, eps=xsph_eps, push=False,
-        kernel=kernel
-    )
-    return True
 
 
 def _wc_sph_pec_continuity_step(nnps, pa_index, dt, rho0, c0, p0,
@@ -2287,31 +2472,38 @@ def _wc_sph_pec_continuity_step(nnps, pa_index, dt, rho0, c0, p0,
                                 dt_min, dt_max, adaptive_dt_scale,
                                 step_dt_max):
     pa = nnps.particles[pa_index]
+    use_xsph = xsph_eps is not None and xsph_eps != 0.0
+    eps = 0.0 if xsph_eps is None else xsph_eps
     if push:
         nnps.update(push=True)
     save_wcsph_state(pa, dim=nnps.dim, device=nnps.device, push=push)
-    _compute_wcsph_acceleration(
-        nnps, pa_index, rho0, c0, p0, alpha, beta, push=False,
-        eos=eos, gamma=gamma, kernel=kernel, density_mode='continuity'
+
+    stage_cache = nnps.build_neighbor_cache_gpu(pa_index, pa_index)
+    _ensure_property(pa, 'arho', nnps.device)
+    _apply_wcsph_eos(nnps, pa, rho0, c0, p0, eos, gamma)
+    compute_wcsph_accel_continuity(
+        nnps, pa_index, pa_index, alpha=alpha, beta=beta, eps=eps, c0=c0,
+        kernel=kernel, cache=stage_cache, push=False
     )
     if adaptive_dt:
         dt = compute_wcsph_adaptive_timestep(
             nnps, pa_index=pa_index, c0=c0, cfl=cfl, dt_min=dt_min,
-            dt_max=dt_max, push=False
+            dt_max=dt_max, push=False, cache=stage_cache
         )
         dt = min(float(dt) * float(adaptive_dt_scale), float(step_dt_max))
-    use_xsph = _compute_wcsph_xsph(nnps, pa_index, xsph_eps, kernel)
     wcsph_pec_stage(
         pa, dt=dt, stage=0.5, dim=nnps.dim, xsph=use_xsph,
         device=nnps.device, push=False
     )
     wrap_periodic(pa, periodic_bounds, dim=nnps.dim, device=nnps.device)
     nnps.update(push=False)
-    _compute_wcsph_acceleration(
-        nnps, pa_index, rho0, c0, p0, alpha, beta, push=False,
-        eos=eos, gamma=gamma, kernel=kernel, density_mode='continuity'
+
+    stage_cache = nnps.build_neighbor_cache_gpu(pa_index, pa_index)
+    _apply_wcsph_eos(nnps, pa, rho0, c0, p0, eos, gamma)
+    compute_wcsph_accel_continuity(
+        nnps, pa_index, pa_index, alpha=alpha, beta=beta, eps=eps, c0=c0,
+        kernel=kernel, cache=stage_cache, push=False
     )
-    use_xsph = _compute_wcsph_xsph(nnps, pa_index, xsph_eps, kernel)
     result = wcsph_pec_stage(
         pa, dt=dt, stage=1.0, dim=nnps.dim, xsph=use_xsph,
         device=nnps.device, push=False

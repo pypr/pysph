@@ -3,7 +3,7 @@ aspect: warp-backend
 implementation: blast-from-the-past
 owner: @kunalpuri-prediqt
 created: 2026-06-15T07:19:08 CET
-last_reviewed: 2026-06-15T08:34:00 CET
+last_reviewed: 2026-06-17T18:45:00 CEST
 status: active
 ---
 
@@ -45,6 +45,27 @@ device-resident.
 - The PySPH Application parity step uses device-side saved state plus
   continuity-density PEC stages; the original summation-density KDK path remains
   the compatibility default.
+- ADR-0003 adopts dynamic Warp equation-group code generation
+  (`pysph/base/warp_codegen.py`), mirroring PySPH's equation/group transpilation
+  on the GPU. A `WarpEquation` block declares its source/dest/out arrays, the
+  shared per-pair quantities it needs (`dx`, `rij`, `hij`, `grad`, `wij`,
+  `vij*`), and `initialize`/`loop`/`post_loop` source snippets; a group unions
+  the signature, computes shared geometry once, inlines each block's per-pair
+  loop into one neighbor traversal accumulating into shared `_acc_<out>`
+  registers, and emits one cached, JIT-compiled kernel per
+  `(ordered equation signatures, dtype)`. Kernels are materialized by templating
+  source, registering it in `linecache`, and wrapping with
+  `wp.Kernel(func=..., source=...)`; the generated namespace is seeded with the
+  module's device `wp.func`s so Warp resolves them. Fusion is thus a property of
+  grouping rather than hand-written, and the f32/f64 split collapses into a
+  dtype parameter.
+- First consumer: the continuity-density PEC half-stage fuses pressure gradient,
+  Monaghan viscosity, continuity, and XSPH (blocks in
+  `_WCSPH_CONTINUITY_BLOCKS`) into one generated kernel via
+  `compute_wcsph_accel_continuity`. The summation-density path, the Euler step,
+  the standalone per-equation helpers (kept as the trusted oracle), and the
+  adaptive `_wcsph_dt_factors` traversal are unchanged; migrating them onto the
+  generator is the ADR-0003 follow-up.
 
 ## References for this aspect
 

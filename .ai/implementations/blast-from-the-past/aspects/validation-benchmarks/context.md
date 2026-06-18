@@ -264,6 +264,47 @@ python -m pytest pysph/base/tests/test_warp_sph.py -q
   `26.5732471299998` s / 1393 steps, versus the committed run's
   `23.629107111992198` s / 1393 steps; both are the same fp32 device path, so
   the timing difference is treated as run-to-run/module-cache variance.
+- Million-particle fixed-step comparison before cache reuse:
+  `nx=565`, 1,002,885 particles, 10 fixed steps. PySPH CPU Application took
+  57.48 s, Warp GPU took 7.17 s, for `8.01673640167364x` wall-time speedup.
+  Final shape/density/energy deltas were tiny and both outputs were finite.
+- Profiling that million-particle path showed the continuity-density PEC step
+  was building eight same-array neighbor caches per step. Each cache had about
+  45M neighbor entries, and cache construction dominated the Warp step time.
+- Cache-reuse slice: `pysph/base/warp_sph.py` helpers now accept optional
+  prebuilt neighbor caches, and the continuity-density PEC path builds one
+  cache per half-stage. Focused tests assert the full step builds two equation
+  caches instead of eight.
+- Million-particle fixed-step comparison after cache reuse:
+  the same PySPH CPU Application baseline remains 57.48 s, while Warp improved
+  to 4.51 s / 10 steps, for `12.7450110864745x` speedup and
+  `1.58980044345898x` improvement over the prior Warp run. The segmented
+  cache profile now shows two cache builds per step and step wall times around
+  `0.098335` to `0.138290` s before runner output/setup overhead.
+- Equation-fusion slice (ADR-0003 dynamic code generation): the four
+  continuity-stage neighbor-loop equations are fused into one generated kernel
+  per PEC half-stage. The segmented million-particle profile drops equation
+  launches from 8 to 2 per step, equation-kernel time from ~0.064-0.088 s to
+  0.011-0.014 s per step (~5-6x), and steady-state step wall from
+  0.098-0.138 s to 0.076-0.098 s (~25%); the neighbor-cache build (~0.034-0.046
+  s) is now the dominant per-step cost. The 10-step headline wall is
+  overhead/IO-bound and noisy (warm samples 3.77-6.04 s, best 3.77 s =
+  `15.25x` vs CPU), so per-step compute is the meaningful metric. Numerical
+  parity is essentially exact versus the prior separate-kernel Warp run
+  (positions/density/pressure identical to fp32 print precision, kinetic-energy
+  delta `-6.4e-09`); CPU deltas match the cache-reuse run. The new focused suite
+  is `python -m pytest -q pysph/base/tests/test_warp_codegen.py
+  pysph/base/tests/test_warp_sph.py pysph/base/tests/test_warp_nnps.py`
+  -> `47 passed`, including a generated-vs-hand-helper parity test and a
+  single-fused-launch-per-stage count test.
+- Adaptive `nx=100` resolved guard with the fused path: reached `t=0.0038` in
+  `1393` steps (identical to the committed run), all finite, with shape deltas
+  `~4.8e-07`, density deltas `~1e-06`, and kinetic-energy delta `1.45e-04`
+  versus committed Warp metrics. The adaptive path now runs
+  fused(1)+dt_factors(1)=2 traversals per stage instead of 5, and its Warp wall
+  fell from the committed `23.63 s` to `10.83-14.33 s` (cross-session, same step
+  count) -- a cleaner demonstration of the fusion because that run is
+  per-step-compute-bound.
 
 ## Key sub-topics
 

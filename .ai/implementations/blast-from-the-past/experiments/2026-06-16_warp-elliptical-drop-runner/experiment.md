@@ -5,7 +5,7 @@ created: 2026-06-16T12:30:00 CEST
 author: @kunalpuri-prediqt
 aspect: validation-benchmarks
 status: active
-last_checked: 2026-06-17T09:33:00 CEST
+last_checked: 2026-06-17T18:40:00 CEST
 ---
 
 # Experiment: Warp Elliptical-Drop Runner
@@ -358,6 +358,99 @@ Output:
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-10step/million-cpu-gpu-10step-summary.json
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-10step/pysph/million-pysph_00010.hdf5
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-10step/warp/million-warp.npz
+```
+
+Million-particle fixed-step cache-reuse rerun:
+
+After changing the Warp continuity-density PEC path to reuse one neighbor
+cache per half-stage, the same 1,002,885-particle fixed-step benchmark was
+rerun. The PySPH CPU Application baseline did not change, so the comparison
+uses the previously recorded CPU wall time.
+
+```text
+$ python .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/warp_elliptical_drop_runner.py --nx 565 --steps 10 --dt 0.0000003732778967800475 --rho0 1.0 --c0 1400.0 --p0 0.0 --alpha 0.1 --beta 0.0 --eos tait --gamma 7.0 --kernel gaussian --xsph-eps 0.5 --density-mode continuity --output .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-10step-cache-reuse/warp/million-warp.npz
+real 4.51
+```
+
+Performance:
+
+| Backend / run | Wall time (s) | Steps | Average step time (s) | Speedup vs CPU |
+| --- | ---: | ---: | ---: | ---: |
+| PySPH CPU Application | 57.48 | 10 | 5.747999999999999 | 1.0 |
+| Warp GPU before cache reuse | 7.17 | 10 | 0.717 | 8.01673640167364 |
+| Warp GPU after cache reuse | 4.51 | 10 | 0.45099999999999996 | 12.7450110864745 |
+
+Cache profile:
+
+| Metric | Before | After |
+| --- | ---: | ---: |
+| neighbor-cache builds per step | 8 | 2 |
+| average neighbors per cache | 44.873 | 44.873 |
+| segmented step wall-time range | 0.36-0.46 s | 0.098335-0.138290 s |
+| segmented cache-time range | 0.27-0.33 s | 0.036122-0.052126 s |
+
+The new Warp result is `1.58980044345898x` faster than the previous Warp
+million-particle run while keeping the same final metrics to the recorded
+precision.
+
+Output:
+
+```text
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-10step-cache-reuse/million-cpu-gpu-10step-cache-reuse-summary.json
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-10step-cache-reuse/warp/million-warp.npz
+```
+
+Million-particle fused-equation (code-generation) rerun:
+
+Per ADR-0003 the four continuity-stage neighbor-loop equations (pressure
+gradient, artificial viscosity, continuity, XSPH) are now expressed as
+composable `WarpEquation` blocks and fused by a dynamic code generator
+(`pysph/base/warp_codegen.py`) into one generated kernel per PEC half-stage.
+The same 1,002,885-particle fixed-step benchmark and physics were rerun. The
+PySPH CPU Application baseline is unchanged.
+
+```text
+$ python .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/warp_elliptical_drop_runner.py --nx 565 --steps 10 --dt 0.0000003732778967800475 --rho0 1.0 --c0 1400.0 --p0 0.0 --alpha 0.1 --beta 0.0 --eos tait --gamma 7.0 --kernel gaussian --xsph-eps 0.5 --density-mode continuity --output .ai/.../million-cpu-gpu-10step-fused-eqns/warp/million-warp.npz
+warm-cache wall samples: 6.04, 5.94, 4.89, 3.77, 4.05  (best 3.77; cold first-compile 6.15)
+```
+
+The 10-step headline wall is overhead/IO-bound (Warp init + 1M-particle mgrid
+creation + 282MB npz write), so the wall is noisy and roughly flat versus the
+4.51 s cache-reuse run (best case 3.77 s, `15.25x` versus CPU). The meaningful
+gain is per-step, isolated by the segmented profile:
+
+| Metric | After cache reuse | After equation fusion |
+| --- | ---: | ---: |
+| equation-kernel launches per step | 8 | 2 |
+| equation-kernel time per step | ~0.064-0.088 s | 0.011-0.014 s |
+| segmented step wall-time range | 0.098335-0.138290 s | 0.075883-0.097561 s |
+| segmented cache-time range | 0.036122-0.052126 s | 0.033743-0.045973 s |
+
+Equation-kernel time dropped roughly `5-6x` and steady-state step wall about
+`25%`; register pressure from the single larger kernel did not reduce
+throughput. The neighbor-cache build is now the dominant per-step cost
+(~45-50% of step wall).
+
+Numerical parity (fused vs the prior separate-kernel Warp run): positions,
+densities, and pressures are identical to fp32 print precision; kinetic energy
+differs by `-6.4e-09`. Versus the recorded CPU baseline the deltas match the
+cache-reuse run (`x ~1e-7`, `rho ~1e-8`, `kinetic_energy 8.5e-06`). Both final
+states finite.
+
+Adaptive `nx=100` resolved guard (Warp-only) with the fused path reached
+`t=0.0038` in `1393` steps (identical to the committed run), all finite, with
+shape deltas `~4.8e-07`, density deltas `~1e-06`, and kinetic-energy delta
+`1.45e-04` versus the committed Warp metrics. Because that run is
+per-step-compute-bound (1393 steps), the fusion shows in wall time too: the
+adaptive path now runs fused(1)+dt_factors(1)=2 traversals per stage instead of
+5, and the Warp wall fell from the committed `23.63 s` to `10.83-14.33 s`
+(cross-session, same step count).
+
+Output:
+
+```text
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-10step-fused-eqns/million-cpu-gpu-10step-fused-eqns-summary.json
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-10step-fused-eqns/warp/million-warp.npz
 ```
 
 Million-particle adaptive GPU probe:

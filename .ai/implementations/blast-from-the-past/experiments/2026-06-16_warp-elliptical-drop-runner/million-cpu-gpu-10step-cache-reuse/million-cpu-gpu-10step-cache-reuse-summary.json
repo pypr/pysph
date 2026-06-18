@@ -1,0 +1,98 @@
+{
+  "cache_profile": {
+    "avg_neighbors_per_cache": 44.873,
+    "current_cache_builds_per_step": 2,
+    "previous_cache_builds_per_step": 8,
+    "segmented_cache_time_s_range": [
+      0.036122,
+      0.052126
+    ],
+    "segmented_step_wall_s_range": [
+      0.098335,
+      0.13829
+    ]
+  },
+  "case": {
+    "alpha": 0.1,
+    "beta": 0.0,
+    "c0": 1400.0,
+    "density_mode": "continuity",
+    "dt": 3.732778967800475e-07,
+    "gamma": 7.0,
+    "kernel": "Gaussian",
+    "mode": "fixed timestep",
+    "nx": 565,
+    "optimization": "reuse one neighbor cache per PEC half-stage",
+    "particles": 1002885,
+    "rho0": 1.0,
+    "steps": 10,
+    "tf": 3.732778967800475e-06,
+    "xsph_eps": 0.5
+  },
+  "cpu": {
+    "metrics": {
+      "all_finite": true,
+      "axis_x_abs": 0.999184493010564,
+      "axis_y_abs": 0.9999306197161054,
+      "kinetic_energy": 7854.129614325726,
+      "p_max": 131.6238816019233,
+      "p_min": -138.08411842127555,
+      "particles": 1002885,
+      "rho_max": 1.000068054002785,
+      "rho_min": 0.9999282369195914,
+      "steps": 10,
+      "time": 3.732778967800475e-06,
+      "x_max": 0.999184493010564,
+      "x_min": -0.9982998675927736,
+      "y_max": 0.9999306197161054,
+      "y_min": -0.9990453336294709
+    },
+    "path": ".ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-10step/pysph/million-pysph_00010.hdf5"
+  },
+  "deltas": {
+    "axis_x_abs": -1.2296967044633789e-07,
+    "axis_y_abs": 4.773760275966765e-10,
+    "kinetic_energy": 8.525348675902933e-06,
+    "p_max": 0.18822166956107367,
+    "p_min": 0.030224378306797917,
+    "rho_max": 1.4501548406542497e-08,
+    "rho_min": -9.119009991565008e-10,
+    "x_max": -1.2296967044633789e-07,
+    "x_min": -1.4833358752408543e-07,
+    "y_max": 4.773760275966765e-10,
+    "y_min": 8.082948310672577e-08
+  },
+  "performance": {
+    "cpu_average_step_time_s": 5.747999999999999,
+    "cpu_wall_time_s": 57.48,
+    "cpu_wall_time_source": ".ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-10step/million-cpu-gpu-10step-summary.json",
+    "previous_speedup_wall_time": 8.01673640167364,
+    "previous_warp_wall_time_s": 7.17,
+    "speedup_wall_time": 12.7450110864745,
+    "warp_average_step_time_s": 0.45099999999999996,
+    "warp_improvement_vs_previous": 1.58980044345898,
+    "warp_wall_time_s": 4.51
+  },
+  "warp": {
+    "metrics": {
+      "all_finite": true,
+      "axis_x_abs": 0.9991843700408936,
+      "axis_y_abs": 0.9999306201934814,
+      "dt_max_used": 3.732778967800475e-07,
+      "dt_min_used": 3.732778967800475e-07,
+      "kinetic_energy": 7854.129622851075,
+      "p_max": 131.81210327148438,
+      "p_min": -138.05389404296875,
+      "particles": 1002885,
+      "rho_max": 1.0000680685043335,
+      "rho_min": 0.9999282360076904,
+      "steps": 10,
+      "time": 3.732778967800476e-06,
+      "x_max": 0.9991843700408936,
+      "x_min": -0.9983000159263611,
+      "y_max": 0.9999306201934814,
+      "y_min": -0.9990452527999878
+    },
+    "path": ".ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-10step-cache-reuse/warp/million-warp.npz"
+  }
+}

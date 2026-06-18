@@ -14,12 +14,14 @@ from pysph.base.kernels import CubicSpline, Gaussian
 from pysph.base.nnps import LinkedListNNPS
 from pysph.base.utils import get_particle_array
 from pysph.base.warp_nnps import UniformGridWarpNNPS
+import pysph.base.warp_sph as warp_sph
 from pysph.base.warp_sph import (
     compute_artificial_viscosity, compute_continuity, compute_isothermal_eos,
     compute_pressure_gradient, compute_summation_density, compute_tait_eos,
-    compute_wcsph_adaptive_timestep, compute_xsph_correction, euler_step,
-    leapfrog_drift, leapfrog_kick, save_wcsph_state, wc_sph_euler_step,
-    wc_sph_leapfrog_step, wcsph_pec_stage, wrap_periodic
+    compute_wcsph_accel_continuity, compute_wcsph_adaptive_timestep,
+    compute_xsph_correction, euler_step, leapfrog_drift, leapfrog_kick,
+    save_wcsph_state, wc_sph_euler_step, wc_sph_leapfrog_step, wcsph_pec_stage,
+    wrap_periodic
 )
 
 
@@ -644,6 +646,206 @@ def test_warp_adaptive_timestep_matches_cpu_reference_and_clamps():
     assert np.isclose(actual, expected)
     assert np.all(np.isfinite(pa.dt_cfl))
     assert np.all(np.isfinite(pa.dt_force))
+
+
+def test_warp_equation_helpers_accept_prebuilt_neighbor_cache(monkeypatch):
+    pa = get_particle_array(
+        name='fluid',
+        x=[0.0, 0.2, 0.45, 0.7],
+        y=[0.0, 0.03, -0.02, 0.1],
+        z=[0.0, 0.0, 0.0, 0.0],
+        h=[0.35, 0.35, 0.4, 0.35],
+        m=[1.0, 1.5, 1.2, 0.8],
+        rho=[1.0, 1.1, 0.9, 1.2],
+        p=[2.0, 3.0, 1.5, 0.5],
+        u=[1.0, -1.0, -0.2, 0.0],
+        v=[0.0, 0.05, -0.1, 0.0],
+        w=[0.0, 0.0, 0.0, 0.0],
+        au=[0.0, 0.0, 0.0, 0.0],
+        av=[0.0, 0.0, 0.0, 0.0],
+        aw=[0.0, 0.0, 0.0, 0.0],
+        arho=[0.0, 0.0, 0.0, 0.0],
+        ax=[0.0, 0.0, 0.0, 0.0],
+        ay=[0.0, 0.0, 0.0, 0.0],
+        az=[0.0, 0.0, 0.0, 0.0],
+        backend='warp',
+    )
+    nnps = UniformGridWarpNNPS(dim=2, particles=[pa], radius_scale=2.0)
+    cache = nnps.build_neighbor_cache_gpu(0, 0)
+    calls = []
+    original = nnps.build_neighbor_cache_gpu
+
+    def counted_cache(src_index, dst_index):
+        calls.append((src_index, dst_index))
+        return original(src_index, dst_index)
+
+    monkeypatch.setattr(nnps, 'build_neighbor_cache_gpu', counted_cache)
+
+    compute_pressure_gradient(nnps, 0, 0)
+    assert calls == [(0, 0)]
+
+    compute_pressure_gradient(nnps, 0, 0, cache=cache)
+    compute_artificial_viscosity(nnps, 0, 0, alpha=0.1, cache=cache)
+    compute_continuity(nnps, 0, 0, cache=cache)
+    compute_xsph_correction(nnps, 0, 0, eps=0.5, cache=cache)
+    assert calls == [(0, 0)]
+
+
+def test_warp_continuity_step_reuses_one_neighbor_cache_per_stage(monkeypatch):
+    x = np.asarray([0.0, 0.2, 0.45, 1.2])
+    y = np.asarray([0.0, 0.1, -0.05, 0.2])
+    z = np.zeros_like(x)
+    pa = get_particle_array(
+        name='fluid',
+        x=x.copy(), y=y.copy(), z=z.copy(),
+        h=np.asarray([0.35, 0.35, 0.4, 0.35]),
+        m=np.asarray([1.0, 1.5, 1.2, 0.8]),
+        rho=np.asarray([1.0, 1.03, 0.98, 1.01]),
+        p=np.zeros_like(x),
+        cs=np.ones_like(x) * 5.0,
+        u=np.asarray([0.1, -0.05, 0.2, 0.0]),
+        v=np.asarray([0.0, 0.15, -0.1, 0.05]),
+        w=z.copy(),
+        au=np.zeros_like(x), av=np.zeros_like(x), aw=np.zeros_like(x),
+        ax=np.zeros_like(x), ay=np.zeros_like(x), az=np.zeros_like(x),
+        arho=np.zeros_like(x),
+        backend='warp',
+    )
+    nnps = UniformGridWarpNNPS(dim=2, particles=[pa], radius_scale=2.0)
+    original = nnps.build_neighbor_cache_gpu
+    calls = []
+
+    def counted_cache(src_index, dst_index):
+        calls.append((src_index, dst_index))
+        return original(src_index, dst_index)
+
+    monkeypatch.setattr(nnps, 'build_neighbor_cache_gpu', counted_cache)
+
+    wc_sph_leapfrog_step(
+        nnps, dt=1.0e-3, rho0=1.0, c0=5.0, alpha=0.1, beta=0.0,
+        eos='tait', gamma=7.0, xsph_eps=0.5, adaptive_dt=True,
+        cfl=0.3, dt_min=1.0e-8, dt_max=1.0e-2,
+        density_mode='continuity'
+    )
+
+    assert calls == [(0, 0), (0, 0)]
+
+
+def test_warp_fused_accel_matches_separate_helpers():
+    def make_pa():
+        x = np.asarray([0.0, 0.2, 0.45, 0.7, 1.1])
+        y = np.asarray([0.0, 0.03, -0.02, 0.1, -0.15])
+        z = np.zeros_like(x)
+        return get_particle_array(
+            name='fluid', x=x.copy(), y=y.copy(), z=z.copy(),
+            h=np.asarray([0.35, 0.35, 0.4, 0.35, 0.38]),
+            m=np.asarray([1.0, 1.5, 1.2, 0.8, 1.1]),
+            rho=np.asarray([1.0, 1.1, 0.9, 1.2, 1.05]),
+            p=np.asarray([2.0, 3.0, 1.5, 0.5, 1.2]),
+            cs=np.asarray([5.0, 5.0, 5.0, 5.0, 5.0]),
+            u=np.asarray([1.0, -1.0, -0.2, 0.0, 0.3]),
+            v=np.asarray([0.0, 0.05, -0.1, 0.0, 0.2]),
+            w=z.copy(),
+            au=np.zeros_like(x), av=np.zeros_like(x), aw=np.zeros_like(x),
+            arho=np.zeros_like(x), ax=np.zeros_like(x), ay=np.zeros_like(x),
+            az=np.zeros_like(x), backend='warp',
+        )
+
+    alpha, beta, eps, kernel = 0.15, 0.05, 0.5, 'gaussian'
+
+    # Reference: the four separate helpers chained on one cache. Inputs are
+    # pushed once, then helpers run with push=False so artificial viscosity
+    # accumulates onto the pressure-gradient result instead of clobbering it.
+    pa_sep = make_pa()
+    nnps_sep = UniformGridWarpNNPS(dim=2, particles=[pa_sep], radius_scale=3.0)
+    pa_sep.gpu.push(
+        'x', 'y', 'z', 'h', 'm', 'rho', 'p', 'cs', 'u', 'v', 'w',
+        'au', 'av', 'aw', 'arho', 'ax', 'ay', 'az'
+    )
+    cache_sep = nnps_sep.build_neighbor_cache_gpu(0, 0)
+    compute_pressure_gradient(
+        nnps_sep, 0, 0, kernel=kernel, cache=cache_sep, push=False
+    )
+    compute_artificial_viscosity(
+        nnps_sep, 0, 0, alpha=alpha, beta=beta, kernel=kernel,
+        cache=cache_sep, push=False
+    )
+    compute_continuity(
+        nnps_sep, 0, 0, kernel=kernel, cache=cache_sep, push=False
+    )
+    compute_xsph_correction(
+        nnps_sep, 0, 0, eps=eps, kernel=kernel, cache=cache_sep, push=False
+    )
+    pa_sep.gpu.pull('au', 'av', 'aw', 'arho', 'ax', 'ay', 'az')
+
+    # Fused: one generated group kernel.
+    pa_fused = make_pa()
+    nnps_fused = UniformGridWarpNNPS(
+        dim=2, particles=[pa_fused], radius_scale=3.0
+    )
+    compute_wcsph_accel_continuity(
+        nnps_fused, 0, 0, alpha=alpha, beta=beta, eps=eps, kernel=kernel,
+        push=True
+    )
+    pa_fused.gpu.pull('au', 'av', 'aw', 'arho', 'ax', 'ay', 'az')
+
+    for name in ('au', 'av', 'aw', 'arho', 'ax', 'ay', 'az'):
+        assert np.allclose(
+            getattr(pa_sep, name), getattr(pa_fused, name),
+            rtol=1e-5, atol=1e-6
+        ), name
+
+
+def test_warp_continuity_step_issues_single_fused_launch_per_stage(
+        monkeypatch):
+    x = np.asarray([0.0, 0.2, 0.45, 1.2])
+    y = np.asarray([0.0, 0.1, -0.05, 0.2])
+    z = np.zeros_like(x)
+    pa = get_particle_array(
+        name='fluid', x=x.copy(), y=y.copy(), z=z.copy(),
+        h=np.asarray([0.35, 0.35, 0.4, 0.35]),
+        m=np.asarray([1.0, 1.5, 1.2, 0.8]),
+        rho=np.asarray([1.0, 1.03, 0.98, 1.01]),
+        p=np.zeros_like(x), cs=np.ones_like(x) * 5.0,
+        u=np.asarray([0.1, -0.05, 0.2, 0.0]),
+        v=np.asarray([0.0, 0.15, -0.1, 0.05]), w=z.copy(),
+        au=np.zeros_like(x), av=np.zeros_like(x), aw=np.zeros_like(x),
+        ax=np.zeros_like(x), ay=np.zeros_like(x), az=np.zeros_like(x),
+        arho=np.zeros_like(x), backend='warp',
+    )
+    nnps = UniformGridWarpNNPS(dim=2, particles=[pa], radius_scale=2.0)
+
+    counts = {'fused': 0, 'separate': 0}
+    fused_original = warp_sph.compute_wcsph_accel_continuity
+
+    def counted_fused(*args, **kwargs):
+        counts['fused'] += 1
+        return fused_original(*args, **kwargs)
+
+    def counted_separate(name):
+        original = getattr(warp_sph, name)
+
+        def wrapper(*args, **kwargs):
+            counts['separate'] += 1
+            return original(*args, **kwargs)
+        return wrapper
+
+    monkeypatch.setattr(
+        warp_sph, 'compute_wcsph_accel_continuity', counted_fused
+    )
+    for name in ('compute_pressure_gradient', 'compute_artificial_viscosity',
+                 'compute_continuity', 'compute_xsph_correction'):
+        monkeypatch.setattr(warp_sph, name, counted_separate(name))
+
+    wc_sph_leapfrog_step(
+        nnps, dt=1.0e-3, rho0=1.0, c0=5.0, alpha=0.1, beta=0.0,
+        eos='tait', gamma=7.0, xsph_eps=0.5, density_mode='continuity'
+    )
+
+    # One fused launch per PEC half-stage, and none of the per-equation
+    # neighbor-loop helpers are called in the continuity path.
+    assert counts['fused'] == 2
+    assert counts['separate'] == 0
 
 
 def test_warp_leapfrog_adaptive_timestep_scale_and_step_cap():
