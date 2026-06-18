@@ -268,7 +268,16 @@ def get_zoltan_args():
     """
     global HAVE_MPI, USE_ZOLTAN
     zoltan_include_dirs, zoltan_library_dirs = [], []
-    if not HAVE_MPI or not HAVE_ZOLTAN:
+    if not HAVE_MPI:
+        return zoltan_include_dirs, zoltan_library_dirs
+    if not HAVE_ZOLTAN:
+        # PyZoltan is not installed, so the parallel/Zoltan extension cannot be
+        # cythonized (it cimports pyzoltan's .pxd headers). Disable the parallel
+        # build rather than failing -- the serial/GPU build does not need it.
+        print("*" * 80)
+        print("PyZoltan not found; skipping the MPI/Zoltan parallel extension.")
+        print("*" * 80)
+        HAVE_MPI = False
         return zoltan_include_dirs, zoltan_library_dirs
     # First try with the environment variable 'ZOLTAN'
     zoltan_base = get_zoltan_directory('ZOLTAN')

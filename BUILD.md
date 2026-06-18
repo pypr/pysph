@@ -128,7 +128,10 @@ RTX PRO 6000 Blackwell), see [§10](#10-gpu-architecture-compatibility-v100-a100
 for PySPH's MPI/Zoltan distributed mode (multi-rank domain decomposition; the
 `slow or parallel` tests). `setup.py` builds the
 `pysph.parallel.parallel_manager` extension only when **mpi4py**, the **Zoltan**
-library, and the separate **`pyzoltan`** package are all present.
+library, and the separate **`pyzoltan`** package are all present; if PyZoltan is
+absent the build prints a notice and skips that extension (so a plain
+`build_ext` works for serial/GPU use even on a box that has mpi4py but no
+PyZoltan).
 
 Canonical instructions are in `docs/source/installation.rst` and the PyZoltan
 docs (<https://pyzoltan.readthedocs.io>). The flow:
