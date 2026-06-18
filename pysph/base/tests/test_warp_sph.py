@@ -1216,6 +1216,57 @@ def test_warp_wc_sph_euler_step_matches_cpu_expected_state():
     assert np.allclose(pa.z, z)
 
 
+def test_warp_summation_step_paths_build_no_flat_neighbor_cache(monkeypatch):
+    # Grid-direct extended to the summation paths: wc_sph_euler_step and the
+    # summation KDK leapfrog step walk the cell list directly, so neither builds
+    # a flat CSR neighbor cache; the grid is consulted instead.
+    x = np.asarray([0.0, 0.2, 0.45, 1.2])
+    y = np.asarray([0.0, 0.1, -0.05, 0.2])
+    z = np.zeros_like(x)
+
+    def make_pa():
+        return get_particle_array(
+            name='fluid', x=x.copy(), y=y.copy(), z=z.copy(),
+            h=np.asarray([0.35, 0.35, 0.4, 0.35]),
+            m=np.asarray([1.0, 1.5, 1.2, 0.8]),
+            rho=np.ones_like(x), p=np.zeros_like(x), cs=np.ones_like(x) * 5.0,
+            u=np.asarray([0.1, -0.05, 0.2, 0.0]),
+            v=np.asarray([0.0, 0.15, -0.1, 0.05]), w=z.copy(),
+            au=np.zeros_like(x), av=np.zeros_like(x), aw=np.zeros_like(x),
+            ax=np.zeros_like(x), ay=np.zeros_like(x), az=np.zeros_like(x),
+            backend='warp',
+        )
+
+    def run_and_check(step_fn):
+        pa = make_pa()
+        nnps = UniformGridWarpNNPS(dim=2, particles=[pa], radius_scale=2.0)
+        flat_orig = nnps.build_neighbor_cache_gpu
+        grid_orig = nnps._build_grid
+        calls = []
+        grid_calls = []
+
+        def counted_cache(src_index, dst_index):
+            calls.append((src_index, dst_index))
+            return flat_orig(src_index, dst_index)
+
+        def counted_grid(src_index):
+            grid_calls.append(src_index)
+            return grid_orig(src_index)
+
+        monkeypatch.setattr(nnps, 'build_neighbor_cache_gpu', counted_cache)
+        monkeypatch.setattr(nnps, '_build_grid', counted_grid)
+        step_fn(nnps)
+        assert calls == [], 'built a flat cache: %r' % (calls,)
+        assert len(grid_calls) >= 1
+
+    run_and_check(lambda n: wc_sph_euler_step(
+        n, dt=1.0e-3, rho0=1.0, c0=5.0, alpha=0.1, eos='tait'))
+    run_and_check(lambda n: wc_sph_leapfrog_step(
+        n, dt=1.0e-3, rho0=1.0, c0=5.0, alpha=0.1, eos='tait', xsph_eps=0.5,
+        adaptive_dt=True, cfl=0.3, dt_min=1.0e-8, dt_max=1.0e-2,
+        density_mode='summation'))
+
+
 def test_warp_wc_sph_leapfrog_step_matches_cpu_expected_state():
     x = np.asarray([0.0, 0.2, 0.45, 1.2])
     y = np.asarray([0.0, 0.1, -0.05, 0.2])

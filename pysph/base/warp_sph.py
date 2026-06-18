@@ -1069,7 +1069,7 @@ def _kernel_id(kernel):
 
 def compute_summation_density(nnps, src_index=0, dst_index=0,
                               out_prop='rho', push=True, kernel='cubic',
-                              cache=None):
+                              cache=None, neighbor_mode='flat'):
     """Compute standard SPH summation density with Warp.
 
     This mirrors ``pysph.sph.basic_equations.SummationDensity`` for one
@@ -1093,7 +1093,7 @@ def compute_summation_density(nnps, src_index=0, dst_index=0,
         dst_pa.gpu.push('x', 'y', 'z', 'h', out_prop)
     _run_equation_group(
         nnps, src_index, dst_index, [SummationDensity()],
-        kernel=kernel, cache=cache,
+        kernel=kernel, cache=cache, neighbor_mode=neighbor_mode,
     )
     return dst_pa.gpu.get_device_array(out_prop)
 
@@ -1180,7 +1180,8 @@ def compute_tait_eos(pa, rho0, c0, gamma=7.0, p0=0.0, out_prop='p',
 
 
 def compute_continuity(nnps, src_index=0, dst_index=0, out_prop='arho',
-                       push=True, kernel='cubic', cache=None):
+                       push=True, kernel='cubic', cache=None,
+                       neighbor_mode='flat'):
     """Compute PySPH ``ContinuityEquation`` with Warp."""
     if wp is None:  # pragma: no cover
         raise ImportError("warp is required for compute_continuity")
@@ -1199,14 +1200,15 @@ def compute_continuity(nnps, src_index=0, dst_index=0, out_prop='arho',
         dst_pa.gpu.push('x', 'y', 'z', 'h', 'u', 'v', 'w', out_prop)
     _run_equation_group(
         nnps, src_index, dst_index, [ContinuityEquation()],
-        kernel=kernel, cache=cache,
+        kernel=kernel, cache=cache, neighbor_mode=neighbor_mode,
     )
     return dst_pa.gpu.get_device_array(out_prop)
 
 
 def compute_pressure_gradient(nnps, src_index=0, dst_index=0,
                               out_props=('au', 'av', 'aw'), push=True,
-                              kernel='cubic', cache=None):
+                              kernel='cubic', cache=None,
+                              neighbor_mode='flat'):
     """Compute the inviscid pressure-gradient part of WCSPH momentum."""
     if wp is None:  # pragma: no cover
         raise ImportError("warp is required for compute_pressure_gradient")
@@ -1226,7 +1228,7 @@ def compute_pressure_gradient(nnps, src_index=0, dst_index=0,
         dst_pa.gpu.push('x', 'y', 'z', 'h', 'rho', 'p', *out_props)
     _run_equation_group(
         nnps, src_index, dst_index, [PressureGradient()],
-        kernel=kernel, cache=cache,
+        kernel=kernel, cache=cache, neighbor_mode=neighbor_mode,
     )
     dst = dst_pa.gpu
     return (
@@ -1239,7 +1241,8 @@ def compute_pressure_gradient(nnps, src_index=0, dst_index=0,
 def compute_artificial_viscosity(nnps, src_index=0, dst_index=0, alpha=0.1,
                                  beta=0.0, c0=20.0,
                                  out_props=('au', 'av', 'aw'), push=True,
-                                 kernel='cubic', cache=None):
+                                 kernel='cubic', cache=None,
+                                 neighbor_mode='flat'):
     """Add Monaghan artificial viscosity to WCSPH acceleration arrays."""
     if wp is None:  # pragma: no cover
         raise ImportError("warp is required for compute_artificial_viscosity")
@@ -1269,7 +1272,8 @@ def compute_artificial_viscosity(nnps, src_index=0, dst_index=0, alpha=0.1,
     _run_equation_group(
         nnps, src_index, dst_index, [ArtificialViscosity()],
         scalar_values={'alpha': alpha, 'beta': beta},
-        kernel=kernel, cache=cache, accumulate_outputs=True,
+        kernel=kernel, cache=cache, neighbor_mode=neighbor_mode,
+        accumulate_outputs=True,
     )
     dst = dst_pa.gpu
     return (
@@ -1281,7 +1285,8 @@ def compute_artificial_viscosity(nnps, src_index=0, dst_index=0, alpha=0.1,
 
 def compute_xsph_correction(nnps, src_index=0, dst_index=0, eps=0.5,
                             out_props=('ax', 'ay', 'az'), push=True,
-                            kernel='cubic', cache=None):
+                            kernel='cubic', cache=None,
+                            neighbor_mode='flat'):
     """Compute PySPH leapfrog XSPH position correction on the device."""
     if wp is None:  # pragma: no cover
         raise ImportError("warp is required for compute_xsph_correction")
@@ -1304,6 +1309,7 @@ def compute_xsph_correction(nnps, src_index=0, dst_index=0, eps=0.5,
     _run_equation_group(
         nnps, src_index, dst_index, [XSPHCorrection()],
         scalar_values={'eps': eps}, kernel=kernel, cache=cache,
+        neighbor_mode=neighbor_mode,
     )
     dst = dst_pa.gpu
     return (
@@ -1778,10 +1784,15 @@ def compute_wcsph_accel_continuity(nnps, src_index=0, dst_index=0, alpha=0.1,
 def _compute_wcsph_acceleration(nnps, pa_index, rho0, c0, p0, alpha, beta,
                                 push, eos, gamma, kernel,
                                 density_mode='summation', cache=None):
+    # Grid-direct (ADR-0004 extended): all neighbor consumers walk the cell list
+    # directly, so the summation step builds no flat CSR neighbor cache. The
+    # pressure-gradient(overwrite) -> viscosity(add) composition is unchanged;
+    # only the neighbor source (and thus fp32 visitation order) differs.
     pa = nnps.particles[pa_index]
     if density_mode == 'summation':
         compute_summation_density(
-            nnps, pa_index, pa_index, push=push, kernel=kernel, cache=cache
+            nnps, pa_index, pa_index, push=push, kernel=kernel,
+            neighbor_mode='grid'
         )
     elif density_mode == 'continuity':
         _ensure_property(pa, 'arho', nnps.device)
@@ -1791,16 +1802,18 @@ def _compute_wcsph_acceleration(nnps, pa_index, rho0, c0, p0, alpha, beta,
         raise ValueError("density_mode must be 'summation' or 'continuity'")
     _apply_wcsph_eos(nnps, pa, rho0, c0, p0, eos, gamma)
     result = compute_pressure_gradient(
-        nnps, pa_index, pa_index, push=False, kernel=kernel, cache=cache
+        nnps, pa_index, pa_index, push=False, kernel=kernel,
+        neighbor_mode='grid'
     )
     if alpha != 0.0 or beta != 0.0:
         result = compute_artificial_viscosity(
             nnps, pa_index, pa_index, alpha=alpha, beta=beta, c0=c0,
-            push=False, kernel=kernel, cache=cache
+            push=False, kernel=kernel, neighbor_mode='grid'
         )
     if density_mode == 'continuity':
         compute_continuity(
-            nnps, pa_index, pa_index, push=False, kernel=kernel, cache=cache
+            nnps, pa_index, pa_index, push=False, kernel=kernel,
+            neighbor_mode='grid'
         )
     return result
 
@@ -1888,7 +1901,7 @@ def wc_sph_leapfrog_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
     if adaptive_dt:
         dt = compute_wcsph_adaptive_timestep(
             nnps, pa_index=pa_index, c0=c0, cfl=cfl, dt_min=dt_min,
-            dt_max=dt_max, push=False
+            dt_max=dt_max, push=False, neighbor_mode='grid'
         )
         dt = min(float(dt) * float(adaptive_dt_scale), float(step_dt_max))
     leapfrog_kick(pa, dt=0.5*dt, dim=nnps.dim, device=nnps.device,
@@ -1900,7 +1913,7 @@ def wc_sph_leapfrog_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
     else:
         compute_xsph_correction(
             nnps, pa_index, pa_index, eps=xsph_eps, push=False,
-            kernel=kernel
+            kernel=kernel, neighbor_mode='grid'
         )
         leapfrog_drift_xsph(
             pa, dt=dt, dim=nnps.dim, device=nnps.device, push=False
@@ -1927,7 +1940,9 @@ def wc_sph_euler_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
     viscosity, and a simple Euler velocity/position update on the device.
     """
     pa = nnps.particles[pa_index]
-    compute_summation_density(nnps, pa_index, pa_index, kernel=kernel)
+    compute_summation_density(
+        nnps, pa_index, pa_index, kernel=kernel, neighbor_mode='grid'
+    )
     if eos == 'isothermal':
         compute_isothermal_eos(
             pa, rho0=rho0, c0=c0, p0=p0, device=nnps.device, push=False
@@ -1941,12 +1956,13 @@ def wc_sph_euler_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
     else:
         raise ValueError("EOS must be 'isothermal' or 'tait'")
     compute_pressure_gradient(
-        nnps, pa_index, pa_index, push=False, kernel=kernel
+        nnps, pa_index, pa_index, push=False, kernel=kernel,
+        neighbor_mode='grid'
     )
     if alpha != 0.0 or beta != 0.0:
         compute_artificial_viscosity(
             nnps, pa_index, pa_index, alpha=alpha, beta=beta, c0=c0,
-            push=False, kernel=kernel
+            push=False, kernel=kernel, neighbor_mode='grid'
         )
     return euler_step(pa, dt=dt, dim=nnps.dim, device=nnps.device,
                       push=False)

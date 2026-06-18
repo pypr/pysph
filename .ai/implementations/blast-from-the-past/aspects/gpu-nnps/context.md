@@ -191,6 +191,12 @@ Grid-direct neighbor traversal proof (ADR-0004):
   continuity path is byte-identical (same fused grid kernel), so this is
   perf-neutral; the flat `build_neighbor_cache_gpu` still backs the host query
   API, the summation path, and `compute_neighbor_sum`.
+- "Grid-direct everywhere": the summation Euler (`wc_sph_euler_step`) and KDK
+  leapfrog step paths were also moved to grid-direct (the 5 standalone helpers
+  gained `neighbor_mode`, defaulting flat; the summation step paths pass
+  `'grid'`). No device step path builds a flat CSR neighbor cache anymore;
+  `build_neighbor_cache_gpu` is now used only by the host `get_nearest_particles`
+  query API, `compute_neighbor_sum`, and the flat-mode oracle/cross-array tests.
 
 ## Key sub-topics
 
