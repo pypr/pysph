@@ -611,15 +611,24 @@ ran with no code/build changes (BUILD.md section 10).
 
 Per-GPU throughput vs particle count for the grid-direct continuity PEC step
 (fp32), collected in `gpu-sweep/` (one JSON per GPU + a comparison `README.md`).
-First full sweep -- **NVIDIA L40S** (sm_89, 44 GiB): throughput ramps to a
-**~9.8e7 particle-steps/s plateau from ~1M to ~10M** particles (per-step scales
-~linearly there), then a super-linear knee at 21M (5.96e7); all points finite.
-Cross-GPU at 1M particles: RTX 4060 `1.68e7` < L40S `9.19e7` < RTX PRO 6000
-Blackwell `1.16e8` particle-steps/s. Full Blackwell/4060 sweeps pending.
+Four full sweeps recorded -- L40S (sm_89), RTX 5090 (sm_120), RTX PRO 6000
+Blackwell (sm_120), B300 SXM6 (sm_103) -- plus the 4060 1M anchor.
+
+Throughput at **1M particles** (particle-steps/s): RTX 4060 `1.68e7` < RTX 5090
+`6.74e7` < L40S `9.19e7` < RTX PRO 6000 `1.22e8` < B300 `1.41e8`. Peak/sustained:
+5090 ~`7.3e7`, L40S ~`9.9e7`, and **both Blackwell cards plateau at ~`1.43e8`**
+(a likely bandwidth/occupancy ceiling -- the B300's edge is scale: it holds the
+peak to 6M, reaches **78.5M particles**, and keeps a higher post-knee plateau).
+
+Open finding: every card shows a **super-linear knee** whose location is
+non-monotonic with VRAM (RTX PRO 6000 95 GiB knees at 6M; B300 268 GiB at 10M;
+5090 32 GiB at 10M; L40S 44 GiB at 21M) -- so it is not a capacity ceiling but
+an algorithmic/grid effect to profile (grid-build vs equation time). All sweep
+points finite.
 
 ```text
-.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/gpu-sweep/sweep-l40s.json
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/gpu-sweep/README.md
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/gpu-sweep/sweep-{l40s,rtx5090,rtxpro6000,b300}.json
 ```
 
 ## Interpretation

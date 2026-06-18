@@ -1,0 +1,44 @@
+{
+  "benchmark": "warp grid-direct WCSPH continuity PEC step (fp32)",
+  "hardware": {
+    "name": "NVIDIA B300 SXM6 AC",
+    "arch": "sm_103",
+    "memory_gib": 267.7,
+    "warp": "1.14.0",
+    "cuda_toolkit": "12.9",
+    "driver_cuda": "13.0",
+    "host": "brev-cw5dulrtv",
+    "run_by": "@kunalpuri-prediqt",
+    "date": "2026-06-18"
+  },
+  "config": {
+    "dt": 3.732778967800475e-07,
+    "steps": 20,
+    "warmup_discarded": 8,
+    "physics": {
+      "rho0": 1.0,
+      "c0": 1400.0,
+      "p0": 0.0,
+      "alpha": 0.1,
+      "beta": 0.0,
+      "eos": "tait",
+      "gamma": 7.0,
+      "kernel": "gaussian",
+      "xsph_eps": 0.5,
+      "density_mode": "continuity"
+    },
+    "cold_compile_s": 41.25
+  },
+  "results": [
+    {"nx": 100, "particles": 31417, "setup_s": 0.0, "per_step_s_min": 0.001016, "per_step_s_median": 0.001025, "per_step_s_max": 0.001034, "throughput_particle_steps_per_s": 30663805.0, "all_finite": true},
+    {"nx": 200, "particles": 125629, "setup_s": 0.0, "per_step_s_min": 0.001547, "per_step_s_median": 0.001594, "per_step_s_max": 0.001704, "throughput_particle_steps_per_s": 78822824.5, "all_finite": true},
+    {"nx": 400, "particles": 502625, "setup_s": 0.0, "per_step_s_min": 0.003546, "per_step_s_median": 0.003614, "per_step_s_max": 0.003635, "throughput_particle_steps_per_s": 139075641.2, "all_finite": true},
+    {"nx": 565, "particles": 1002885, "setup_s": 0.0, "per_step_s_min": 0.007055, "per_step_s_median": 0.007132, "per_step_s_max": 0.007165, "throughput_particle_steps_per_s": 140619314.7, "all_finite": true},
+    {"nx": 1000, "particles": 3141549, "setup_s": 0.0, "per_step_s_min": 0.021866, "per_step_s_median": 0.022015, "per_step_s_max": 0.022182, "throughput_particle_steps_per_s": 142700285.6, "all_finite": true},
+    {"nx": 1400, "particles": 6157477, "setup_s": 0.0, "per_step_s_min": 0.043108, "per_step_s_median": 0.043366, "per_step_s_max": 0.043954, "throughput_particle_steps_per_s": 141988790.2, "all_finite": true},
+    {"nx": 1800, "particles": 10178545, "setup_s": 0.0, "per_step_s_min": 0.12741, "per_step_s_median": 0.128046, "per_step_s_max": 0.128974, "throughput_particle_steps_per_s": 79491280.9, "all_finite": true},
+    {"nx": 2600, "particles": 21236953, "setup_s": 0.0002, "per_step_s_min": 0.30304, "per_step_s_median": 0.305089, "per_step_s_max": 0.306577, "throughput_particle_steps_per_s": 69608976.8, "all_finite": true},
+    {"nx": 3600, "particles": 40714821, "setup_s": 0.0003, "per_step_s_min": 0.579547, "per_step_s_median": 0.583046, "per_step_s_max": 0.589412, "throughput_particle_steps_per_s": 69831207.8, "all_finite": true},
+    {"nx": 5000, "particles": 78539677, "setup_s": 0.0005, "per_step_s_min": 1.114662, "per_step_s_median": 1.120131, "per_step_s_max": 1.131411, "throughput_particle_steps_per_s": 70116519.6, "all_finite": true}
+  ]
+}
