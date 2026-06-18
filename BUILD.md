@@ -36,7 +36,7 @@ Notes:
   was provided by **Spack** and a pip venv was layered on top. That is **not
   required** — plain `pip` works for the core build. `h5py`/`mpi4py` are only
   needed for HDF5 output and MPI/Zoltan parallel runs respectively; skip them
-  for a minimal build.
+  for a minimal build. MPI/Zoltan/PyZoltan setup is covered in §5a.
 - Warp ships its own CUDA runtime support; you do **not** need a separately
   installed CUDA Toolkit, only a recent NVIDIA driver and a supported GPU.
 
@@ -119,6 +119,50 @@ you need fp64 on the GPU path.
 
 For specific data-center and Blackwell GPUs (V100, A100, H100, RTX 5090,
 RTX PRO 6000 Blackwell), see [§10](#10-gpu-architecture-compatibility-v100-a100-h100-rtx-5090-rtx-pro-6000-blackwell).
+
+---
+
+## 5a. MPI + Zoltan + PyZoltan (optional -- distributed parallel runs)
+
+**Not needed** for the Warp single-GPU backend or serial CPU runs. Required only
+for PySPH's MPI/Zoltan distributed mode (multi-rank domain decomposition; the
+`slow or parallel` tests). `setup.py` builds the
+`pysph.parallel.parallel_manager` extension only when **mpi4py**, the **Zoltan**
+library, and the separate **`pyzoltan`** package are all present.
+
+Canonical instructions are in `docs/source/installation.rst` and the PyZoltan
+docs (<https://pyzoltan.readthedocs.io>). The flow:
+
+1. Install and verify **mpi4py**, configured for your MPI/hardware.
+2. Install the **Zoltan** library (from Trilinos, your package manager, or
+   Spack). Note its `include/` (has `zoltan.h`) and `lib/` (has `libzoltan.a`).
+3. Point the build at Zoltan via an env var (or `~/.compyle/config.py`):
+   ```bash
+   export ZOLTAN=/path/to/zoltan          # expects $ZOLTAN/include and $ZOLTAN/lib
+   # or, instead of ZOLTAN:
+   export ZOLTAN_INCLUDE=/path/include ZOLTAN_LIBRARY=/path/lib
+   # if Zoltan came from Trilinos, also: export USE_TRILINOS=1   # links -ltrilinos_zoltan
+   ```
+4. Install **PyZoltan** (not vendored in this repo), then PySPH, with build
+   isolation **off** so they use your mpi4py:
+   ```bash
+   pip install pyzoltan --no-build-isolation
+   pip install -e . --no-build-isolation     # or: python setup.py build_ext --inplace
+   ```
+5. Custom MPI compile/link flags go in `~/.compyle/config.py` (`MPI_CFLAGS`,
+   `MPI_LINK`); the Zoltan options above can live there too.
+
+Verify and run the parallel suite:
+
+```bash
+python -c "import mpi4py, pyzoltan; print('pyzoltan', pyzoltan.__version__)"
+python -m pytest -v -m "slow or parallel"   # the CI parallel/Zoltan command
+```
+
+On the dev machine here, mpi4py + Zoltan + PyZoltan (1.1.1) come from the Spack
+stack and `pysph/parallel/parallel_manager` is built; a plain
+`pip install pyzoltan --no-build-isolation` against a system/Spack Zoltan also
+works.
 
 ---
 
