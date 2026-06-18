@@ -642,6 +642,31 @@ in one box; ~2x faster single step), not cost-per-work. Pick by constraint:
 throughput-bound batch -> RTX 5090 / L40S; biggest problem or fastest turnaround
 -> B300 / RTX PRO 6000.
 
+**Two estimate-only lenses** (modeled from existing data; no measured power or
+profiler run -- and none planned, so these are the final reported values, each
+with its caveat):
+
+- _Energy-to-solution ($ lens's physical cousin)_: `kJ per billion particle-steps`
+  = `TDP_W / throughput x 1e6`, from datasheet board power (B300 1400 W, RTX PRO
+  6000 600 W, 5090 575 W, L40S 350 W, 4060 115 W). At 1M: L40S **3.8** < RTX PRO
+  6000 **4.9** < 4060 **6.9** < 5090 **8.5** < B300 **10.0** kJ. This **breaks the
+  5090=L40S dollar tie**: same $0.0032/Gp-step, but the L40S uses **~2.2x fewer
+  joules** per unit work (350 W @ 9.19e7 vs 575 W @ 6.74e7), so on a power-capped
+  or owned fleet the L40S wins outright; the B300 is the least energy-efficient
+  (~2.6x the L40S). Caveat: the step is not FLOP-bound so cards won't pull full
+  TDP -- this is an upper-bound bracket, not a measured draw.
+- _Roofline / memory-bandwidth utilization (analytic)_: `MBU = throughput x ~1.12
+  KB/p-step / peak_BW` (B_eff = own state ~60 B + measured avg_neighbors 44.9 x
+  ~24 B; peaks B300 8 TB/s HBM3E, GDDR7 cards 1.79, L40S 0.864). At 1M: L40S
+  **~11.9%** > RTX PRO 6000 **~7.6%** > 4060 **~7.0%** > 5090 **~4.2%** > B300
+  **~2.0%** of peak. **Partly corrects the earlier "bandwidth/occupancy-bound"
+  guess**: even this generous upper-bound byte model leaves every card well under
+  peak (B300 ~2% of 8 TB/s), so the ~1.43e8 Blackwell ceiling is **occupancy /
+  launch / grid-build bound, NOT a memory wall** -- large untapped headroom,
+  especially on the big-memory cards; the next perf win is occupancy/launch
+  tuning, not faster memory. Caveat: model-based whole-step upper bound (ignores
+  L2 reuse, includes grid-build), robust within ~2-3x; no profiler counter.
+
 Figures (`gpu-sweep/plot_gpu_sweep.py`, pure matplotlib from the JSONs):
 
 _Performance lens:_
@@ -658,10 +683,16 @@ _Cost-of-compute lens ($):_
 
 ![Cost per billion particle-steps vs particle count](gpu-sweep/cost_per_billion_vs_particles.png)
 
+_Estimate-only lenses (energy + roofline):_
+
+![Energy per billion particle-steps @ 1M (TDP estimate)](gpu-sweep/energy_per_gpstep_1M.png)
+
+![Analytic memory-bandwidth utilization @ 1M](gpu-sweep/mbu_at_1M.png)
+
 ```text
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/gpu-sweep/README.md
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/gpu-sweep/sweep-{l40s,rtx5090,rtxpro6000,b300}.json
-.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/gpu-sweep/{throughput_vs_particles,perstep_vs_particles,speedup_vs_cpu_1M,cost_per_billion_1M,cost_per_billion_vs_particles}.png
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/gpu-sweep/{throughput_vs_particles,perstep_vs_particles,speedup_vs_cpu_1M,cost_per_billion_1M,cost_per_billion_vs_particles,energy_per_gpstep_1M,mbu_at_1M}.png
 ```
 
 ## Interpretation

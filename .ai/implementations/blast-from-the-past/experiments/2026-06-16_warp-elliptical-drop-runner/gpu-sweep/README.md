@@ -59,6 +59,81 @@ rises sharply past its knee (you pay for idle silicon once throughput drops):
 
 ![cost per billion particle-steps vs particles](cost_per_billion_vs_particles.png)
 
+### Energy-to-solution lens (estimate -- board TDP, not measured)
+
+> **Estimate, not a measurement.** We did not log GPU power, and there will be no
+> profiled re-run, so this lens is **modeled** from each card's datasheet board
+> power (TDP) and the recorded throughput. The continuity PEC step is *not*
+> FLOP-bound, so the cards will not actually pull full TDP -- this **overstates**
+> the energy of the high-TDP idle-headroom parts and should be read as an
+> upper-bound *bracket* that orders the cards, not an exact joule count.
+
+Metric: **kJ per billion particle-steps** = `TDP_W / throughput x 1e6`
+(equivalently energy-to-solution); its reciprocal is **particle-steps per watt**.
+Board power used (datasheet): B300 SXM6 1400 W, RTX PRO 6000 600 W, RTX 5090
+575 W, L40S 350 W, RTX 4060 Laptop 115 W.
+
+![energy per billion particle-steps at 1M (TDP estimate)](energy_per_gpstep_1M.png)
+
+| GPU | TDP (W) | throughput @1M | kJ / billion p-steps | particle-steps / W | vs best |
+|---|---:|---:|---:|---:|---:|
+| L40S | 350 | 9.19e7 | **3.8** | 2.63e5 | 1.0x |
+| RTX PRO 6000 Blackwell | 600 | 1.22e8 | **4.9** | 2.03e5 | 1.3x |
+| RTX 4060 Laptop | 115 | 1.68e7 | **6.9** | 1.46e5 | 1.8x |
+| RTX 5090 | 575 | 6.74e7 | **8.5** | 1.17e5 | 2.2x |
+| B300 SXM6 | 1400 | 1.41e8 | **10.0** | 1.00e5 | 2.6x |
+
+**Why this lens matters: it breaks the 5090 = L40S dollar tie.** On rental cost
+both sit at $0.0032 per billion particle-steps, but on energy the L40S does the
+same SPH work for **~2.2x fewer joules** than the 5090 (350 W at 9.19e7 vs 575 W
+at 6.74e7) -- so on a power-capped or *owned* fleet (where you pay the power bill,
+not the cloud margin) the L40S is the clear pick. The datacenter B300 is the
+*least* energy-efficient per unit work (~2.6x the L40S): it spends ~1.4 kW to hold
+the same ~1.43e8 ceiling the 600 W RTX PRO 6000 reaches. Cloud $/hr hides this
+because it bundles the provider's power, cooling, and margin into one number.
+
+### Roofline lens: memory-bandwidth utilization (analytic estimate)
+
+> **Analytic estimate, not a profiler counter.** With no Nsight/`ncu` run, we
+> model the achieved DRAM bandwidth as `throughput x B_eff`, where `B_eff ~= 1.12
+> KB per particle-step` (own state read+write ~60 B + the measured `avg_neighbors
+> = 44.9` x ~24 B per neighbor read). This counts *logical* reads and ignores L2
+> reuse, so it is an **upper bound** on true DRAM traffic -- the real utilization
+> is at most this and likely lower. It is also a *whole-step* number (includes the
+> grid build and launch overhead, not just the neighbor gather). Treat the
+> percentages as an order-of-magnitude bracket, robust to the byte model within
+> ~2-3x.
+
+Metric: **MBU** = `achieved_BW / peak_BW`. Datasheet peak DRAM bandwidth: B300
+HBM3E ~8 TB/s, RTX 5090 / RTX PRO 6000 GDDR7 ~1.79 TB/s, L40S GDDR6 ~0.864 TB/s,
+RTX 4060 ~0.27 TB/s.
+
+![analytic memory-bandwidth utilization at 1M](mbu_at_1M.png)
+
+| GPU | peak BW | throughput @1M | achieved BW (est.) | MBU (est.) |
+|---|---:|---:|---:|---:|
+| L40S | 0.864 TB/s | 9.19e7 | ~103 GB/s | **~11.9%** |
+| RTX PRO 6000 Blackwell | 1.79 TB/s | 1.22e8 | ~137 GB/s | **~7.6%** |
+| RTX 4060 Laptop | 0.27 TB/s | 1.68e7 | ~19 GB/s | **~7.0%** |
+| RTX 5090 | 1.79 TB/s | 6.74e7 | ~75 GB/s | **~4.2%** |
+| B300 SXM6 | 8.0 TB/s | 1.41e8 | ~157 GB/s | **~2.0%** |
+
+**This sharpens (and partly corrects) the earlier "bandwidth/occupancy-bound"
+guess.** Even with the *generous* upper-bound byte model, no card exceeds ~12% of
+its peak DRAM bandwidth, and a more realistic multi-pass byte count (~2-3x) still
+leaves every card well under ~30%. So the ~1.43e8 Blackwell ceiling is **not a
+memory-bandwidth wall** -- it is **occupancy / launch / grid-build bound**, with
+large untapped memory headroom. The B300 is the extreme case: it holds the same
+peak as the 600 W RTX PRO 6000 while sitting at only **~2% of its 8 TB/s HBM3E**,
+i.e. its flat plateau and poor $/work are an *un-tuned-kernel* artifact, not an
+intrinsic hardware verdict. This is the single most actionable signal in the
+sweep: the next perf win is occupancy/launch tuning (and the super-linear knee is
+most likely a grid-build / cache-residency effect), not faster memory.
+
+> Caveat shared by both lenses: these are *single-machine, model-based* estimates
+> meant to order the cards and frame the next optimization -- not validated
+> against measured power or profiler counters.
+
 ## Full sweep -- NVIDIA L40S (sm_89, 44 GiB usable)
 
 | nx | particles | per-step (s) | throughput (particle-steps/s) | finite |
@@ -191,10 +266,14 @@ Peak / sustained throughput and the super-linear knee:
 
 Observations (`*` = open question):
 - **Both Blackwell cards hit the same peak ceiling (~1.43e8)** despite very
-  different class/VRAM -- the step looks bandwidth/occupancy-bound on Blackwell,
-  not raw-FLOP-bound. The **B300's edge is scale**: it sustains the peak to 6M,
-  reaches **78.5M particles**, and holds a higher post-knee plateau (~7.0e7 vs
-  RTX PRO 6000 ~5.2e7, 5090 ~4.2e7).
+  different class/VRAM -- not raw-FLOP-bound. The analytic roofline lens above
+  refines the earlier "bandwidth/occupancy-bound" guess: every card sits well
+  under peak DRAM bandwidth (B300 ~2% of 8 TB/s at the plateau), so the ceiling
+  is **occupancy / launch / grid-build bound, not a memory-bandwidth wall** --
+  there is large untapped headroom, especially on the big-memory cards. The
+  **B300's edge is scale**: it sustains the peak to 6M, reaches **78.5M
+  particles**, and holds a higher post-knee plateau (~7.0e7 vs RTX PRO 6000
+  ~5.2e7, 5090 ~4.2e7).
 - On this fp32 SPH workload the **datacenter Ada L40S (9.19e7) beats the consumer
   5090 (6.74e7)** at 1M -- capacity/bandwidth/occupancy shaped, not FLOP shaped.
 - `*` The **super-linear knee is non-monotonic with VRAM**: RTX PRO 6000 (95 GiB)
