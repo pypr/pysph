@@ -100,15 +100,28 @@ Holds the **~1.43e8 plateau from ~0.5M to 6M**, knee at 10M, then a stable
 
 ## Cross-GPU comparison
 
-At **1M particles (nx=565)** -- the common anchor:
+At **1M particles (nx=565)** -- the common anchor.
 
-| GPU | arch | VRAM | per-step (s) | throughput (p-steps/s) | vs RTX 4060 |
-|---|---|---:|---:|---:|---:|
-| RTX 4060 Laptop | sm_89 | 8 GiB | 0.0598 | 1.68e7 | 1.0x |
-| RTX 5090 | sm_120 | 32 GiB | 0.014879 | 6.74e7 | 4.0x |
-| L40S | sm_89 | 48 GiB | 0.010915 | 9.19e7 | 5.5x |
-| RTX PRO 6000 Blackwell | sm_120 | 96 GiB | 0.008223 | 1.22e8 | 7.3x |
-| B300 SXM6 | sm_103 | 268 GiB | 0.007132 | 1.41e8 | 8.4x |
+Headline speedup is **vs a single CPU core**: the single-threaded PySPH Cython
+Application runs this step at **~3.5 s/step at 1M** (measured 3.445 s on the
+4060 host, 3.574 s on the Blackwell host -- same workload, host-CPU dependent).
+The speedup column below uses CPU = 3.5 s/step; the GPU-vs-GPU column is relative
+to the 4060.
+
+| GPU | arch | VRAM | per-step (s) | throughput (p-steps/s) | **vs 1 CPU core** | vs RTX 4060 |
+|---|---|---:|---:|---:|---:|---:|
+| RTX 4060 Laptop | sm_89 | 8 GiB | 0.0598 | 1.68e7 | **~59x** | 1.0x |
+| RTX 5090 | sm_120 | 32 GiB | 0.014879 | 6.74e7 | **~235x** | 4.0x |
+| L40S | sm_89 | 48 GiB | 0.010915 | 9.19e7 | **~321x** | 5.5x |
+| RTX PRO 6000 Blackwell | sm_120 | 96 GiB | 0.008223 | 1.22e8 | **~426x** | 7.3x |
+| B300 SXM6 | sm_103 | 268 GiB | 0.007132 | 1.41e8 | **~491x** | 8.4x |
+
+Directly-measured CPU-vs-Warp pairs (from `headline_million_100step.py`, fresh
+on the same host) corroborate the column: 4060 **57.6x** (CPU 3.445 / Warp
+0.0598) and RTX PRO 6000 Blackwell **414x** (CPU 3.574 / Warp 0.008625, its
+100-step fixed run). The single-thread CPU step is O(N) like the GPU, so the
+speedup is roughly flat with particle count **until the GPU knee**, past which it
+falls (e.g. B300 at 10M: CPU ~35 s/step vs Warp 0.128 s -> ~273x).
 
 Peak / sustained throughput and the super-linear knee:
 

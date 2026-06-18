@@ -614,6 +614,12 @@ Per-GPU throughput vs particle count for the grid-direct continuity PEC step
 Four full sweeps recorded -- L40S (sm_89), RTX 5090 (sm_120), RTX PRO 6000
 Blackwell (sm_120), B300 SXM6 (sm_103) -- plus the 4060 1M anchor.
 
+**Headline speedup vs a single CPU core** at 1M (single-threaded PySPH Cython
+~3.5 s/step; GPU per-step from the sweep): RTX 4060 ~`59x`, RTX 5090 ~`235x`,
+L40S ~`321x`, RTX PRO 6000 ~`426x`, B300 ~`491x` (directly-measured CPU-vs-Warp
+pairs corroborate: 4060 `57.6x`, RTX PRO 6000 `414x`). Speedup is ~flat with N
+until the GPU knee, then falls.
+
 Throughput at **1M particles** (particle-steps/s): RTX 4060 `1.68e7` < RTX 5090
 `6.74e7` < L40S `9.19e7` < RTX PRO 6000 `1.22e8` < B300 `1.41e8`. Peak/sustained:
 5090 ~`7.3e7`, L40S ~`9.9e7`, and **both Blackwell cards plateau at ~`1.43e8`**
