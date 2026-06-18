@@ -1,0 +1,61 @@
+{
+  "note": "Production GPU result on an NVIDIA RTX PRO 6000 Blackwell Server Edition, recorded from a run by @kunalpuri-prediqt on the brev cloud box (host: brev-xrsztl72t) on 2026-06-18. Numbers are as reported by the scripts; not re-run on the dev RTX 4060. CPU = single-threaded PySPH Cython Application; Warp = grid-direct WCSPH (fp32).",
+  "hardware": {
+    "gpu": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+    "gpu_memory_gib": 95,
+    "arch": "sm_120 (Blackwell)",
+    "warp": "1.14.0",
+    "cuda_toolkit": "12.9",
+    "driver_cuda": "13.0",
+    "cpu_threads": 1
+  },
+  "million_100step_fixed": {
+    "nx": 565,
+    "particles": 1002885,
+    "steps": 100,
+    "dt": 3.732778967800475e-07,
+    "mode": "fixed timestep (--no-adaptive-timestep --n-damp 0)",
+    "kernel": "gaussian", "eos": "tait", "density_mode": "continuity",
+    "cpu_total_wall_s": 357.4319926870012,
+    "cpu_per_step_s": 3.574319926870012,
+    "cpu_kinetic_energy": 7854.038960953369,
+    "warp_total_wall_s": 1.316273918000661,
+    "warp_setup_s": 0.45374192199960817,
+    "warp_steps_s": 0.8625319960010529,
+    "warp_per_step_s": 0.008625319960010529,
+    "warp_kinetic_energy": 7854.038954632484,
+    "speedup_total_wall": 271.54833640547884,
+    "speedup_per_step": 414.3985316998778,
+    "kinetic_energy_rel_delta": 8.047941353933115e-10,
+    "all_finite": true
+  },
+  "segmented_profile": {
+    "nx": 565,
+    "particles": 1002885,
+    "steps": 12,
+    "warmup_discarded": 2,
+    "flat_cache_builds_total": 0,
+    "grid_builds_per_step": 2.0,
+    "equation_launches_total": 24,
+    "step_wall_s_steady_range": [0.00803287199960323, 0.008118533998640487],
+    "equation_launch_s_steady_range_per_launch": [0.001573813999129925, 0.0016127579983731266],
+    "grid_build_s_steady_range": [0.00019679899924085476, 0.0002280590015288908],
+    "kinetic_energy": 7854.127631137399,
+    "all_finite": true,
+    "note": "steady step wall ~8.0 ms (vs ~60 ms on the RTX 4060 -> ~7.4x faster per step on this GPU); no flat neighbor cache built."
+  },
+  "kernel_cache": {
+    "cold_compile_ms_first_run": 38575.45,
+    "warm_load_ms_subsequent": 6.42,
+    "note": "Fused continuity grid kernel cold-compiled once then loaded (cached) on subsequent invocations -- confirms the deterministic-name on-disk kernel cache (md5 cache key) works on a fresh machine."
+  },
+  "comparison_vs_rtx4060_laptop": {
+    "rtx4060_speedup_total_wall": 41.17,
+    "rtx4060_speedup_per_step": 57.64,
+    "rtx4060_warp_per_step_s": 0.05976,
+    "blackwell_speedup_total_wall": 271.55,
+    "blackwell_speedup_per_step": 414.40,
+    "blackwell_warp_per_step_s": 0.008625,
+    "note": "Same fp32 grid-direct code; per-GPU jump is the Blackwell datacenter-class GPU (~7x faster per step) over the laptop 4060 while single-threaded CPU stays ~3.5 s/step."
+  }
+}

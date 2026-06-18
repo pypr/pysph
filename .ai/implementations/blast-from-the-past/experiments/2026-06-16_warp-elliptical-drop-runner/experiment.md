@@ -582,6 +582,31 @@ Output:
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-grid-direct/fresh-headline-speedups.json
 ```
 
+### Production GPU result -- RTX PRO 6000 Blackwell (sm_120)
+
+Run by @kunalpuri-prediqt on a cloud box (NVIDIA RTX PRO 6000 Blackwell Server
+Edition, 95 GiB, sm_120; Warp 1.14 / CUDA Toolkit 12.9 / driver 13.0), same
+grid-direct fp32 code. Million-particle, 100 fixed steps, CPU single-threaded
+PySPH Application vs Warp:
+
+```text
+CPU  357.43 s total (3.574 s/step), KE 7854.038961
+Warp   1.32 s total (0.454 setup + 0.863 step; 0.008625 s/step), KE 7854.038955
+speedup 271.5x wall / 414.4x per-step | KE rel delta 8.0e-10 | all_finite True
+segmented: flat_cache_builds 0; steady step wall ~8.0 ms; equation ~1.6 ms/launch; grid build ~0.2 ms
+```
+
+Notes: per-step ~8.0 ms vs the RTX 4060 laptop's ~60 ms (~7.4x faster on this
+GPU); the single-threaded CPU stays ~3.5 s/step, so the headline jumps from
+`41x/57x` (4060) to `271x/414x` (Blackwell). The fused grid kernel cold-compiled
+once (38.6 s) then loaded cached (~6 ms) on subsequent runs, confirming the
+deterministic-name on-disk kernel cache on a fresh machine. Blackwell (sm_120)
+ran with no code/build changes (BUILD.md section 10).
+
+```text
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-grid-direct/blackwell-rtxpro6000-million-100step-summary.json
+```
+
 ## Interpretation
 
 The resolved `nx=100` timestep-policy run is now an apples-to-apples
