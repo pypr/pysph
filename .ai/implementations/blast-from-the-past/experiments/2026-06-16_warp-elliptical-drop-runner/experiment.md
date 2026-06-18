@@ -607,6 +607,21 @@ ran with no code/build changes (BUILD.md section 10).
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-grid-direct/blackwell-rtxpro6000-million-100step-summary.json
 ```
 
+### Cross-GPU throughput sweep (`gpu_perf_sweep.py`)
+
+Per-GPU throughput vs particle count for the grid-direct continuity PEC step
+(fp32), collected in `gpu-sweep/` (one JSON per GPU + a comparison `README.md`).
+First full sweep -- **NVIDIA L40S** (sm_89, 44 GiB): throughput ramps to a
+**~9.8e7 particle-steps/s plateau from ~1M to ~10M** particles (per-step scales
+~linearly there), then a super-linear knee at 21M (5.96e7); all points finite.
+Cross-GPU at 1M particles: RTX 4060 `1.68e7` < L40S `9.19e7` < RTX PRO 6000
+Blackwell `1.16e8` particle-steps/s. Full Blackwell/4060 sweeps pending.
+
+```text
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/gpu-sweep/sweep-l40s.json
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/gpu-sweep/README.md
+```
+
 ## Interpretation
 
 The resolved `nx=100` timestep-policy run is now an apples-to-apples
