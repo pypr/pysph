@@ -632,9 +632,18 @@ non-monotonic with VRAM (RTX PRO 6000 95 GiB knees at 6M; B300 268 GiB at 10M;
 an algorithmic/grid effect to profile (grid-build vs equation time). All sweep
 points finite.
 
+Figures (`gpu-sweep/plot_gpu_sweep.py`, pure matplotlib from the JSONs):
+
+![Speedup vs 1 CPU core @ 1M particles](gpu-sweep/speedup_vs_cpu_1M.png)
+
+![Throughput vs particle count](gpu-sweep/throughput_vs_particles.png)
+
+![Per-step wall time vs particle count](gpu-sweep/perstep_vs_particles.png)
+
 ```text
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/gpu-sweep/README.md
 .ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/gpu-sweep/sweep-{l40s,rtx5090,rtxpro6000,b300}.json
+.ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/gpu-sweep/{throughput_vs_particles,perstep_vs_particles,speedup_vs_cpu_1M}.png
 ```
 
 ## Interpretation

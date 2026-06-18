@@ -23,6 +23,24 @@ Gaussian kernel, Tait EOS, continuity density, radius_scale=3, fixed dt, fp32
 \* full `gpu_perf_sweep.py` runs for Blackwell and the 4060 are pending; only the
 single 1M-particle point is on record for those so far.
 
+## Figures
+
+Generated from the JSONs by `plot_gpu_sweep.py` (pure matplotlib, no GPU).
+
+**Speedup vs a single CPU core @ 1M particles** -- up to ~491x (B300):
+
+![speedup vs 1 CPU core at 1M](speedup_vs_cpu_1M.png)
+
+**Throughput vs particle count** -- the ramp, the ~1.43e8 Blackwell ceiling, and
+the per-GPU super-linear knees:
+
+![throughput vs particles](throughput_vs_particles.png)
+
+**Per-step wall time vs particle count** (log-log) -- linear scaling up to each
+card's knee:
+
+![per-step vs particles](perstep_vs_particles.png)
+
 ## Full sweep -- NVIDIA L40S (sm_89, 44 GiB usable)
 
 | nx | particles | per-step (s) | throughput (particle-steps/s) | finite |
