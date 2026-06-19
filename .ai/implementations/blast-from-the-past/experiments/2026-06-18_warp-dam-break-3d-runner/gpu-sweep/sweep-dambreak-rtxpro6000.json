@@ -1,0 +1,40 @@
+{
+  "benchmark": "warp 3D dam-break fused WCSPH step (fp32)",
+  "hardware": {
+    "name": "RTX PRO 6000 Blackwell",
+    "arch": "sm_120",
+    "memory_gib": 95.0,
+    "warp": "1.14.0"
+  },
+  "config": {
+    "dt": 0.0001,
+    "steps": 12,
+    "warmup_discarded": 4,
+    "physics": {
+      "rho0": 1000.0,
+      "c0": 32.849657532461435,
+      "gamma": 7.0,
+      "alpha": 0.25,
+      "beta": 0.0,
+      "kernel": "wendland",
+      "xsph_eps": 0.5,
+      "gz": -9.81
+    },
+    "radius_scale": 2.0,
+    "hdx": 1.3,
+    "geometry": "Lobovsky no-obstacle",
+    "cold_compile_s": 145.58
+  },
+  "results": [
+    {"dx": 0.04, "particles": 32254, "fluid": 16250, "wall": 16004, "per_step_s_min": 0.005448, "per_step_s_median": 0.005466, "per_step_s_max": 0.005518, "throughput_particle_steps_per_s": 5900852.4, "all_finite": true},
+    {"dx": 0.03, "particles": 71867, "fluid": 34848, "wall": 37019, "per_step_s_min": 0.006231, "per_step_s_median": 0.006236, "per_step_s_max": 0.006267, "throughput_particle_steps_per_s": 11523879.9, "all_finite": true},
+    {"dx": 0.022, "particles": 158651, "fluid": 89100, "wall": 69551, "per_step_s_min": 0.007521, "per_step_s_median": 0.007612, "per_step_s_max": 0.007643, "throughput_particle_steps_per_s": 20842763.6, "all_finite": true},
+    {"dx": 0.016, "particles": 367292, "fluid": 240250, "wall": 127042, "per_step_s_min": 0.011435, "per_step_s_median": 0.011504, "per_step_s_max": 0.011562, "throughput_particle_steps_per_s": 31927970.7, "all_finite": true},
+    {"dx": 0.013, "particles": 633538, "fluid": 441864, "wall": 191674, "per_step_s_min": 0.017385, "per_step_s_median": 0.017479, "per_step_s_max": 0.017618, "throughput_particle_steps_per_s": 36245002.7, "all_finite": true},
+    {"dx": 0.011, "particles": 999975, "fluid": 733050, "wall": 266925, "per_step_s_min": 0.025436, "per_step_s_median": 0.025601, "per_step_s_max": 0.025768, "throughput_particle_steps_per_s": 39059394.2, "all_finite": true},
+    {"dx": 0.009, "particles": 1752448, "fluid": 1355310, "wall": 397138, "per_step_s_min": 0.042633, "per_step_s_median": 0.042907, "per_step_s_max": 0.043053, "throughput_particle_steps_per_s": 40842545.8, "all_finite": true},
+    {"dx": 0.0075, "particles": 2906784, "fluid": 2334948, "wall": 571836, "per_step_s_min": 0.067804, "per_step_s_median": 0.068542, "per_step_s_max": 0.068948, "throughput_particle_steps_per_s": 42409004.9, "all_finite": true},
+    {"dx": 0.006, "particles": 5480298, "fluid": 4588074, "wall": 892224, "per_step_s_min": 0.124892, "per_step_s_median": 0.126501, "per_step_s_max": 0.126966, "throughput_particle_steps_per_s": 43322210.7, "all_finite": true},
+    {"dx": 0.005, "particles": 9486957, "fluid": 7880400, "wall": 1606557, "per_step_s_min": 0.209162, "per_step_s_median": 0.211193, "per_step_s_max": 0.214387, "throughput_particle_steps_per_s": 44920867.4, "all_finite": true}
+  ]
+}

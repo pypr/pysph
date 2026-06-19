@@ -200,6 +200,14 @@ explicit (x-z side, x-y top-down, y-z end, 3D scatter):
 
 ![Warp fp32 3D dam break, ~1M particles, four views at t=0.2 s](bench-1M-3d-snapshot.png)
 
+### Cross-GPU sweep
+
+`gpu_perf_sweep_dam_break.py` sweeps particle count (dx) per GPU; lenses +
+figures in `gpu-sweep/` (`README.md`). At ~1M, fixed-dt fused step: RTX PRO 6000
+Blackwell 39.1 Mp-st/s (163x vs 1 CPU core) > L40S 25.9 Mp-st/s (108x) > RTX 4060
+4.5 Mp-st/s (19x). Cost/energy favour the L40S ($0.0114 vs $0.0187 per billion
+p-steps; 13.5 vs 15.4 kJ/billion). (5090 + B300 deferred.)
+
 Artifacts: `results-smoke.npz`, `comparison-tier1-summary.json` (+ warp npz),
 `comparison-resolved-summary.json`, `cpu-vs-warp-perf.json`,
 `cpu-vs-warp-snapshot.png`, `bench-1M-perf.json`, `bench-1Mplus-perf.json`,
