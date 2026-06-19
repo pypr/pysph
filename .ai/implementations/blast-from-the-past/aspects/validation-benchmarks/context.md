@@ -345,6 +345,13 @@ python -m pytest pysph/base/tests/test_warp_sph.py -q
 - Device-reduced adaptive timestep correctness.
 - CPU PySPH-primitive side-by-side image comparison.
 - Optional parallel/Zoltan test slice after commit readiness.
+- 3D dam-break (Lobovsky no-obstacle, ADR-0005): two-tier CPU parity -- hand-rolled
+  CPU EPEC (`LinkedListNNPS(dim=3)` + WendlandQuintic) field-by-field, and the real
+  `dam_break_3d_lobovsky.py` Application at matched checkpoints. Headline validators
+  are aggregate observables (KE, surge-front x, max height, density) which match to
+  fp32; near-rest pressure is at the fp32 Tait-EOS cancellation floor
+  (`rho0*c0^2*2^-23`, absolute tolerance) and recovers to ~1% relative once
+  developed. Packet: `experiments/2026-06-18_warp-dam-break-3d-runner/`.
 
 ## References for this aspect
 

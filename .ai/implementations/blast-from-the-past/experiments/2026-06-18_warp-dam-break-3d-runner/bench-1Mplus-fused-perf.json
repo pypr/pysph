@@ -1,0 +1,22 @@
+{
+  "c0": 32.849657532461435,
+  "case": "Lobovsky 3D dam-break, no obstacle (~1M particles)",
+  "cpu_pysph_fp64": {
+    "particle_steps_per_s": 200835.71135595912,
+    "s_per_step": 5.049261374649996,
+    "solve_s": 100.98522749299991,
+    "steps": 20
+  },
+  "device": "RTX 4060 Laptop (fp32) vs single-thread PySPH Cython (fp64)",
+  "dx": 0.0108,
+  "kernel": "wendland",
+  "n_fluid": 799940,
+  "n_total": 1014072,
+  "n_wall": 214132,
+  "speedup_per_step": 14.969771031846312,
+  "warp_gpu_fp32": {
+    "particle_steps_per_s": 3006464.6140166847,
+    "s_per_step": 0.33729716799998644,
+    "steps": 20
+  }
+}

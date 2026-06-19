@@ -10,18 +10,19 @@ pytest.importorskip('warp')
 
 from cyarray.carray import UIntArray
 
-from pysph.base.kernels import CubicSpline, Gaussian
+from pysph.base.kernels import CubicSpline, Gaussian, WendlandQuintic
 from pysph.base.nnps import LinkedListNNPS
 from pysph.base.utils import get_particle_array
 from pysph.base.warp_nnps import UniformGridWarpNNPS
 import pysph.base.warp_sph as warp_sph
 from pysph.base.warp_sph import (
-    compute_artificial_viscosity, compute_continuity, compute_isothermal_eos,
-    compute_pressure_gradient, compute_summation_density, compute_tait_eos,
+    apply_body_force, compute_artificial_viscosity, compute_continuity,
+    compute_isothermal_eos, compute_pressure_gradient, compute_summation_density,
+    compute_tait_eos, compute_tait_eos_hg_correction,
     compute_wcsph_accel_continuity, compute_wcsph_adaptive_timestep,
     compute_xsph_correction, euler_step, leapfrog_drift, leapfrog_kick,
-    save_wcsph_state, wc_sph_euler_step, wc_sph_leapfrog_step, wcsph_pec_stage,
-    wrap_periodic
+    save_wcsph_state, wc_sph_dam_break_step, wc_sph_euler_step,
+    wc_sph_leapfrog_step, wcsph_pec_stage, wrap_periodic
 )
 
 
@@ -34,6 +35,8 @@ def _neighbors(nnps, src_index, dst_index, d_idx):
 def _cpu_kernel(dim, kernel='cubic'):
     if kernel == 'gaussian':
         return Gaussian(dim=dim)
+    if kernel == 'wendland':
+        return WendlandQuintic(dim=dim)
     return CubicSpline(dim=dim)
 
 
@@ -356,6 +359,31 @@ def test_warp_gaussian_summation_density_matches_pysph_kernel():
     ).get()
 
     assert np.allclose(actual, expected)
+
+
+def test_warp_wendland_summation_density_matches_pysph_kernel_in_3d():
+    # ADR-0005: the new WendlandQuintic kernel id (2) must match PySPH's
+    # WendlandQuintic(dim=3) device-side. Wendland C2 support is q < 2, so
+    # radius_scale=2.0. Genuine 3D coords exercise the dim==3 normalization
+    # (21/(16 pi h^3)).
+    pa = get_particle_array(
+        name='fluid',
+        x=[0.0, 0.2, 0.4, 0.15],
+        y=[0.0, 0.05, 0.1, -0.08],
+        z=[0.0, 0.1, -0.05, 0.12],
+        h=[0.25, 0.25, 0.35, 0.3],
+        m=[1.0, 2.0, 1.5, 1.0],
+        backend='warp',
+    )
+    particles = [pa]
+    expected = _cpu_summation_density(
+        particles, 0, 0, dim=3, radius_scale=2.0, kernel='wendland'
+    )
+    nnps = UniformGridWarpNNPS(dim=3, particles=particles, radius_scale=2.0)
+
+    actual = compute_summation_density(nnps, 0, 0, kernel='wendland').get()
+
+    assert np.allclose(actual, expected, rtol=1e-5, atol=1e-6)
 
 
 def test_warp_summation_density_matches_cpu_cross_array_in_3d_and_pulls_rho():
@@ -747,6 +775,90 @@ def test_warp_adaptive_timestep_matches_cpu_reference_and_clamps():
     assert np.all(np.isfinite(pa.dt_force))
 
 
+def test_warp_apply_body_force_adds_ramped_gravity_to_acceleration():
+    # ADR-0005: gravity is a body force == acceleration; apply_body_force adds
+    # ramp*g to au/av/aw (matching MomentumEquation's gz), under dim>1/dim>2
+    # guards. dim=3 with gz<0 and a partial n_damp ramp; aw must update.
+    au0 = np.array([1.0, -0.5, 0.2])
+    av0 = np.array([0.0, 0.3, -0.1])
+    aw0 = np.array([0.4, 0.0, -0.2])
+    pa = get_particle_array(
+        name='fluid',
+        x=[0.0, 0.1, 0.2], y=[0.0, 0.05, -0.05], z=[0.0, 0.1, -0.1],
+        h=[0.3, 0.3, 0.3], m=[1.0, 1.0, 1.0],
+        au=au0.copy(), av=av0.copy(), aw=aw0.copy(),
+        backend='warp',
+    )
+    gx, gy, gz, ramp = 0.0, 0.0, -9.81, 0.5
+    apply_body_force(pa, gx=gx, gy=gy, gz=gz, dim=3, ramp=ramp)
+    pa.gpu.pull('au', 'av', 'aw')
+
+    assert np.allclose(pa.au, au0 + ramp * gx, rtol=1e-5, atol=1e-7)
+    assert np.allclose(pa.av, av0 + ramp * gy, rtol=1e-5, atol=1e-7)
+    assert np.allclose(pa.aw, aw0 + ramp * gz, rtol=1e-5, atol=1e-7)
+
+
+def test_warp_apply_body_force_default_is_noop_and_respects_2d_guard():
+    # Default g=0 leaves acceleration unchanged; under dim=2 the aw (z)
+    # component is never touched even with a nonzero gz.
+    au0 = np.array([1.0, -0.5])
+    av0 = np.array([0.2, 0.3])
+    aw0 = np.array([0.7, -0.4])
+    pa = get_particle_array(
+        name='fluid',
+        x=[0.0, 0.1], y=[0.0, 0.05], z=[0.0, 0.0],
+        h=[0.3, 0.3], m=[1.0, 1.0],
+        au=au0.copy(), av=av0.copy(), aw=aw0.copy(),
+        backend='warp',
+    )
+    apply_body_force(pa, dim=2)                  # default g=0 -> no-op
+    apply_body_force(pa, gz=-9.81, dim=2)        # 2D: aw untouched
+    pa.gpu.pull('au', 'av', 'aw')
+
+    assert np.allclose(pa.au, au0)
+    assert np.allclose(pa.av, av0)
+    assert np.allclose(pa.aw, aw0)
+
+
+def test_warp_adaptive_timestep_matches_cpu_reference_and_clamps_in_3d():
+    # dim=3 pin (ADR-0005): the CFL dt-factors (vij.xij/rij2) and dt_force
+    # (au^2+av^2+aw^2) must include the z/w third component. Mirrors the 2D
+    # test with nonzero z, w, aw; _cpu_wcsph_dt already handles dim=3.
+    pa = get_particle_array(
+        name='fluid',
+        x=[0.0, 0.2, 0.45, 0.7],
+        y=[0.0, 0.03, -0.02, 0.1],
+        z=[0.0, 0.05, -0.03, 0.08],
+        h=[0.35, 0.35, 0.4, 0.35],
+        m=[1.0, 1.5, 1.2, 0.8],
+        u=[1.0, -1.0, -0.2, 0.0],
+        v=[0.0, 0.05, -0.1, 0.0],
+        w=[0.0, 0.1, -0.05, 0.0],
+        au=[4.0, -0.5, 0.25, 0.0],
+        av=[0.0, 0.2, -0.1, 0.0],
+        aw=[0.0, 0.3, -0.2, 0.0],
+        backend='warp',
+    )
+    particles = [pa]
+    c0 = 5.0
+    cfl = 0.3
+    dt_min = 1.0e-6
+    dt_max = 1.0e-2
+    expected = _cpu_wcsph_dt(
+        particles, 0, dim=3, c0=c0, cfl=cfl, dt_min=dt_min, dt_max=dt_max
+    )
+    nnps = UniformGridWarpNNPS(dim=3, particles=particles, radius_scale=2.0)
+
+    actual = compute_wcsph_adaptive_timestep(
+        nnps, 0, c0=c0, cfl=cfl, dt_min=dt_min, dt_max=dt_max
+    )
+    pa.gpu.pull('dt_cfl', 'dt_force')
+
+    assert np.isclose(actual, expected)
+    assert np.all(np.isfinite(pa.dt_cfl))
+    assert np.all(np.isfinite(pa.dt_force))
+
+
 def test_warp_equation_helpers_accept_prebuilt_neighbor_cache(monkeypatch):
     pa = get_particle_array(
         name='fluid',
@@ -930,6 +1042,70 @@ def test_warp_fused_accel_matches_separate_helpers():
         ), name
 
 
+def test_warp_fused_accel_matches_separate_helpers_in_3d():
+    # dim=3 pin (ADR-0005): fusing the 4-equation group equals running the four
+    # single-block helpers and composing, with genuine 3D positions/velocities
+    # (nonzero z, w) so the third component is exercised on both sides.
+    def make_pa():
+        x = np.asarray([0.0, 0.2, 0.45, 0.7, 1.1])
+        y = np.asarray([0.0, 0.03, -0.02, 0.1, -0.15])
+        z = np.asarray([0.0, 0.08, -0.05, 0.12, 0.04])
+        return get_particle_array(
+            name='fluid', x=x.copy(), y=y.copy(), z=z.copy(),
+            h=np.asarray([0.35, 0.35, 0.4, 0.35, 0.38]),
+            m=np.asarray([1.0, 1.5, 1.2, 0.8, 1.1]),
+            rho=np.asarray([1.0, 1.1, 0.9, 1.2, 1.05]),
+            p=np.asarray([2.0, 3.0, 1.5, 0.5, 1.2]),
+            cs=np.asarray([5.0, 5.0, 5.0, 5.0, 5.0]),
+            u=np.asarray([1.0, -1.0, -0.2, 0.0, 0.3]),
+            v=np.asarray([0.0, 0.05, -0.1, 0.0, 0.2]),
+            w=np.asarray([0.1, -0.2, 0.15, -0.05, 0.0]),
+            au=np.zeros_like(x), av=np.zeros_like(x), aw=np.zeros_like(x),
+            arho=np.zeros_like(x), ax=np.zeros_like(x), ay=np.zeros_like(x),
+            az=np.zeros_like(x), backend='warp',
+        )
+
+    alpha, beta, eps, kernel = 0.15, 0.05, 0.5, 'gaussian'
+
+    pa_sep = make_pa()
+    nnps_sep = UniformGridWarpNNPS(dim=3, particles=[pa_sep], radius_scale=3.0)
+    pa_sep.gpu.push(
+        'x', 'y', 'z', 'h', 'm', 'rho', 'p', 'cs', 'u', 'v', 'w',
+        'au', 'av', 'aw', 'arho', 'ax', 'ay', 'az'
+    )
+    cache_sep = nnps_sep.build_neighbor_cache_gpu(0, 0)
+    compute_pressure_gradient(
+        nnps_sep, 0, 0, kernel=kernel, cache=cache_sep, push=False
+    )
+    compute_artificial_viscosity(
+        nnps_sep, 0, 0, alpha=alpha, beta=beta, kernel=kernel,
+        cache=cache_sep, push=False
+    )
+    compute_continuity(
+        nnps_sep, 0, 0, kernel=kernel, cache=cache_sep, push=False
+    )
+    compute_xsph_correction(
+        nnps_sep, 0, 0, eps=eps, kernel=kernel, cache=cache_sep, push=False
+    )
+    pa_sep.gpu.pull('au', 'av', 'aw', 'arho', 'ax', 'ay', 'az')
+
+    pa_fused = make_pa()
+    nnps_fused = UniformGridWarpNNPS(
+        dim=3, particles=[pa_fused], radius_scale=3.0
+    )
+    compute_wcsph_accel_continuity(
+        nnps_fused, 0, 0, alpha=alpha, beta=beta, eps=eps, kernel=kernel,
+        push=True
+    )
+    pa_fused.gpu.pull('au', 'av', 'aw', 'arho', 'ax', 'ay', 'az')
+
+    for name in ('au', 'av', 'aw', 'arho', 'ax', 'ay', 'az'):
+        assert np.allclose(
+            getattr(pa_sep, name), getattr(pa_fused, name),
+            rtol=1e-5, atol=1e-6
+        ), name
+
+
 def test_warp_grid_direct_accel_matches_flat_fused():
     # ADR-0004: the grid-direct fused kernel must visit exactly the neighbor
     # set the flat CSR list contained (same support cutoff), so its result
@@ -966,6 +1142,54 @@ def test_warp_grid_direct_accel_matches_flat_fused():
 
     pa_grid = make_pa()
     nnps_grid = UniformGridWarpNNPS(dim=2, particles=[pa_grid], radius_scale=3.0)
+    compute_wcsph_accel_continuity(
+        nnps_grid, 0, 0, alpha=alpha, beta=beta, eps=eps, kernel=kernel,
+        push=True, neighbor_mode='grid'
+    )
+    pa_grid.gpu.pull('au', 'av', 'aw', 'arho', 'ax', 'ay', 'az')
+
+    for name in ('au', 'av', 'aw', 'arho', 'ax', 'ay', 'az'):
+        assert np.allclose(
+            getattr(pa_flat, name), getattr(pa_grid, name),
+            rtol=1e-5, atol=1e-6
+        ), name
+
+
+def test_warp_grid_direct_accel_matches_flat_fused_in_3d():
+    # dim=3 pin (ADR-0005): the grid-direct fused kernel (27-cell triple-loop
+    # walk + 3D cell id) must visit exactly the flat CSR neighbor set in 3D,
+    # matching the flat fused result to fp32 reordering scale. Nonzero z, w.
+    def make_pa():
+        x = np.asarray([0.0, 0.2, 0.45, 0.7, 1.1, 0.15, 0.9])
+        y = np.asarray([0.0, 0.03, -0.02, 0.1, -0.15, 0.25, 0.18])
+        z = np.asarray([0.0, 0.07, -0.04, 0.11, 0.05, -0.08, 0.13])
+        return get_particle_array(
+            name='fluid', x=x.copy(), y=y.copy(), z=z.copy(),
+            h=np.asarray([0.35, 0.35, 0.4, 0.35, 0.38, 0.36, 0.34]),
+            m=np.asarray([1.0, 1.5, 1.2, 0.8, 1.1, 0.95, 1.05]),
+            rho=np.asarray([1.0, 1.1, 0.9, 1.2, 1.05, 0.97, 1.03]),
+            p=np.asarray([2.0, 3.0, 1.5, 0.5, 1.2, 0.8, 1.7]),
+            cs=np.ones_like(x) * 5.0,
+            u=np.asarray([1.0, -1.0, -0.2, 0.0, 0.3, 0.4, -0.3]),
+            v=np.asarray([0.0, 0.05, -0.1, 0.0, 0.2, -0.15, 0.1]),
+            w=np.asarray([0.1, -0.2, 0.15, -0.05, 0.0, 0.25, -0.1]),
+            au=np.zeros_like(x), av=np.zeros_like(x), aw=np.zeros_like(x),
+            arho=np.zeros_like(x), ax=np.zeros_like(x), ay=np.zeros_like(x),
+            az=np.zeros_like(x), backend='warp',
+        )
+
+    alpha, beta, eps, kernel = 0.15, 0.05, 0.5, 'gaussian'
+
+    pa_flat = make_pa()
+    nnps_flat = UniformGridWarpNNPS(dim=3, particles=[pa_flat], radius_scale=3.0)
+    compute_wcsph_accel_continuity(
+        nnps_flat, 0, 0, alpha=alpha, beta=beta, eps=eps, kernel=kernel,
+        push=True, neighbor_mode='flat'
+    )
+    pa_flat.gpu.pull('au', 'av', 'aw', 'arho', 'ax', 'ay', 'az')
+
+    pa_grid = make_pa()
+    nnps_grid = UniformGridWarpNNPS(dim=3, particles=[pa_grid], radius_scale=3.0)
     compute_wcsph_accel_continuity(
         nnps_grid, 0, 0, alpha=alpha, beta=beta, eps=eps, kernel=kernel,
         push=True, neighbor_mode='grid'
@@ -1583,3 +1807,80 @@ def test_warp_wc_sph_leapfrog_continuity_mode_matches_cpu_pec_state():
     assert np.allclose(pa.av, acc_half[:, 1], rtol=1e-5, atol=1e-5)
     assert np.allclose(pa.aw, acc_half[:, 2], rtol=1e-5, atol=1e-5)
     assert np.allclose(pa.arho, arho_half, rtol=1e-5, atol=1e-5)
+
+
+def test_warp_tait_eos_hg_correction_clamps_density_and_pressure():
+    # ADR-0005: the wall EOS clamps rho to >= rho0 (so p >= 0) then Tait.
+    rho0, c0, gamma = 1000.0, 20.0, 7.0
+    rho_in = np.array([900.0, 1000.0, 1100.0])  # below, at, above rho0
+    pa = get_particle_array(
+        name='wall', x=[0.0, 0.1, 0.2], y=[0.0, 0.0, 0.0], z=[0.0, 0.0, 0.0],
+        h=[0.2, 0.2, 0.2], m=[1.0, 1.0, 1.0], rho=rho_in.copy(),
+        backend='warp',
+    )
+    compute_tait_eos_hg_correction(pa, rho0=rho0, c0=c0, gamma=gamma)
+    pa.gpu.pull('rho', 'p', 'cs')
+
+    # below-rho0 is clamped up to rho0; at/above are unchanged.
+    assert np.allclose(pa.rho, [1000.0, 1000.0, 1100.0])
+    # clamped and at-rest give p == 0; compression gives p > 0; never negative.
+    assert np.all(pa.p >= -1.0e-6)
+    assert np.isclose(pa.p[0], 0.0, atol=1.0e-4)
+    assert np.isclose(pa.p[1], 0.0, atol=1.0e-4)
+    assert pa.p[2] > 0.0
+    b = rho0 * c0 * c0 / gamma
+    expected_p2 = b * ((1100.0 / rho0) ** gamma - 1.0)
+    assert np.isclose(pa.p[2], expected_p2, rtol=1.0e-4)
+
+
+def test_warp_dam_break_step_two_array_3d_is_finite_and_walls_fixed():
+    # ADR-0005: a minimal 3D dam-break step over a fluid block + a fixed wall
+    # floor. Walls must not move, all fields must stay finite, and gravity must
+    # drive the fluid downward (mean vertical velocity becomes negative).
+    dx = 0.1
+    fx, fy, fz = np.mgrid[0:3, 0:3, 0:3]
+    fx = (fx.ravel() + 1) * dx
+    fy = (fy.ravel() + 1) * dx
+    fz = (fz.ravel() + 2) * dx          # fluid block sits above the floor
+    wx, wy = np.mgrid[0:5, 0:5]
+    wx = wx.ravel() * dx
+    wy = wy.ravel() * dx
+    wz = np.zeros_like(wx)              # single-layer wall floor at z=0
+    rho0 = 1000.0
+    h = 1.3 * dx
+    m = rho0 * dx ** 3
+    fluid = get_particle_array(
+        name='fluid', x=fx, y=fy, z=fz,
+        h=np.ones(fx.size) * h, m=np.ones(fx.size) * m,
+        rho=np.ones(fx.size) * rho0, backend='warp',
+    )
+    wall = get_particle_array(
+        name='wall', x=wx, y=wy, z=wz,
+        h=np.ones(wx.size) * h, m=np.ones(wx.size) * m,
+        rho=np.ones(wx.size) * rho0, backend='warp',
+    )
+    nnps = UniformGridWarpNNPS(dim=3, particles=[fluid, wall], radius_scale=2.0)
+
+    wall_x0, wall_y0, wall_z0 = wall.x.copy(), wall.y.copy(), wall.z.copy()
+    c0 = 10.0 * np.sqrt(2.0 * 9.81 * 0.3)
+    dt = 1.0e-4
+    for step in range(5):
+        wc_sph_dam_break_step(
+            nnps, fluid_index=0, solid_indices=(1,), dt=dt, rho0=rho0,
+            c0=c0, gamma=7.0, alpha=0.1, beta=0.0, kernel='wendland',
+            xsph_eps=0.5, gz=-9.81, gravity_ramp=1.0, push=(step == 0),
+        )
+    fluid.gpu.pull('x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p')
+    wall.gpu.pull('x', 'y', 'z', 'rho', 'p')
+
+    for arr in (fluid.x, fluid.y, fluid.z, fluid.u, fluid.v, fluid.w,
+                fluid.rho, fluid.p, wall.rho, wall.p):
+        assert np.all(np.isfinite(arr))
+    # Walls are fixed (position unchanged).
+    assert np.allclose(wall.x, wall_x0)
+    assert np.allclose(wall.y, wall_y0)
+    assert np.allclose(wall.z, wall_z0)
+    # Wall pressure is non-negative (HG correction).
+    assert np.all(wall.p >= -1.0e-3)
+    # Gravity pulled the fluid down.
+    assert fluid.w.mean() < 0.0

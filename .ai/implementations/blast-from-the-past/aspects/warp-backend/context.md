@@ -92,6 +92,33 @@ device-resident.
   `len(_KERNEL_CACHE)`), so the source is byte-stable across runs and Warp's
   on-disk kernel cache hits instead of recompiling cold every session. EOS,
   integrator, and dt init/reduce/finalize reduction kernels are unchanged.
+- 3D dam-break WCSPH physics (ADR-0005, additive). New device funcs: Wendland
+  quintic value + dwdq (`dim==1/2/3` normalization) routed through the shared
+  `_kernel_value`/`_kernel_dwdq` routers as kernel id 2 (cubic 0 / gaussian 1
+  branches untouched); `_apply_body_force` (ramped gravity into au/av/aw under
+  `dim>1`/`dim>2` guards); `_tait_eos_hg_correction` (clamp `rho>=rho0` so wall
+  `p>=0`). New host driver `wc_sph_dam_break_step`: an E-P-E-C (== reference
+  `EPECIntegrator`) continuity-density step that sums fluid accel + density over
+  `[fluid, walls]`, takes wall density from `[fluid]` only, XSPH from fluid only,
+  and holds walls fixed via zero accel through the shared `wcsph_pec_stage`. All
+  composed from the existing generated equation blocks with
+  `accumulate_outputs=True` over each source -- no new neighbor-loop code, no edit
+  to ids 0/1, the generated 2D source, or the single-array elliptical-drop step.
+  The 2D generated source is byte-identical (md5-pinned by
+  `test_2d_path_generated_source_is_byte_identical_to_golden`); the router gained
+  an additive `id==2` branch (logic-preserving; a one-time recompile can occur).
+  Wendland inflates every generated kernel's PTX (~10-13 MB), so cold compiles are
+  now multi-minute per large 3D fused kernel.
+- Dam-break perf follow-up: the fluid acceleration+density blocks were **fused**
+  via `_WCSPH_DAM_BREAK_FLUID_BLOCKS` (PressureGradient + ArtificialViscosity +
+  ContinuityEquation) run as one generated kernel per source
+  (`accumulate_outputs=True`) instead of three separate single-block launches --
+  one neighbour walk / one per-pair geometry for all three. 1.23x faster Warp
+  step at >1M (0.415 -> 0.337 s/step; ~13-15x vs single-thread CPU). XSPH
+  (fluid-only) and wall continuity (fluid->wall) stay separate (heterogeneous
+  source/destination), so it is not a single fused kernel like the single-array
+  elliptical path. New cache entry; the 2D generated source stays byte-identical
+  (guard `test_2d_path_generated_source_is_byte_identical_to_golden` passes).
 
 ## References for this aspect
 

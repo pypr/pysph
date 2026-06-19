@@ -22,6 +22,7 @@ import warp as wp
 from pysph.base.kernels import CubicSpline
 from pysph.base.warp_codegen import (
     WarpEquation, build_group_kernel, clear_kernel_cache,
+    generate_group_source,
 )
 import pysph.base.warp_sph as ws
 
@@ -218,6 +219,42 @@ def test_grid_mode_kernel_sum_matches_reference_single_cell():
     assert np.allclose(wsum, [expected, expected], rtol=1e-5, atol=1e-6)
 
 
+def test_grid_mode_kernel_sum_matches_reference_in_3d_across_z_cells():
+    # dim=3 coverage of the generated grid path (ADR-0005 pin): a 1x1x2 cell
+    # grid (nz=2) with one particle per z-layer forces the 27-cell triple loop
+    # to reach an adjacent cell via dzc=+/-1 and to form the 3D linear cell id
+    # cid = ix + iy*nx + iz*nx*ny -- the iz*nx*ny term is exercised only in 3D.
+    clear_kernel_cache()
+    group = build_group_kernel(
+        [_KernelSum()], np.float32, ws._WARP_DEVICE_FUNCS, neighbor_mode='grid'
+    )
+    h = 0.35
+    cs = 0.7              # cell_size = radius_scale*h, so the z-neighbor one
+    z1 = 0.5             # cell away (dz=0.5 < cutoff 0.7) is found by the walk
+    arrays = {
+        's_x': _arr([0.0, 0.0], np.float32), 's_y': _arr([0.0, 0.0], np.float32),
+        's_z': _arr([0.0, z1], np.float32), 's_h': _arr([h, h], np.float32),
+        'd_x': _arr([0.0, 0.0], np.float32), 'd_y': _arr([0.0, 0.0], np.float32),
+        'd_z': _arr([0.0, z1], np.float32), 'd_h': _arr([h, h], np.float32),
+        # particle 0 -> cell (0,0,0)=cid 0; particle 1 -> cell (0,0,1)=cid 1
+        'cell_starts': _arr([0, 1], np.int32),
+        'cell_counts': _arr([1, 1], np.int32),
+        'cell_particles': _arr([0, 1], np.uint32),
+        'xmin': -0.35, 'ymin': -0.35, 'zmin': -0.35, 'cell_size': cs,
+        'nx': 1, 'ny': 1, 'nz': 2, 'ncells': 2, 'radius_scale': 2.0,
+        'd_wsum': wp.zeros(2, dtype=wp.float32, device=_device()),
+        '_n': 2,
+    }
+    _launch_grid_manual(group, arrays, dim=3, kernel_id=0)
+    wsum = arrays['d_wsum'].numpy()
+
+    cpu = CubicSpline(dim=3)
+    w_self = cpu.kernel([0.0, 0.0, 0.0], 0.0, h)
+    w_pair = cpu.kernel([0.0, 0.0, z1], z1, h)
+    expected = w_self + w_pair
+    assert np.allclose(wsum, [expected, expected], rtol=1e-5, atol=1e-6)
+
+
 def test_accumulate_outputs_adds_to_existing_output():
     # accumulate_outputs=True seeds _acc from the existing d_<out>[i] so the
     # group adds to (read-modify-writes) the destination arrays instead of
@@ -278,3 +315,41 @@ def test_unknown_shared_quantity_is_rejected():
 
     with pytest.raises(ValueError):
         build_group_kernel([_Bad()], np.float32, ws._WARP_DEVICE_FUNCS)
+
+
+def test_2d_path_generated_source_is_byte_identical_to_golden():
+    # ADR-0005 cache-stability guard. Adding the WendlandQuintic kernel id (2)
+    # must NOT perturb the generated source for the 2D elliptical-drop kernels:
+    # the kernel choice is a *runtime* kernel_id, so the SummationDensity and
+    # the fused WCSPH-continuity group each emit one shared source string,
+    # independent of which kernel is used. Warp's on-disk cache for those
+    # kernels is keyed by that source, so a stable source == stable 2D baseline
+    # and cache. These md5s were captured pre-Wendland; any future edit that
+    # would change the 2D-path emitted source (and bust its cache / perturb the
+    # committed elliptical-drop baseline) fails here. func_name is pinned so the
+    # digest reflects only the equation snippets + geometry emission.
+    import hashlib
+
+    golden = {
+        ('summation', 'flat'): 'c473f1a544a6bbf31eb70ebafe7a3399',
+        ('summation', 'grid'): 'edd7cbd57050ca10cbfe4064f5ff7de7',
+        ('wcsph_continuity', 'flat'): '9a568b201d9faac1e41bda0350a2e2fb',
+        ('wcsph_continuity', 'grid'): 'eff64c63fbab32768d3bd14a7eb0928d',
+    }
+    groups = {
+        'summation': [ws.SummationDensity()],
+        'wcsph_continuity': list(ws._WCSPH_CONTINUITY_BLOCKS),
+    }
+    for name, eqs in groups.items():
+        for mode in ('flat', 'grid'):
+            src, *_ = generate_group_source(
+                eqs, np.float32, func_name='_golden', neighbor_mode=mode
+            )
+            digest = hashlib.md5(src.encode()).hexdigest()
+            assert digest == golden[(name, mode)], (
+                "%s/%s 2D-path source changed (cache-bust / baseline risk): "
+                "%s != %s" % (name, mode, digest, golden[(name, mode)])
+            )
+            # The 2D path never mentions Wendland; the kernel router resolves
+            # ids at runtime, so the emitted source must stay kernel-agnostic.
+            assert 'wendland' not in src

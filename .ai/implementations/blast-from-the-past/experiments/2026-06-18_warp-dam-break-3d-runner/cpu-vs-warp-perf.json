@@ -1,0 +1,27 @@
+{
+  "c0": 32.849657532461435,
+  "case": "Lobovsky 3D dam-break, no obstacle",
+  "cpu_pysph_fp64": {
+    "final_t": 0.4,
+    "s_per_step": 0.01303212759869848,
+    "solve_s": 6.007810823,
+    "steps": 461,
+    "subprocess_wall_s": 9.911120583999946
+  },
+  "dx": 0.08,
+  "kernel": "wendland",
+  "n_fluid": 1800,
+  "n_total": 7392,
+  "n_wall": 5592,
+  "reference_example": "pysph.examples.dam_break.dam_break_3d_lobovsky",
+  "snapshot_image": "/home/kunalp/work/particles/pysph/.ai/implementations/blast-from-the-past/experiments/2026-06-18_warp-dam-break-3d-runner/cpu-vs-warp-snapshot.png",
+  "speedup_per_step": 1.528473001996329,
+  "speedup_wall": 1.531795769391973,
+  "tf": 0.4,
+  "warp_gpu_fp32": {
+    "final_t": 0.4,
+    "s_per_step": 0.008526239967390527,
+    "steps": 460,
+    "wall_s": 3.9220703849996426
+  }
+}

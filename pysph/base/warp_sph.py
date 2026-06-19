@@ -241,12 +241,121 @@ if wp is not None:
 
 
     @wp.func
+    def _wendland_quintic_f64(rij: wp.float64, h: wp.float64, dim: wp.int32):
+        # Wendland C2 quintic (PySPH WendlandQuintic), support q < 2.
+        # alpha_d = 7/(4 pi) (2D), 21/(16 pi) (3D); dim==1 is unsupported in
+        # PySPH and never used here (left as a harmless 2D-base fallback).
+        h1 = wp.float64(1.0) / h
+        q = rij * h1
+        fac = wp.float64(7.0) / (
+            wp.float64(4.0) * wp.float64(3.141592653589793)
+        )
+        if dim == wp.int32(3):
+            fac = wp.float64(21.0) / (
+                wp.float64(16.0) * wp.float64(3.141592653589793)
+            )
+
+        if dim == wp.int32(1):
+            fac = fac * h1
+        elif dim == wp.int32(2):
+            fac = fac * h1 * h1
+        else:
+            fac = fac * h1 * h1 * h1
+
+        val = wp.float64(0.0)
+        tmp = wp.float64(1.0) - wp.float64(0.5) * q
+        if q < wp.float64(2.0):
+            val = tmp * tmp * tmp * tmp * (wp.float64(2.0) * q + wp.float64(1.0))
+        return val * fac
+
+
+    @wp.func
+    def _wendland_quintic_f32(rij: wp.float32, h: wp.float32, dim: wp.int32):
+        h1 = wp.float32(1.0) / h
+        q = rij * h1
+        fac = wp.float32(7.0) / (
+            wp.float32(4.0) * wp.float32(3.141592653589793)
+        )
+        if dim == wp.int32(3):
+            fac = wp.float32(21.0) / (
+                wp.float32(16.0) * wp.float32(3.141592653589793)
+            )
+
+        if dim == wp.int32(1):
+            fac = fac * h1
+        elif dim == wp.int32(2):
+            fac = fac * h1 * h1
+        else:
+            fac = fac * h1 * h1 * h1
+
+        val = wp.float32(0.0)
+        tmp = wp.float32(1.0) - wp.float32(0.5) * q
+        if q < wp.float32(2.0):
+            val = tmp * tmp * tmp * tmp * (wp.float32(2.0) * q + wp.float32(1.0))
+        return val * fac
+
+
+    @wp.func
+    def _wendland_dwdq_f64(rij: wp.float64, h: wp.float64, dim: wp.int32):
+        h1 = wp.float64(1.0) / h
+        q = rij * h1
+        fac = wp.float64(7.0) / (
+            wp.float64(4.0) * wp.float64(3.141592653589793)
+        )
+        if dim == wp.int32(3):
+            fac = wp.float64(21.0) / (
+                wp.float64(16.0) * wp.float64(3.141592653589793)
+            )
+
+        if dim == wp.int32(1):
+            fac = fac * h1
+        elif dim == wp.int32(2):
+            fac = fac * h1 * h1
+        else:
+            fac = fac * h1 * h1 * h1
+
+        val = wp.float64(0.0)
+        tmp = wp.float64(1.0) - wp.float64(0.5) * q
+        if rij > wp.float64(1.0e-12) and q < wp.float64(2.0):
+            val = -wp.float64(5.0) * q * tmp * tmp * tmp
+        return val * fac
+
+
+    @wp.func
+    def _wendland_dwdq_f32(rij: wp.float32, h: wp.float32, dim: wp.int32):
+        h1 = wp.float32(1.0) / h
+        q = rij * h1
+        fac = wp.float32(7.0) / (
+            wp.float32(4.0) * wp.float32(3.141592653589793)
+        )
+        if dim == wp.int32(3):
+            fac = wp.float32(21.0) / (
+                wp.float32(16.0) * wp.float32(3.141592653589793)
+            )
+
+        if dim == wp.int32(1):
+            fac = fac * h1
+        elif dim == wp.int32(2):
+            fac = fac * h1 * h1
+        else:
+            fac = fac * h1 * h1 * h1
+
+        val = wp.float32(0.0)
+        tmp = wp.float32(1.0) - wp.float32(0.5) * q
+        if rij > wp.float32(1.0e-12) and q < wp.float32(2.0):
+            val = -wp.float32(5.0) * q * tmp * tmp * tmp
+        return val * fac
+
+
+    @wp.func
     def _kernel_value_f64(
             rij: wp.float64, h: wp.float64, dim: wp.int32,
             kernel_id: wp.int32,
     ):
         if kernel_id == wp.int32(1):
             return _gaussian_spline_f64(rij, h, dim)
+        if kernel_id == wp.int32(2):
+            return _wendland_quintic_f64(rij, h, dim)
         return _cubic_spline_f64(rij, h, dim)
 
 
@@ -257,6 +366,8 @@ if wp is not None:
     ):
         if kernel_id == wp.int32(1):
             return _gaussian_spline_f32(rij, h, dim)
+        if kernel_id == wp.int32(2):
+            return _wendland_quintic_f32(rij, h, dim)
         return _cubic_spline_f32(rij, h, dim)
 
 
@@ -267,6 +378,8 @@ if wp is not None:
     ):
         if kernel_id == wp.int32(1):
             return _gaussian_dwdq_f64(rij, h, dim)
+        if kernel_id == wp.int32(2):
+            return _wendland_dwdq_f64(rij, h, dim)
         return _cubic_dwdq_f64(rij, h, dim)
 
 
@@ -277,6 +390,8 @@ if wp is not None:
     ):
         if kernel_id == wp.int32(1):
             return _gaussian_dwdq_f32(rij, h, dim)
+        if kernel_id == wp.int32(2):
+            return _wendland_dwdq_f32(rij, h, dim)
         return _cubic_dwdq_f32(rij, h, dim)
 
 
@@ -341,6 +456,50 @@ if wp is not None:
         ratio = rho[i] * rho01
         tmp = wp.pow(ratio, gamma)
         p[i] = p0 + b * (tmp - wp.float32(1.0))
+        cs[i] = c0 * wp.pow(ratio, gamma1)
+
+
+    @wp.kernel
+    def _tait_eos_hg_correction_f64(
+            rho: wp.array(dtype=wp.float64),
+            p: wp.array(dtype=wp.float64),
+            cs: wp.array(dtype=wp.float64),
+            rho0: wp.float64,
+            rho01: wp.float64,
+            c0: wp.float64,
+            gamma: wp.float64,
+            gamma1: wp.float64,
+            b: wp.float64,
+    ):
+        # PySPH TaitEOSHGCorrection: clamp wall density to >= rho0 (so wall
+        # pressure is always >= 0 and repels), then standard Tait.
+        i = wp.tid()
+        if rho[i] < rho0:
+            rho[i] = rho0
+        ratio = rho[i] * rho01
+        tmp = wp.pow(ratio, gamma)
+        p[i] = b * (tmp - wp.float64(1.0))
+        cs[i] = c0 * wp.pow(ratio, gamma1)
+
+
+    @wp.kernel
+    def _tait_eos_hg_correction_f32(
+            rho: wp.array(dtype=wp.float32),
+            p: wp.array(dtype=wp.float32),
+            cs: wp.array(dtype=wp.float32),
+            rho0: wp.float32,
+            rho01: wp.float32,
+            c0: wp.float32,
+            gamma: wp.float32,
+            gamma1: wp.float32,
+            b: wp.float32,
+    ):
+        i = wp.tid()
+        if rho[i] < rho0:
+            rho[i] = rho0
+        ratio = rho[i] * rho01
+        tmp = wp.pow(ratio, gamma)
+        p[i] = b * (tmp - wp.float32(1.0))
         cs[i] = c0 * wp.pow(ratio, gamma1)
 
 
@@ -430,6 +589,42 @@ if wp is not None:
             v[i] = v[i] + dt * av[i]
         if dim > wp.int32(2):
             w[i] = w[i] + dt * aw[i]
+
+
+    @wp.kernel
+    def _apply_body_force_f64(
+            au: wp.array(dtype=wp.float64),
+            av: wp.array(dtype=wp.float64),
+            aw: wp.array(dtype=wp.float64),
+            gx: wp.float64,
+            gy: wp.float64,
+            gz: wp.float64,
+            dim: wp.int32,
+    ):
+        i = wp.tid()
+        au[i] = au[i] + gx
+        if dim > wp.int32(1):
+            av[i] = av[i] + gy
+        if dim > wp.int32(2):
+            aw[i] = aw[i] + gz
+
+
+    @wp.kernel
+    def _apply_body_force_f32(
+            au: wp.array(dtype=wp.float32),
+            av: wp.array(dtype=wp.float32),
+            aw: wp.array(dtype=wp.float32),
+            gx: wp.float32,
+            gy: wp.float32,
+            gz: wp.float32,
+            dim: wp.int32,
+    ):
+        i = wp.tid()
+        au[i] = au[i] + gx
+        if dim > wp.int32(1):
+            av[i] = av[i] + gy
+        if dim > wp.int32(2):
+            aw[i] = aw[i] + gz
 
 
     @wp.kernel
@@ -852,6 +1047,15 @@ if wp is not None:
         '_gaussian_spline_f64': _gaussian_spline_f64,
         '_gaussian_dwdq_f32': _gaussian_dwdq_f32,
         '_gaussian_dwdq_f64': _gaussian_dwdq_f64,
+        # Wendland leaves are reachable transitively via the routers'
+        # __globals__ (so kernel_id==2 already resolves), but are listed here
+        # for parity with cubic/gaussian and robustness against a future
+        # generated kernel that calls a leaf directly. Not part of the cache key
+        # or any generated source, so this does not perturb the 2D path.
+        '_wendland_quintic_f32': _wendland_quintic_f32,
+        '_wendland_quintic_f64': _wendland_quintic_f64,
+        '_wendland_dwdq_f32': _wendland_dwdq_f32,
+        '_wendland_dwdq_f64': _wendland_dwdq_f64,
     }
 else:  # pragma: no cover
     _WARP_DEVICE_FUNCS = {}
@@ -945,6 +1149,18 @@ class XSPHCorrection(WarpEquation):
 _WCSPH_CONTINUITY_BLOCKS = (
     PressureGradient(), ArtificialViscosity(), ContinuityEquation(),
     XSPHCorrection(),
+)
+
+# The dam-break fluid acceleration+density group (multi-array): pressure
+# gradient, Monaghan viscosity (both -> au/av/aw), continuity (-> arho), FUSED so
+# the per-pair geometry (dx/dy/dz, grad, vij, rij2, hij) is computed once per
+# neighbour instead of three times. Run once per source array with
+# accumulate_outputs=True. Excludes XSPHCorrection -- XSPH sums over the fluid
+# only (not the walls), so it stays a separate launch with a different source
+# set. Pressure-before-viscosity fixes the au/av/aw accumulation order, matching
+# the single-array fused group above.
+_WCSPH_DAM_BREAK_FLUID_BLOCKS = (
+    PressureGradient(), ArtificialViscosity(), ContinuityEquation(),
 )
 
 
@@ -1065,15 +1281,18 @@ def _ensure_sound_speed(pa, c0, device):
 
 def _kernel_id(kernel):
     if isinstance(kernel, (int, np.integer)):
-        if int(kernel) in (0, 1):
+        if int(kernel) in (0, 1, 2):
             return np.int32(kernel)
-        raise ValueError("kernel id must be 0 (cubic) or 1 (gaussian)")
+        raise ValueError(
+            "kernel id must be 0 (cubic), 1 (gaussian), or 2 (wendland)")
     name = str(kernel).lower().replace('-', '_')
     if name in ('cubic', 'cubic_spline', 'cubicspline'):
         return np.int32(0)
     if name == 'gaussian':
         return np.int32(1)
-    raise ValueError("kernel must be 'cubic' or 'gaussian'")
+    if name in ('wendland', 'wendland_quintic', 'wendlandquintic'):
+        return np.int32(2)
+    raise ValueError("kernel must be 'cubic', 'gaussian', or 'wendland'")
 
 
 def compute_summation_density(nnps, src_index=0, dst_index=0,
@@ -1182,6 +1401,55 @@ def compute_tait_eos(pa, rho0, c0, gamma=7.0, p0=0.0, out_prop='p',
                 rho.dev, out.dev, cs.dev, rho0, rho01, c0, gamma,
                 gamma1, b, p0
             ],
+            device=device,
+        )
+        wp.synchronize_device(device)
+    return out, cs
+
+
+def compute_tait_eos_hg_correction(pa, rho0, c0, gamma=7.0, out_prop='p',
+                                   cs_prop='cs', device=None, push=True):
+    """PySPH ``TaitEOSHGCorrection`` for solid walls (ADR-0005).
+
+    Clamps density to ``>= rho0`` in place (so wall pressure stays ``>= 0`` and
+    repels approaching fluid) and then applies Tait EOS for ``p`` and ``cs``.
+    Used on boundary/solid arrays in the dam-break step; the fluid uses the
+    regular :func:`compute_tait_eos`.
+    """
+    if wp is None:  # pragma: no cover
+        raise ImportError("warp is required for compute_tait_eos_hg_correction")
+
+    device = wp.get_device(device)
+    _ensure_property(pa, out_prop, device)
+    _ensure_property(pa, cs_prop, device)
+    if push:
+        pa.gpu.push('rho', out_prop, cs_prop)
+    rho = pa.gpu.get_device_array('rho')
+    out = pa.gpu.get_device_array(out_prop)
+    cs = pa.gpu.get_device_array(cs_prop)
+    n = pa.gpu.get_number_of_particles()
+    if rho.dtype == np.float32:
+        kernel = _tait_eos_hg_correction_f32
+        rho0 = np.float32(rho0)
+        rho01 = np.float32(1.0 / rho0)
+        c0 = np.float32(c0)
+        gamma = np.float32(gamma)
+        gamma1 = np.float32(0.5 * (gamma - np.float32(1.0)))
+        b = np.float32(rho0 * c0 * c0 / gamma)
+    else:
+        kernel = _tait_eos_hg_correction_f64
+        rho0 = np.float64(rho0)
+        rho01 = np.float64(1.0 / rho0)
+        c0 = np.float64(c0)
+        gamma = np.float64(gamma)
+        gamma1 = np.float64(0.5 * (gamma - np.float64(1.0)))
+        b = np.float64(rho0 * c0 * c0 / gamma)
+    if n > 0:
+        wp.launch(
+            kernel,
+            dim=n,
+            inputs=[rho.dev, out.dev, cs.dev, rho0, rho01, c0, gamma,
+                    gamma1, b],
             device=device,
         )
         wp.synchronize_device(device)
@@ -1391,6 +1659,55 @@ def leapfrog_kick(pa, dt, dim=3, device=None, push=True):
         )
         wp.synchronize_device(device)
     return gpu.u, gpu.v, gpu.w
+
+
+def apply_body_force(pa, gx=0.0, gy=0.0, gz=0.0, dim=3, ramp=1.0,
+                     device=None, push=True):
+    """Add a (ramped) constant body-force acceleration to ``au``/``av``/``aw``.
+
+    Gravity is a body force, i.e. an acceleration; this adds ``ramp*g`` to the
+    acceleration arrays the integrator integrates -- matching PySPH's
+    ``MomentumEquation`` ``gz`` term -- so it folds consistently into the PEC
+    predictor and corrector. Standalone additive kernel (ADR-0005): it does not
+    touch any generated equation kernel or the elliptical-drop step, so with the
+    default ``gx=gy=gz=0`` it is a no-op and the 2D path is unchanged. ``ramp``
+    in ``[0, 1]`` applies the WCSPH ``n_damp`` gravity startup ramp. Components
+    are applied under the same ``dim>1``/``dim>2`` guards as the integrator.
+    """
+    if wp is None:  # pragma: no cover
+        raise ImportError("warp is required for apply_body_force")
+
+    device = wp.get_device(device)
+    _ensure_property(pa, 'au', device)
+    _ensure_property(pa, 'av', device)
+    _ensure_property(pa, 'aw', device)
+    if push:
+        pa.gpu.push('au', 'av', 'aw')
+    gpu = pa.gpu
+    n = gpu.get_number_of_particles()
+    gx_e, gy_e, gz_e = ramp * gx, ramp * gy, ramp * gz
+    if gpu.au.dtype == np.float32:
+        kernel = _apply_body_force_f32
+        gx_e, gy_e, gz_e = (
+            np.float32(gx_e), np.float32(gy_e), np.float32(gz_e)
+        )
+    else:
+        kernel = _apply_body_force_f64
+        gx_e, gy_e, gz_e = (
+            np.float64(gx_e), np.float64(gy_e), np.float64(gz_e)
+        )
+    if n > 0:
+        wp.launch(
+            kernel,
+            dim=n,
+            inputs=[
+                gpu.au.dev, gpu.av.dev, gpu.aw.dev,
+                gx_e, gy_e, gz_e, np.int32(dim)
+            ],
+            device=device,
+        )
+        wp.synchronize_device(device)
+    return gpu.au, gpu.av, gpu.aw
 
 
 def leapfrog_drift(pa, dt, dim=3, device=None, push=True):
@@ -1948,6 +2265,123 @@ def wc_sph_leapfrog_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,
     if return_dt:
         return result, dt
     return result
+
+
+def _zero_device_props(pa, props):
+    """Zero the named device arrays in place (no host transfer)."""
+    for prop in props:
+        pa.gpu.get_device_array(prop).dev.zero_()
+
+
+def wc_sph_dam_break_step(nnps, fluid_index=0, solid_indices=(1,), dt=1.0e-4,
+                          rho0=1000.0, c0=10.0, p0=0.0, alpha=0.1, beta=0.0,
+                          gamma=7.0, kernel='wendland', xsph_eps=0.5,
+                          gx=0.0, gy=0.0, gz=-9.81, gravity_ramp=1.0,
+                          adaptive_dt=False, cfl=0.25, dt_min=0.0,
+                          dt_max=np.inf, adaptive_dt_scale=1.0,
+                          step_dt_max=np.inf, push=False, return_dt=False):
+    """One 3D dam-break WCSPH continuity-density PEC step (ADR-0005).
+
+    Multi-array: the fluid's acceleration and density rate sum over the fluid
+    plus every solid wall array; each wall integrates density from the fluid
+    only and is otherwise fixed -- walls start at rest with zero acceleration,
+    so the shared PEC stage leaves their position/velocity unchanged while their
+    density (hence pressure) responds to approaching fluid. Walls use
+    ``TaitEOSHGCorrection`` (clamped ``p >= 0``); the fluid uses Tait EOS.
+    Gravity is added to the fluid acceleration with an optional ``n_damp`` ramp
+    (``gravity_ramp`` in ``[0, 1]``). All neighbour traversal is grid-direct.
+
+    This is additive to the backend: it composes the existing generated equation
+    blocks (run with ``accumulate_outputs=True`` over each source) and the
+    existing PEC stage; it does not modify any single-array path, so the 2D
+    elliptical-drop step is unchanged.
+    """
+    if wp is None:  # pragma: no cover
+        raise ImportError("warp is required for wc_sph_dam_break_step")
+
+    fluid_index = int(fluid_index)
+    solid_indices = [int(i) for i in solid_indices]
+    fluid = nnps.particles[fluid_index]
+    solids = [nnps.particles[i] for i in solid_indices]
+    arrays = [fluid] + solids
+    sources_for_fluid = [fluid_index] + solid_indices
+    use_xsph = xsph_eps is not None and xsph_eps != 0.0
+    eps = 0.0 if xsph_eps is None else xsph_eps
+    dim = nnps.dim
+    device = nnps.device
+
+    out_props = ('au', 'av', 'aw', 'arho', 'ax', 'ay', 'az')
+    for pa in arrays:
+        for prop in ('rho', 'p', 'cs') + out_props:
+            _ensure_property(pa, prop, device)
+    if push:
+        for pa in arrays:
+            pa.gpu.push('x', 'y', 'z', 'h', 'm', 'rho', 'p', 'cs',
+                        'u', 'v', 'w', *out_props)
+    nnps.update(push=push)
+
+    for pa in arrays:
+        save_wcsph_state(pa, dim=dim, device=device, push=False)
+
+    def accel():
+        # EOS: fluid Tait; walls Tait-HG (clamp rho>=rho0 so wall p>=0).
+        compute_tait_eos(fluid, rho0=rho0, c0=c0, gamma=gamma, p0=p0,
+                         device=device, push=False)
+        for s in solids:
+            compute_tait_eos_hg_correction(s, rho0=rho0, c0=c0, gamma=gamma,
+                                            device=device, push=False)
+        # Zero accumulators (walls keep zero accel -> they stay fixed).
+        for pa in arrays:
+            _zero_device_props(pa, out_props)
+        # Fluid: pressure + Monaghan AV + continuity summed over fluid + walls,
+        # fused into ONE kernel per source (single neighbour walk / single
+        # per-pair geometry for all three blocks instead of three).
+        for s_index in sources_for_fluid:
+            _run_equation_group(nnps, s_index, fluid_index,
+                                list(_WCSPH_DAM_BREAK_FLUID_BLOCKS),
+                                scalar_values={'alpha': alpha, 'beta': beta},
+                                kernel=kernel, neighbor_mode='grid',
+                                accumulate_outputs=True)
+        # XSPH position correction from fluid neighbours only.
+        if use_xsph:
+            _run_equation_group(nnps, fluid_index, fluid_index,
+                                [XSPHCorrection()],
+                                scalar_values={'eps': eps}, kernel=kernel,
+                                neighbor_mode='grid', accumulate_outputs=True)
+        # Walls: density rate from the fluid only.
+        for w_index in solid_indices:
+            _run_equation_group(nnps, fluid_index, w_index,
+                                [ContinuityEquation()], kernel=kernel,
+                                neighbor_mode='grid', accumulate_outputs=True)
+        # Gravity (ramped) into the fluid acceleration.
+        apply_body_force(fluid, gx=gx, gy=gy, gz=gz, dim=dim,
+                         ramp=gravity_ramp, device=device, push=False)
+
+    # Predictor half-stage (dt fixed for both stages, set adaptively here).
+    accel()
+    if adaptive_dt:
+        dt = compute_wcsph_adaptive_timestep(
+            nnps, pa_index=fluid_index, c0=c0, cfl=cfl, dt_min=dt_min,
+            dt_max=dt_max, push=False, neighbor_mode='grid'
+        )
+        dt = min(float(dt) * float(adaptive_dt_scale), float(step_dt_max))
+    for pa in arrays:
+        wcsph_pec_stage(pa, dt=dt, stage=0.5, dim=dim,
+                        xsph=(use_xsph and pa is fluid), device=device,
+                        push=False)
+    nnps.update(push=False)
+
+    # Corrector half-stage.
+    accel()
+    for pa in arrays:
+        wcsph_pec_stage(pa, dt=dt, stage=1.0, dim=dim,
+                        xsph=(use_xsph and pa is fluid), device=device,
+                        push=False)
+    nnps.update(push=False)
+
+    if return_dt:
+        return dt
+    return dt
 
 
 def wc_sph_euler_step(nnps, pa_index=0, dt=1.0e-4, rho0=1000.0,

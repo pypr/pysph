@@ -19,6 +19,21 @@
       "from": "ADR-0004",
       "to": "ADR-0003",
       "type": "depends_on"
+    },
+    {
+      "from": "ADR-0005",
+      "to": "ADR-0003",
+      "type": "relates_to"
+    },
+    {
+      "from": "ADR-0005",
+      "to": "ADR-0004",
+      "type": "relates_to"
+    },
+    {
+      "from": "ADR-0005",
+      "to": "ADR-0003",
+      "type": "depends_on"
     }
   ],
   "nodes": [
@@ -48,6 +63,13 @@
       "file": "decisions/2026-06-18_adr-0004_grid-direct-neighbor-traversal-for-wcsph-continuity-hot-path.md",
       "id": "ADR-0004",
       "scope": "gpu-nnps",
+      "status": "Accepted"
+    },
+    {
+      "date": "2026-06-18",
+      "file": "decisions/2026-06-18_adr-0005_adopt-additive-3d-wcsph-physics-for-the-warp-dam-break-benchmark.md",
+      "id": "ADR-0005",
+      "scope": "warp-backend",
       "status": "Accepted"
     }
   ]
