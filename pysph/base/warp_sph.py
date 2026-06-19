@@ -1031,6 +1031,92 @@ if wp is not None:
             z[i] = _wrap_value_f32(z[i], zmin, zmax)
 
 
+    @wp.kernel
+    def _rigid_moments_reduce_f64(
+            body_id: wp.array(dtype=wp.int32),
+            m: wp.array(dtype=wp.float64),
+            x: wp.array(dtype=wp.float64),
+            y: wp.array(dtype=wp.float64),
+            z: wp.array(dtype=wp.float64),
+            fx: wp.array(dtype=wp.float64),
+            fy: wp.array(dtype=wp.float64),
+            fz: wp.array(dtype=wp.float64),
+            mi: wp.array(dtype=wp.float64),
+    ):
+        # ADR-0006: per-body SUM-reduction matching RigidBodyMoments.reduce
+        # (rigid_body.py:90-122) -- 16 slots per body: total mass, m*x/y/z (for
+        # COM), 6 second-moments about the ORIGIN, total force, torque about the
+        # origin. The host finalize shifts to the COM. Accumulators are f64 even
+        # on the f32 path (P0: fp32 atomic_add is non-associative); ``mi`` is
+        # pre-zeroed by wp.zeros.
+        i = wp.tid()
+        b = body_id[i] * wp.int32(16)
+        mm = m[i]
+        xi = x[i]
+        yi = y[i]
+        zi = z[i]
+        fxi = fx[i]
+        fyi = fy[i]
+        fzi = fz[i]
+        wp.atomic_add(mi, b + 0, mm)
+        wp.atomic_add(mi, b + 1, mm * xi)
+        wp.atomic_add(mi, b + 2, mm * yi)
+        wp.atomic_add(mi, b + 3, mm * zi)
+        wp.atomic_add(mi, b + 4, mm * (yi * yi + zi * zi))
+        wp.atomic_add(mi, b + 5, mm * (xi * xi + zi * zi))
+        wp.atomic_add(mi, b + 6, mm * (xi * xi + yi * yi))
+        wp.atomic_add(mi, b + 7, -mm * xi * yi)
+        wp.atomic_add(mi, b + 8, -mm * xi * zi)
+        wp.atomic_add(mi, b + 9, -mm * yi * zi)
+        wp.atomic_add(mi, b + 10, fxi)
+        wp.atomic_add(mi, b + 11, fyi)
+        wp.atomic_add(mi, b + 12, fzi)
+        wp.atomic_add(mi, b + 13, yi * fzi - zi * fyi)
+        wp.atomic_add(mi, b + 14, zi * fxi - xi * fzi)
+        wp.atomic_add(mi, b + 15, xi * fyi - yi * fxi)
+
+
+    @wp.kernel
+    def _rigid_moments_reduce_f32(
+            body_id: wp.array(dtype=wp.int32),
+            m: wp.array(dtype=wp.float32),
+            x: wp.array(dtype=wp.float32),
+            y: wp.array(dtype=wp.float32),
+            z: wp.array(dtype=wp.float32),
+            fx: wp.array(dtype=wp.float32),
+            fy: wp.array(dtype=wp.float32),
+            fz: wp.array(dtype=wp.float32),
+            mi: wp.array(dtype=wp.float64),
+    ):
+        # f32 particle data, but cast to f64 and accumulate in f64 (the locked
+        # decision -- see _rigid_moments_reduce_f64). ``mi`` is f64.
+        i = wp.tid()
+        b = body_id[i] * wp.int32(16)
+        mm = wp.float64(m[i])
+        xi = wp.float64(x[i])
+        yi = wp.float64(y[i])
+        zi = wp.float64(z[i])
+        fxi = wp.float64(fx[i])
+        fyi = wp.float64(fy[i])
+        fzi = wp.float64(fz[i])
+        wp.atomic_add(mi, b + 0, mm)
+        wp.atomic_add(mi, b + 1, mm * xi)
+        wp.atomic_add(mi, b + 2, mm * yi)
+        wp.atomic_add(mi, b + 3, mm * zi)
+        wp.atomic_add(mi, b + 4, mm * (yi * yi + zi * zi))
+        wp.atomic_add(mi, b + 5, mm * (xi * xi + zi * zi))
+        wp.atomic_add(mi, b + 6, mm * (xi * xi + yi * yi))
+        wp.atomic_add(mi, b + 7, -mm * xi * yi)
+        wp.atomic_add(mi, b + 8, -mm * xi * zi)
+        wp.atomic_add(mi, b + 9, -mm * yi * zi)
+        wp.atomic_add(mi, b + 10, fxi)
+        wp.atomic_add(mi, b + 11, fyi)
+        wp.atomic_add(mi, b + 12, fzi)
+        wp.atomic_add(mi, b + 13, yi * fzi - zi * fyi)
+        wp.atomic_add(mi, b + 14, zi * fxi - xi * fzi)
+        wp.atomic_add(mi, b + 15, xi * fyi - yi * fxi)
+
+
 if wp is not None:
     # Device wp.func objects referenced by generated group kernels. Seeded into
     # the generated kernels' namespace so Warp can resolve them (ADR-0003).
@@ -1945,6 +2031,125 @@ def compute_wcsph_adaptive_timestep(nnps, pa_index=0, c0=20.0, cfl=0.25,
         wp.synchronize_device(nnps.device)
         return float(out_dt.numpy()[0])
     return float(dt_max)
+
+
+def _rigid_finalize_moments(mi, omega=None, nbody=1):
+    """Host (numpy) finalize of the device RigidBodyMoments reduction (ADR-0006).
+
+    Given the reduced 16-slot-per-body ``mi`` vector (total mass; ``m*x/y/z``;
+    the six second-moments/products of inertia about the ORIGIN; total force;
+    torque about the origin) produced by ``_rigid_moments_reduce_*``, compute
+    per body: total mass, centre of mass, the moment-of-inertia tensor about the
+    COM (parallel-axis theorem), total force, COM acceleration, torque about the
+    COM, and ``omega_dot = inv(I) (tau - omega x (I omega))``. Mirrors
+    ``RigidBodyMoments`` (rigid_body.py:128-207) exactly; this is the host half
+    of the 6-DOF solve -- the device only does the sum-reduction. ``omega`` is
+    the current per-body angular velocity (``(nbody, 3)``; defaults to rest).
+    """
+    mi = np.asarray(mi, dtype=np.float64)
+    if omega is None:
+        omega = np.zeros((nbody, 3))
+    else:
+        omega = np.asarray(omega, dtype=np.float64).reshape(nbody, 3)
+    res = {
+        'total_mass': np.zeros(nbody),
+        'cm': np.zeros((nbody, 3)),
+        'inertia': np.zeros((nbody, 3, 3)),
+        'force': np.zeros((nbody, 3)),
+        'ac': np.zeros((nbody, 3)),
+        'torque': np.zeros((nbody, 3)),
+        'omega_dot': np.zeros((nbody, 3)),
+    }
+    for b in range(nbody):
+        base = b * 16
+        m = mi[base + 0]
+        cx = mi[base + 1] / m
+        cy = mi[base + 2] / m
+        cz = mi[base + 3] / m
+        # Parallel-axis theorem: moments/products of inertia about the COM.
+        ixx = mi[base + 4] - (cy * cy + cz * cz) * m
+        iyy = mi[base + 5] - (cx * cx + cz * cz) * m
+        izz = mi[base + 6] - (cx * cx + cy * cy) * m
+        ixy = mi[base + 7] + cx * cy * m
+        ixz = mi[base + 8] + cx * cz * m
+        iyz = mi[base + 9] + cy * cz * m
+        inertia = np.array([[ixx, ixy, ixz],
+                            [ixy, iyy, iyz],
+                            [ixz, iyz, izz]])
+        fx = mi[base + 10]
+        fy = mi[base + 11]
+        fz = mi[base + 12]
+        force = np.array([fx, fy, fz])
+        # Torque about the COM = torque about origin - (cm x F).
+        tx = mi[base + 13] - (cy * fz - cz * fy)
+        ty = mi[base + 14] - (-cx * fz + cz * fx)
+        tz = mi[base + 15] - (cx * fy - cy * fx)
+        torque = np.array([tx, ty, tz])
+        w = omega[b]
+        res['total_mass'][b] = m
+        res['cm'][b] = (cx, cy, cz)
+        res['inertia'][b] = inertia
+        res['force'][b] = force
+        res['ac'][b] = force / m
+        res['torque'][b] = torque
+        res['omega_dot'][b] = np.linalg.solve(
+            inertia, torque - np.cross(w, inertia @ w))
+    return res
+
+
+def compute_rigid_body_moments(pa, nbody=1, omega=None, body_id_dev=None,
+                               device=None, push=False):
+    """RigidBodyMoments for a rigid-body Warp array, on the device (ADR-0006).
+
+    A device ``atomic_add`` SUM-reduction over the body's particles builds the
+    16-slot-per-body ``mi`` vector of PySPH ``RigidBodyMoments.reduce``; the
+    host then finalizes it (:func:`_rigid_finalize_moments`). Accumulation is in
+    f64 regardless of the particle dtype because fp32 ``atomic_add`` is
+    order-dependent / non-associative (P0 kill-test); f64 accumulators make the
+    reduction ~deterministic. Additive to the backend: a standalone launch
+    kernel and host code, touching no generated equation source, kernel-id
+    router, or single-array path -- so the 2D elliptical-drop baseline and its
+    on-disk cache are unaffected.
+
+    ``omega`` is the current per-body angular velocity (``(nbody, 3)``).
+    ``body_id_dev`` is an optional precomputed ``int32`` device array (it is
+    static, so the eventual step driver builds it once); when ``None`` it is
+    built from ``pa.body_id`` (or all-zeros for a single body).
+
+    Returns the per-body dict from :func:`_rigid_finalize_moments`, plus the raw
+    host ``mi`` under key ``'mi'``.
+    """
+    if wp is None:  # pragma: no cover
+        raise ImportError("warp is required for compute_rigid_body_moments")
+
+    device = wp.get_device(device)
+    for prop in ('m', 'x', 'y', 'z', 'fx', 'fy', 'fz'):
+        _ensure_property(pa, prop, device)
+    gpu = pa.gpu
+    n = gpu.get_number_of_particles()
+    if push:
+        gpu.push('m', 'x', 'y', 'z', 'fx', 'fy', 'fz')
+    if body_id_dev is None:
+        if 'body_id' in pa.properties:
+            bid = np.asarray(pa.body_id, dtype=np.int32)
+        else:
+            bid = np.zeros(n, dtype=np.int32)
+        body_id_dev = wp.array(bid, dtype=wp.int32, device=device)
+    mi = wp.zeros(nbody * 16, dtype=wp.float64, device=device)
+    if n > 0:
+        arrays = [gpu.get_device_array(p).dev
+                  for p in ('m', 'x', 'y', 'z', 'fx', 'fy', 'fz')]
+        if gpu.get_device_array('x').dtype == np.float32:
+            kernel = _rigid_moments_reduce_f32
+        else:
+            kernel = _rigid_moments_reduce_f64
+        wp.launch(kernel, dim=n,
+                  inputs=[body_id_dev] + arrays + [mi], device=device)
+        wp.synchronize_device(device)
+    mi_host = mi.numpy()
+    result = _rigid_finalize_moments(mi_host, omega=omega, nbody=nbody)
+    result['mi'] = mi_host
+    return result
 
 
 def _periodic_bounds(bounds, dim):

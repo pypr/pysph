@@ -34,6 +34,26 @@
       "from": "ADR-0005",
       "to": "ADR-0003",
       "type": "depends_on"
+    },
+    {
+      "from": "ADR-0006",
+      "to": "ADR-0003",
+      "type": "relates_to"
+    },
+    {
+      "from": "ADR-0006",
+      "to": "ADR-0004",
+      "type": "relates_to"
+    },
+    {
+      "from": "ADR-0006",
+      "to": "ADR-0005",
+      "type": "relates_to"
+    },
+    {
+      "from": "ADR-0006",
+      "to": "ADR-0005",
+      "type": "depends_on"
     }
   ],
   "nodes": [
@@ -69,6 +89,13 @@
       "date": "2026-06-18",
       "file": "decisions/2026-06-18_adr-0005_adopt-additive-3d-wcsph-physics-for-the-warp-dam-break-benchmark.md",
       "id": "ADR-0005",
+      "scope": "warp-backend",
+      "status": "Accepted"
+    },
+    {
+      "date": "2026-06-19",
+      "file": "decisions/2026-06-19_adr-0006_adopt-additive-rigid-body-coupling-for-the-warp-floating-body-benchmark.md",
+      "id": "ADR-0006",
       "scope": "warp-backend",
       "status": "Accepted"
     }

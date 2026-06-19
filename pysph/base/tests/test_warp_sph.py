@@ -6,7 +6,7 @@ try:
 except Exception:
     pass
 
-pytest.importorskip('warp')
+wp = pytest.importorskip('warp')
 
 from cyarray.carray import UIntArray
 
@@ -18,7 +18,7 @@ import pysph.base.warp_sph as warp_sph
 from pysph.base.warp_sph import (
     apply_body_force, compute_artificial_viscosity, compute_continuity,
     compute_isothermal_eos, compute_pressure_gradient, compute_summation_density,
-    compute_tait_eos, compute_tait_eos_hg_correction,
+    compute_rigid_body_moments, compute_tait_eos, compute_tait_eos_hg_correction,
     compute_wcsph_accel_continuity, compute_wcsph_adaptive_timestep,
     compute_xsph_correction, euler_step, leapfrog_drift, leapfrog_kick,
     save_wcsph_state, wc_sph_dam_break_step, wc_sph_euler_step,
@@ -1884,3 +1884,171 @@ def test_warp_dam_break_step_two_array_3d_is_finite_and_walls_fixed():
     assert np.all(wall.p >= -1.0e-3)
     # Gravity pulled the fluid down.
     assert fluid.w.mean() < 0.0
+
+
+
+
+# ---------------------------------------------------------------------------
+# Rigid-body moments (ADR-0006): the device atomic_add SUM-reduction + host
+# finalize must reproduce PySPH RigidBodyMoments. The CPU reference Application
+# cannot run on Python 3.14 (compyle uses the removed ast.Str), so the reference
+# here is a faithful numpy reimplementation of rigid_body.py:90-207.
+# ---------------------------------------------------------------------------
+def _reference_rigid_moments(x, y, z, m, fx, fy, fz, body_id, nbody, omega):
+    res = {k: np.zeros((nbody, 3)) for k in
+           ('cm', 'force', 'torque', 'omega_dot')}
+    res['total_mass'] = np.zeros(nbody)
+    res['inertia'] = np.zeros((nbody, 3, 3))
+    res['mi'] = np.zeros(nbody * 16)
+    for b in range(nbody):
+        c = body_id == b
+        mb, xb, yb, zb = m[c], x[c], y[c], z[c]
+        fxb, fyb, fzb = fx[c], fy[c], fz[c]
+        base = b * 16
+        # The 16 raw reduction slots (about the ORIGIN), as the kernel builds.
+        mi = res['mi']
+        mi[base + 0] = mb.sum()
+        mi[base + 1] = (mb * xb).sum(); mi[base + 2] = (mb * yb).sum()
+        mi[base + 3] = (mb * zb).sum()
+        mi[base + 4] = (mb * (yb * yb + zb * zb)).sum()
+        mi[base + 5] = (mb * (xb * xb + zb * zb)).sum()
+        mi[base + 6] = (mb * (xb * xb + yb * yb)).sum()
+        mi[base + 7] = -(mb * xb * yb).sum()
+        mi[base + 8] = -(mb * xb * zb).sum()
+        mi[base + 9] = -(mb * yb * zb).sum()
+        mi[base + 10] = fxb.sum(); mi[base + 11] = fyb.sum()
+        mi[base + 12] = fzb.sum()
+        mi[base + 13] = (yb * fzb - zb * fyb).sum()
+        mi[base + 14] = (zb * fxb - xb * fzb).sum()
+        mi[base + 15] = (xb * fyb - yb * fxb).sum()
+        # Finalize (parallel-axis inertia, torque about COM, omega_dot).
+        M = mi[base + 0]
+        cm = np.array([mi[base + 1], mi[base + 2], mi[base + 3]]) / M
+        cx, cy, cz = cm
+        inertia = np.array([
+            [mi[base + 4] - (cy * cy + cz * cz) * M,
+             mi[base + 7] + cx * cy * M, mi[base + 8] + cx * cz * M],
+            [mi[base + 7] + cx * cy * M,
+             mi[base + 5] - (cx * cx + cz * cz) * M,
+             mi[base + 9] + cy * cz * M],
+            [mi[base + 8] + cx * cz * M, mi[base + 9] + cy * cz * M,
+             mi[base + 6] - (cx * cx + cy * cy) * M]])
+        force = np.array([mi[base + 10], mi[base + 11], mi[base + 12]])
+        torque = np.array([mi[base + 13], mi[base + 14], mi[base + 15]]) \
+            - np.cross(cm, force)
+        w = omega[b]
+        res['total_mass'][b] = M
+        res['cm'][b] = cm
+        res['inertia'][b] = inertia
+        res['force'][b] = force
+        res['torque'][b] = torque
+        res['omega_dot'][b] = np.linalg.solve(
+            inertia, torque - np.cross(w, inertia @ w))
+    return res
+
+
+def _make_two_body():
+    """Two asymmetric ellipsoidal bodies (distinct sizes / graded density /
+    one-sided forces) so the inertia tensor has real off-diagonal terms and the
+    net torque / omega_dot are non-trivial. Returns x,y,z,m,fx,fy,fz,body_id."""
+    parts = []
+    centers = [(0.05, 0.18, 0.03), (0.30, 0.10, -0.02)]
+    axes = [(0.025, 0.045, 0.015), (0.020, 0.018, 0.030)]
+    for bid, (cen, (ax, ay, az)) in enumerate(zip(centers, axes)):
+        g = np.linspace(-2 * max(ax, ay, az), 2 * max(ax, ay, az), 18)
+        X, Y, Z = np.meshgrid(g, g, g, indexing='ij')
+        sel = (X / ax) ** 2 + (Y / ay) ** 2 + (Z / az) ** 2 <= 1.0
+        xb, yb, zb = X[sel], Y[sel], Z[sel]
+        dx = g[1] - g[0]
+        rho = 500.0 * (1.0 + 0.6 * xb / ax + 0.4 * zb / az)
+        mb = rho * dx ** 3
+        gacc = 9.81
+        fxb = mb * gacc * (0.8 * xb / ax + 0.3)
+        fyb = -mb * gacc + mb * gacc * 1.3 * np.clip(
+            0.20 - (yb + cen[1]), 0.0, None) / 0.20
+        fzb = mb * gacc * (0.5 * xb / ax)
+        parts.append((xb + cen[0], yb + cen[1], zb + cen[2], mb,
+                      fxb, fyb, fzb, np.full(xb.size, bid, dtype=np.int32)))
+    cols = [np.concatenate([p[i] for p in parts]) for i in range(8)]
+    cols[7] = cols[7].astype(np.int32)
+    return cols
+
+
+@pytest.mark.parametrize('use_double', [False, True])
+def test_rigid_body_moments_matches_reference_3d(use_double):
+    from compyle.config import get_config
+    x, y, z, m, fx, fy, fz, body_id = _make_two_body()
+    nbody = 2
+    omega = np.array([[0.3, -0.5, 0.2], [-0.1, 0.4, -0.25]])
+
+    cfg = get_config()
+    old = cfg.use_double
+    cfg.use_double = use_double
+    try:
+        pa = get_particle_array(name='body', x=x, y=y, z=z, m=m, backend='warp')
+        pa.add_property('fx', data=fx)
+        pa.add_property('fy', data=fy)
+        pa.add_property('fz', data=fz)
+        pa.add_property('body_id', type='int', data=body_id)
+        got = compute_rigid_body_moments(pa, nbody=nbody, omega=omega, push=True)
+    finally:
+        cfg.use_double = old
+
+    # Reference from inputs rounded to the device dtype -> isolates reduction /
+    # finalize exactness from the (inherent) lower precision of f32 inputs.
+    cast = np.float64 if use_double else np.float32
+    xr, yr, zr, mr, fxr, fyr, fzr = (
+        a.astype(cast).astype(np.float64) for a in (x, y, z, m, fx, fy, fz))
+    ref = _reference_rigid_moments(xr, yr, zr, mr, fxr, fyr, fzr,
+                                   body_id, nbody, omega)
+
+    # The raw 16-slot reduction is the new primitive: f64 accumulation of the
+    # same (dtype-matched) values -> matches numpy to f64 round-off either path.
+    rmi = np.where(np.abs(ref['mi']) > 1e-30, ref['mi'], 1.0)
+    assert np.max(np.abs((got['mi'] - ref['mi']) / rmi)) < 1e-9
+    # Downstream moments (finalize has inherent cancellation in I and torque).
+    assert np.allclose(got['total_mass'], ref['total_mass'], rtol=1e-10)
+    assert np.allclose(got['cm'], ref['cm'], rtol=1e-9, atol=1e-13)
+    assert np.allclose(got['force'], ref['force'], rtol=1e-9, atol=1e-12)
+    assert np.allclose(got['inertia'], ref['inertia'], rtol=1e-7, atol=1e-12)
+    assert np.allclose(got['torque'], ref['torque'], rtol=1e-6, atol=1e-9)
+    assert np.allclose(got['omega_dot'], ref['omega_dot'], rtol=1e-5, atol=1e-7)
+    # Bodies are asymmetric: real torque and real angular acceleration.
+    assert np.linalg.norm(ref['torque']) > 1e-6
+    assert np.linalg.norm(ref['omega_dot']) > 1e-3
+
+
+def test_rigid_moments_f32_kernel_is_accurate_and_deterministic():
+    # The fp32 path accumulates in f64 (the ADR-0006 locked decision), so the
+    # atomic_add reduction stays accurate AND deterministic despite f32 inputs.
+    x, y, z, m, fx, fy, fz, body_id = _make_two_body()
+    nbody = 2
+    n = x.size
+
+    def f32(a):
+        return wp.array(a.astype(np.float32), dtype=wp.float32, device='cuda:0')
+    bid = wp.array(body_id.astype(np.int32), dtype=wp.int32, device='cuda:0')
+    args = [f32(a) for a in (m, x, y, z, fx, fy, fz)]
+
+    def reduce_once():
+        mi = wp.zeros(nbody * 16, dtype=wp.float64, device='cuda:0')
+        wp.launch(warp_sph._rigid_moments_reduce_f32, dim=n,
+                  inputs=[bid] + args + [mi], device='cuda:0')
+        wp.synchronize_device('cuda:0')
+        return mi.numpy()
+
+    runs = np.stack([reduce_once() for _ in range(8)])
+    # f64 accumulation -> run-to-run spread at f64 round-off (~1e-16 relative),
+    # vs ~3e-6 for an fp32 accumulator (atomic_add is order-dependent). Not
+    # bit-identical, but ~6 orders tighter -- the ADR-0006 mitigation (P0).
+    denom = np.where(np.abs(runs[0]) > 1e-30, np.abs(runs[0]), 1.0)
+    assert np.max((runs.max(0) - runs.min(0)) / denom) < 1e-12
+
+    # Accurate vs a numpy reference from the SAME f32-rounded inputs.
+    x32, y32, z32, m32, fx32, fy32, fz32 = (
+        a.astype(np.float32).astype(np.float64)
+        for a in (x, y, z, m, fx, fy, fz))
+    ref = _reference_rigid_moments(x32, y32, z32, m32, fx32, fy32, fz32,
+                                   body_id, nbody, np.zeros((nbody, 3)))
+    nz = np.abs(ref['mi']) > 1e-30
+    assert np.max(np.abs((runs[0][nz] - ref['mi'][nz]) / ref['mi'][nz])) < 1e-9
