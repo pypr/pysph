@@ -119,6 +119,14 @@ device-resident.
   source/destination), so it is not a single fused kernel like the single-array
   elliptical path. New cache entry; the 2D generated source stays byte-identical
   (guard `test_2d_path_generated_source_is_byte_identical_to_golden` passes).
+- Floating-body rigid P2 (ADR-0006 amendment) is fully device-resident:
+  `WarpRigidBodyState` keeps the f64 reduction/finalize/COM/inertia/force/torque/
+  RK2 linear+angular state on the GPU; standalone Warp kernels perform the
+  symmetric 3x3 angular solve, RK2 midpoint/full updates, rigid velocity, and
+  particle position stages. The production stage has no host finalize, pull,
+  `.numpy()`, or explicit synchronization. `_rigid_finalize_moments` remains a
+  NumPy parity oracle/explicit host-result helper. All additions are outside
+  generated equation source, so the 2D golden source remains byte-identical.
 
 ## References for this aspect
 

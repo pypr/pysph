@@ -95,6 +95,34 @@ passes):
    validating against PySPH-Liu requires implementing Liu, and the equilibrium
    draft alone is coupling-blind.
 
+### Amendment — 2026-06-20: production 6-DOF stays on the GPU
+
+The original P1/P2 split selected a host NumPy finalize and host integration
+because one body's 3x3 solve is tiny and easy to validate. The implementation
+owner challenged the architectural cost: even a tiny host solve creates a
+synchronization/copy boundary, prevents a fully device-resident step and future
+CUDA-graph capture, and scales poorly with body count. The direction change was
+approved explicitly before the P2 plan.
+
+For the production path, decision items 2 and 3 are therefore amended:
+
+- the f64 16-slot reduction remains on-device and feeds a one-thread-per-body
+  Warp finalize kernel;
+- mass, COM, inertia, force, acceleration, torque, angular acceleration, COM
+  velocity, angular velocity, and saved RK2 state live in persistent f64 device
+  arrays;
+- the symmetric 3x3 solve for
+  `omega_dot = inv(I)(tau - omega x (I omega))`, RK2 midpoint/full body-state
+  updates, `v = vc + omega x r`, and particle position updates run in Warp;
+- the production RK2 stage performs no `.numpy()`, ParticleArray pull, or
+  explicit device synchronization; host transfer is reserved for checkpoints
+  and validation;
+- `_rigid_finalize_moments()` remains as the trusted NumPy oracle and explicit
+  host-result helper, not the stepping implementation.
+
+The additive/cache-stability, f64 reduction, Liu coupling, and sibling-driver
+parts of this ADR are unchanged.
+
 ## Rationale
 
 - The only new device primitive is a hand-written `atomic_add` reduction with
@@ -104,8 +132,9 @@ passes):
 - f64 accumulators are the cheap fix for the fp32 `atomic_add` non-associativity
   the adversarial review flagged: ~6 orders tighter run-to-run, negligible cost
   at body-particle counts.
-- Host integration keeps the project's "byte-identical 2D path" mental model
-  intact for the device kernels and reuses PySPH's correct 6-DOF math.
+- The standalone rigid kernels keep the project's "byte-identical 2D path"
+  mental model intact; the NumPy implementation remains the parity oracle for
+  the device 6-DOF math.
 
 ## Alternatives considered
 
@@ -126,10 +155,10 @@ passes):
 
 ## Consequences
 
-- New standalone kernels (`_rigid_moments_reduce_f32/f64`) and host functions
-  (`compute_rigid_body_moments`, `_rigid_finalize_moments`) in `warp_sph.py`;
-  later a transform kernel, a coupling group, and the sibling driver. All
-  additive; the single-array and fixed-wall paths are untouched.
+- New standalone kernels (`_rigid_moments_reduce_f32/f64`, device finalize,
+  RK2 state, and rigid motion) plus persistent compact device state in
+  `warp_sph.py`; later a coupling group and sibling driver. All additive; the
+  single-array and fixed-wall paths are untouched.
 - The 2D elliptical-drop generated source stays byte-identical (test-asserted);
   the new kernels are not in `_WARP_DEVICE_FUNCS` and not seeded into generated
   kernels, so the existing kernels' disk-cache hashes are unchanged.
@@ -141,7 +170,8 @@ passes):
 
 ## Follow-ups
 
-- P2: host 6-DOF integrate (RK2/Euler) + device transform wired together.
+- P2: device-resident 6-DOF finalize/integrate + device transform wired
+  together. (Completed 2026-06-20; see validation below.)
 - P3: Liu coupling group + `NumberDensity` pre-pass + `wc_sph_dam_break_rigid_step`;
   resolve the `arho` double-count; bolt-on `RigidBodyWallCollision` if the case
   needs it.
@@ -163,3 +193,10 @@ passes):
   asymmetric; f32 and f64 paths match the numpy reference) and
   `test_rigid_moments_f32_kernel_is_accurate_and_deterministic`. The golden
   2D-source guard still passes (cache-stability preserved).
+- **P2 (2026-06-20 amendment):** persistent `WarpRigidBodyState`, device
+  finalize/symmetric-3x3 solve, device RK2 midpoint/full updates, and device
+  `RigidBodyMotion` equivalent. fp32/fp64 device results match the NumPy/PySPH
+  formulas; a guard monkeypatches host finalize, ParticleArray pull, and
+  `wp.synchronize_device` to fail if either production stage crosses the host
+  boundary. Focused rigid + 2D cache guard: `10 passed`; final full Warp SPH
+  regression: `49 passed`.

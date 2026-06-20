@@ -18,11 +18,13 @@ import pysph.base.warp_sph as warp_sph
 from pysph.base.warp_sph import (
     apply_body_force, compute_artificial_viscosity, compute_continuity,
     compute_isothermal_eos, compute_pressure_gradient, compute_summation_density,
-    compute_rigid_body_moments, compute_tait_eos, compute_tait_eos_hg_correction,
+    compute_rigid_body_moments, compute_rigid_body_moments_device,
+    compute_tait_eos, compute_tait_eos_hg_correction, create_rigid_body_state,
     compute_wcsph_accel_continuity, compute_wcsph_adaptive_timestep,
     compute_xsph_correction, euler_step, leapfrog_drift, leapfrog_kick,
-    save_wcsph_state, wc_sph_dam_break_step, wc_sph_euler_step,
-    wc_sph_leapfrog_step, wcsph_pec_stage, wrap_periodic
+    rigid_body_rk2_stage, save_rigid_body_state, save_wcsph_state,
+    wc_sph_dam_break_step, wc_sph_euler_step, wc_sph_leapfrog_step,
+    wcsph_pec_stage, wrap_periodic
 )
 
 
@@ -2052,3 +2054,161 @@ def test_rigid_moments_f32_kernel_is_accurate_and_deterministic():
                                    body_id, nbody, np.zeros((nbody, 3)))
     nz = np.abs(ref['mi']) > 1e-30
     assert np.max(np.abs((runs[0][nz] - ref['mi'][nz]) / ref['mi'][nz])) < 1e-9
+
+
+def _make_warp_rigid_pa(use_double=False):
+    from compyle.config import get_config
+    x, y, z, m, fx, fy, fz, body_id = _make_two_body()
+    cfg = get_config()
+    old = cfg.use_double
+    cfg.use_double = use_double
+    try:
+        pa = get_particle_array(name='body', x=x, y=y, z=z, m=m,
+                                backend='warp')
+        pa.add_property('fx', data=fx)
+        pa.add_property('fy', data=fy)
+        pa.add_property('fz', data=fz)
+        pa.add_property('body_id', type='int', data=body_id)
+    finally:
+        cfg.use_double = old
+    return pa, (x, y, z, m, fx, fy, fz, body_id)
+
+
+@pytest.mark.parametrize('use_double', [False, True])
+def test_rigid_body_device_finalize_matches_numpy(use_double):
+    pa, arrays = _make_warp_rigid_pa(use_double)
+    x, y, z, m, fx, fy, fz, body_id = arrays
+    omega = np.array([[0.3, -0.5, 0.2], [-0.1, 0.4, -0.25]])
+    state = create_rigid_body_state(pa, nbody=2, omega=omega)
+
+    compute_rigid_body_moments_device(pa, state, push=True)
+    wp.synchronize_device(state.device)
+
+    cast = np.float64 if use_double else np.float32
+    rounded = [a.astype(cast).astype(np.float64)
+               for a in (x, y, z, m, fx, fy, fz)]
+    ref = _reference_rigid_moments(
+        *rounded, body_id, 2, omega)
+    assert np.array_equal(state.error.numpy(), np.zeros(2, dtype=np.int32))
+    assert np.allclose(state.total_mass.numpy(), ref['total_mass'], rtol=1e-10)
+    assert np.allclose(state.cm.numpy().reshape(2, 3), ref['cm'],
+                       rtol=1e-9, atol=1e-13)
+    assert np.allclose(state.inertia.numpy().reshape(2, 3, 3), ref['inertia'],
+                       rtol=1e-7, atol=1e-12)
+    assert np.allclose(state.force.numpy().reshape(2, 3), ref['force'],
+                       rtol=1e-9, atol=1e-12)
+    assert np.allclose(state.torque.numpy().reshape(2, 3), ref['torque'],
+                       rtol=1e-6, atol=1e-9)
+    assert np.allclose(state.omega_dot.numpy().reshape(2, 3),
+                       ref['omega_dot'], rtol=1e-5, atol=1e-7)
+
+
+@pytest.mark.parametrize('use_double', [False, True])
+def test_rigid_body_device_rk2_matches_numpy(use_double):
+    pa, arrays = _make_warp_rigid_pa(use_double)
+    x, y, z, m, fx, fy, fz, body_id = arrays
+    vc0 = np.array([[0.2, -0.1, 0.05], [-0.08, 0.03, 0.12]])
+    omega0 = np.array([[0.3, -0.5, 0.2], [-0.1, 0.4, -0.25]])
+    state = create_rigid_body_state(
+        pa, nbody=2, vc=vc0, omega=omega0)
+    pa.gpu.push('m', 'x', 'y', 'z', 'fx', 'fy', 'fz')
+    save_rigid_body_state(pa, state)
+    dt = 2.0e-4
+
+    cast = np.float64 if use_double else np.float32
+    x0, y0, z0, mr, fxr, fyr, fzr = [
+        a.astype(cast).astype(np.float64)
+        for a in (x, y, z, m, fx, fy, fz)]
+    p0 = np.column_stack((x0, y0, z0))
+
+    ref0 = _reference_rigid_moments(
+        x0, y0, z0, mr, fxr, fyr, fzr, body_id, 2, omega0)
+    rel0 = p0 - ref0['cm'][body_id]
+    vel0 = vc0[body_id] + np.cross(omega0[body_id], rel0)
+    pmid = p0 + 0.5 * dt * vel0
+    vc_mid = vc0 + 0.5 * dt * ref0['force'] / ref0['total_mass'][:, None]
+    omega_mid = omega0 + 0.5 * dt * ref0['omega_dot']
+
+    rigid_body_rk2_stage(pa, state, dt=dt, stage=0.5)
+    wp.synchronize_device(state.device)
+    assert np.allclose(state.vc.numpy().reshape(2, 3), vc_mid,
+                       rtol=1e-10, atol=1e-12)
+    assert np.allclose(state.omega.numpy().reshape(2, 3), omega_mid,
+                       rtol=1e-9, atol=1e-12)
+    got_mid = np.column_stack((pa.gpu.x.dev.numpy(), pa.gpu.y.dev.numpy(),
+                               pa.gpu.z.dev.numpy()))
+    tol = 2e-7 if not use_double else 2e-12
+    assert np.allclose(got_mid, pmid, rtol=tol, atol=tol)
+
+    ref_mid = _reference_rigid_moments(
+        *pmid.T, mr, fxr, fyr, fzr, body_id, 2, omega_mid)
+    rel_mid = pmid - ref_mid['cm'][body_id]
+    vel_mid = vc_mid[body_id] + np.cross(omega_mid[body_id], rel_mid)
+    pfinal = p0 + dt * vel_mid
+    vc_final = vc0 + dt * ref_mid['force'] / ref_mid['total_mass'][:, None]
+    omega_final = omega0 + dt * ref_mid['omega_dot']
+
+    rigid_body_rk2_stage(pa, state, dt=dt, stage=1.0)
+    wp.synchronize_device(state.device)
+    got_final = np.column_stack((pa.gpu.x.dev.numpy(), pa.gpu.y.dev.numpy(),
+                                 pa.gpu.z.dev.numpy()))
+    got_vel = np.column_stack((pa.gpu.u.dev.numpy(), pa.gpu.v.dev.numpy(),
+                               pa.gpu.w.dev.numpy()))
+    assert np.allclose(got_final, pfinal, rtol=tol, atol=tol)
+    assert np.allclose(got_vel, vel_mid, rtol=tol, atol=tol)
+    assert np.allclose(state.vc.numpy().reshape(2, 3), vc_final,
+                       rtol=1e-10, atol=1e-12)
+    assert np.allclose(state.omega.numpy().reshape(2, 3), omega_final,
+                       rtol=1e-8, atol=1e-11)
+
+
+def test_rigid_body_device_stage_has_no_host_barrier(monkeypatch):
+    pa, _ = _make_warp_rigid_pa(False)
+    state = create_rigid_body_state(pa, nbody=2)
+    pa.gpu.push('m', 'x', 'y', 'z', 'fx', 'fy', 'fz')
+    save_rigid_body_state(pa, state)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("device rigid stage crossed a host barrier")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(warp_sph, '_rigid_finalize_moments', forbidden)
+        patch.setattr(warp_sph.wp, 'synchronize_device', forbidden)
+        patch.setattr(type(pa.gpu), 'pull', forbidden)
+        rigid_body_rk2_stage(pa, state, dt=1.0e-5, stage=0.5)
+        rigid_body_rk2_stage(pa, state, dt=1.0e-5, stage=1.0)
+
+    wp.synchronize_device(state.device)
+    assert np.array_equal(state.error.numpy(), np.zeros(2, dtype=np.int32))
+
+
+def test_rigid_body_device_pure_translation_preserves_geometry():
+    pa, arrays = _make_warp_rigid_pa(False)
+    body_id = arrays[-1]
+    vc = np.array([[0.2, -0.1, 0.05], [-0.08, 0.03, 0.12]])
+    state = create_rigid_body_state(pa, nbody=2, vc=vc)
+    pa.fx[:] = 0.0
+    pa.fy[:] = 0.0
+    pa.fz[:] = 0.0
+    pa.gpu.push('m', 'x', 'y', 'z', 'fx', 'fy', 'fz')
+    save_rigid_body_state(pa, state)
+    before = np.column_stack((arrays[0], arrays[1], arrays[2]))
+
+    rigid_body_rk2_stage(pa, state, dt=1.0e-3, stage=0.5)
+    rigid_body_rk2_stage(pa, state, dt=1.0e-3, stage=1.0)
+    wp.synchronize_device(state.device)
+    after = np.column_stack((pa.gpu.x.dev.numpy(), pa.gpu.y.dev.numpy(),
+                             pa.gpu.z.dev.numpy()))
+    for body in range(2):
+        idx = np.flatnonzero(body_id == body)
+        assert np.allclose(after[idx] - after[idx[0]],
+                           before[idx] - before[idx[0]], atol=2e-7)
+    assert np.allclose(state.vc.numpy().reshape(2, 3), vc)
+    assert np.allclose(state.omega.numpy(), 0.0)
+
+
+def test_rigid_body_state_rejects_singular_geometry():
+    pa = get_particle_array(name='body', x=[0.0, 0.5, 1.0],
+                            m=[1.0, 1.0, 1.0], backend='warp')
+    with pytest.raises(ValueError, match='singular inertia'):
+        create_rigid_body_state(pa)

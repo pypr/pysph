@@ -7,7 +7,7 @@ agent: claude
 aspect: validation-benchmarks
 adr: ADR-0006
 status: active
-last_checked: 2026-06-19T22:50:00 CEST
+last_checked: 2026-06-20T13:52:29 CEST
 ---
 
 # Experiment: Warp floating / rigid body coupled to SPH (3D dam-break)
@@ -65,12 +65,46 @@ CPU baseline). Tier-2 (real CPU Application) is deferred behind a compyle fix.
   cache-stability guard `test_2d_path_generated_source_is_byte_identical_to_golden`
   still passes.
 
-- **P2 (next).** Host 6-DOF integrate (RK2/Euler) + device rigid-transform.
-- **P3.** Liu coupling group + `NumberDensity` pre-pass + sibling driver
+- **P2 (DONE, amended to fully device-resident).** The implementation owner
+  rejected a host-side production solve because the goal is a genuinely GPU-
+  accelerated backend. Added persistent `WarpRigidBodyState` plus additive Warp
+  kernels for moment finalize, the symmetric 3x3 angular-acceleration solve,
+  RK2 saved/midpoint/full compact state, rigid velocity
+  `v = vc + omega x (x-cm)`, and stage position updates. The production stage
+  performs no host finalize, pull, `.numpy()`, or explicit synchronization;
+  `_rigid_finalize_moments` is retained only as the validation/host-query oracle.
+  Device finalize and both RK2 stages match faithful NumPy/PySPH formulas for
+  asymmetric two-body fp32/fp64 cases; pure translation preserves body geometry
+  and bodies remain isolated. Focused P1/P2 + 2D cache guard: `10 passed`;
+  final full Warp SPH regression: `49 passed`.
+- **P3 (next).** Liu coupling group + `NumberDensity` pre-pass + sibling driver
   `wc_sph_dam_break_rigid_step` (body excluded from the PEC stage); resolve the
   `arho` double-count.
 - **P4.** EPEC fidelity + existing-driver behaviour guard; assemble the 3D
   surge-tosses-a-box case; render.
+
+## P2 runtime case (2026-06-20)
+
+Ran an asymmetric 3D box (9x7x5 = 315 particles) under prescribed nonzero net
+force and torque for 2,000 RK2 steps at `dt=1e-4` (`t=0.2`) on the RTX 4060.
+The stepping loop called only `save_rigid_body_state` and the two device RK2
+stages; host arrays were read once after the final synchronization.
+
+```text
+wall_s:                       0.5445955659997708
+steps_per_s:                  3672.4500250537144
+particle_steps_per_s:         1156821.7578919202
+device_error:                 0
+all_finite:                   true
+vc_max_abs_error:             1.552180384223334e-09
+initial_omega:                [0.2, -0.1, 0.3]
+final_omega:                  [0.4878298261, -0.1616930311, 0.4444991226]
+max_pair_distance_drift:      4.1726284255583224e-07
+relative_pair_distance_drift: 9.386771416218177e-07
+```
+
+This validates repeated GPU-resident rigid stepping and expected force/torque
+response. It is not a fluid-coupled floating-body claim; Liu coupling is P3.
 
 ## How to run
 

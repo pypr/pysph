@@ -1046,7 +1046,8 @@ if wp is not None:
         # ADR-0006: per-body SUM-reduction matching RigidBodyMoments.reduce
         # (rigid_body.py:90-122) -- 16 slots per body: total mass, m*x/y/z (for
         # COM), 6 second-moments about the ORIGIN, total force, torque about the
-        # origin. The host finalize shifts to the COM. Accumulators are f64 even
+        # origin. The device finalize shifts to the COM (the host helper is the
+        # validation oracle). Accumulators are f64 even
         # on the f32 path (P0: fp32 atomic_add is non-associative); ``mi`` is
         # pre-zeroed by wp.zeros.
         i = wp.tid()
@@ -1115,6 +1116,248 @@ if wp is not None:
         wp.atomic_add(mi, b + 13, yi * fzi - zi * fyi)
         wp.atomic_add(mi, b + 14, zi * fxi - xi * fzi)
         wp.atomic_add(mi, b + 15, xi * fyi - yi * fxi)
+
+
+    @wp.kernel
+    def _rigid_finalize_device(
+            mi: wp.array(dtype=wp.float64),
+            omega: wp.array(dtype=wp.float64),
+            total_mass: wp.array(dtype=wp.float64),
+            cm: wp.array(dtype=wp.float64),
+            inertia: wp.array(dtype=wp.float64),
+            force: wp.array(dtype=wp.float64),
+            ac: wp.array(dtype=wp.float64),
+            torque: wp.array(dtype=wp.float64),
+            omega_dot: wp.array(dtype=wp.float64),
+            error: wp.array(dtype=wp.int32),
+    ):
+        """Finalize one reduced rigid body and solve its angular acceleration."""
+        body = wp.tid()
+        base16 = body * wp.int32(16)
+        base3 = body * wp.int32(3)
+        base9 = body * wp.int32(9)
+        mass = mi[base16 + 0]
+        error[body] = wp.int32(0)
+        if mass <= wp.float64(0.0):
+            error[body] = wp.int32(1)
+            total_mass[body] = mass
+            cm[base3 + 0] = wp.float64(0.0)
+            cm[base3 + 1] = wp.float64(0.0)
+            cm[base3 + 2] = wp.float64(0.0)
+            force[base3 + 0] = wp.float64(0.0)
+            force[base3 + 1] = wp.float64(0.0)
+            force[base3 + 2] = wp.float64(0.0)
+            ac[base3 + 0] = wp.float64(0.0)
+            ac[base3 + 1] = wp.float64(0.0)
+            ac[base3 + 2] = wp.float64(0.0)
+            torque[base3 + 0] = wp.float64(0.0)
+            torque[base3 + 1] = wp.float64(0.0)
+            torque[base3 + 2] = wp.float64(0.0)
+            omega_dot[base3 + 0] = wp.float64(0.0)
+            omega_dot[base3 + 1] = wp.float64(0.0)
+            omega_dot[base3 + 2] = wp.float64(0.0)
+        else:
+            cx = mi[base16 + 1] / mass
+            cy = mi[base16 + 2] / mass
+            cz = mi[base16 + 3] / mass
+            ixx = mi[base16 + 4] - (cy * cy + cz * cz) * mass
+            iyy = mi[base16 + 5] - (cx * cx + cz * cz) * mass
+            izz = mi[base16 + 6] - (cx * cx + cy * cy) * mass
+            ixy = mi[base16 + 7] + cx * cy * mass
+            ixz = mi[base16 + 8] + cx * cz * mass
+            iyz = mi[base16 + 9] + cy * cz * mass
+
+            fx = mi[base16 + 10]
+            fy = mi[base16 + 11]
+            fz = mi[base16 + 12]
+            tx = mi[base16 + 13] - (cy * fz - cz * fy)
+            ty = mi[base16 + 14] - (-cx * fz + cz * fx)
+            tz = mi[base16 + 15] - (cx * fy - cy * fx)
+
+            total_mass[body] = mass
+            cm[base3 + 0] = cx
+            cm[base3 + 1] = cy
+            cm[base3 + 2] = cz
+            inertia[base9 + 0] = ixx
+            inertia[base9 + 1] = ixy
+            inertia[base9 + 2] = ixz
+            inertia[base9 + 3] = ixy
+            inertia[base9 + 4] = iyy
+            inertia[base9 + 5] = iyz
+            inertia[base9 + 6] = ixz
+            inertia[base9 + 7] = iyz
+            inertia[base9 + 8] = izz
+            force[base3 + 0] = fx
+            force[base3 + 1] = fy
+            force[base3 + 2] = fz
+            ac[base3 + 0] = fx / mass
+            ac[base3 + 1] = fy / mass
+            ac[base3 + 2] = fz / mass
+            torque[base3 + 0] = tx
+            torque[base3 + 1] = ty
+            torque[base3 + 2] = tz
+
+            wx = omega[base3 + 0]
+            wy = omega[base3 + 1]
+            wz = omega[base3 + 2]
+            iwx = ixx * wx + ixy * wy + ixz * wz
+            iwy = ixy * wx + iyy * wy + iyz * wz
+            iwz = ixz * wx + iyz * wy + izz * wz
+            rx = tx - (wy * iwz - wz * iwy)
+            ry = ty - (wz * iwx - wx * iwz)
+            rz = tz - (wx * iwy - wy * iwx)
+
+            # Explicit inverse of the symmetric 3x3 inertia tensor. Keeping
+            # this compact solve on the device removes the P1 host barrier.
+            c00 = iyy * izz - iyz * iyz
+            c01 = ixz * iyz - ixy * izz
+            c02 = ixy * iyz - ixz * iyy
+            c11 = ixx * izz - ixz * ixz
+            c12 = ixy * ixz - ixx * iyz
+            c22 = ixx * iyy - ixy * ixy
+            det = ixx * c00 + ixy * c01 + ixz * c02
+            if wp.abs(det) <= wp.float64(1.0e-30):
+                error[body] = wp.int32(2)
+                omega_dot[base3 + 0] = wp.float64(0.0)
+                omega_dot[base3 + 1] = wp.float64(0.0)
+                omega_dot[base3 + 2] = wp.float64(0.0)
+            else:
+                inv_det = wp.float64(1.0) / det
+                omega_dot[base3 + 0] = (
+                    c00 * rx + c01 * ry + c02 * rz) * inv_det
+                omega_dot[base3 + 1] = (
+                    c01 * rx + c11 * ry + c12 * rz) * inv_det
+                omega_dot[base3 + 2] = (
+                    c02 * rx + c12 * ry + c22 * rz) * inv_det
+
+
+    @wp.kernel
+    def _rigid_save_body_state(
+            vc: wp.array(dtype=wp.float64),
+            omega: wp.array(dtype=wp.float64),
+            vc0: wp.array(dtype=wp.float64),
+            omega0: wp.array(dtype=wp.float64),
+    ):
+        i = wp.tid()
+        vc0[i] = vc[i]
+        omega0[i] = omega[i]
+
+
+    @wp.kernel
+    def _rigid_update_body_state(
+            ac: wp.array(dtype=wp.float64),
+            omega_dot: wp.array(dtype=wp.float64),
+            vc0: wp.array(dtype=wp.float64),
+            omega0: wp.array(dtype=wp.float64),
+            vc: wp.array(dtype=wp.float64),
+            omega: wp.array(dtype=wp.float64),
+            dt_factor: wp.float64,
+    ):
+        i = wp.tid()
+        vc[i] = vc0[i] + dt_factor * ac[i]
+        omega[i] = omega0[i] + dt_factor * omega_dot[i]
+
+
+    @wp.kernel
+    def _rigid_save_particle_state_f64(
+            x: wp.array(dtype=wp.float64),
+            y: wp.array(dtype=wp.float64),
+            z: wp.array(dtype=wp.float64),
+            x0: wp.array(dtype=wp.float64),
+            y0: wp.array(dtype=wp.float64),
+            z0: wp.array(dtype=wp.float64),
+    ):
+        i = wp.tid()
+        x0[i] = x[i]
+        y0[i] = y[i]
+        z0[i] = z[i]
+
+
+    @wp.kernel
+    def _rigid_save_particle_state_f32(
+            x: wp.array(dtype=wp.float32),
+            y: wp.array(dtype=wp.float32),
+            z: wp.array(dtype=wp.float32),
+            x0: wp.array(dtype=wp.float32),
+            y0: wp.array(dtype=wp.float32),
+            z0: wp.array(dtype=wp.float32),
+    ):
+        i = wp.tid()
+        x0[i] = x[i]
+        y0[i] = y[i]
+        z0[i] = z[i]
+
+
+    @wp.kernel
+    def _rigid_motion_stage_f64(
+            body_id: wp.array(dtype=wp.int32),
+            cm: wp.array(dtype=wp.float64),
+            vc: wp.array(dtype=wp.float64),
+            omega: wp.array(dtype=wp.float64),
+            x0: wp.array(dtype=wp.float64),
+            y0: wp.array(dtype=wp.float64),
+            z0: wp.array(dtype=wp.float64),
+            x: wp.array(dtype=wp.float64),
+            y: wp.array(dtype=wp.float64),
+            z: wp.array(dtype=wp.float64),
+            u: wp.array(dtype=wp.float64),
+            v: wp.array(dtype=wp.float64),
+            w: wp.array(dtype=wp.float64),
+            dt_factor: wp.float64,
+    ):
+        i = wp.tid()
+        base = body_id[i] * wp.int32(3)
+        rx = x[i] - cm[base + 0]
+        ry = y[i] - cm[base + 1]
+        rz = z[i] - cm[base + 2]
+        wx = omega[base + 0]
+        wy = omega[base + 1]
+        wz = omega[base + 2]
+        ui = vc[base + 0] + wy * rz - wz * ry
+        vi = vc[base + 1] + wz * rx - wx * rz
+        wi = vc[base + 2] + wx * ry - wy * rx
+        u[i] = ui
+        v[i] = vi
+        w[i] = wi
+        x[i] = x0[i] + dt_factor * ui
+        y[i] = y0[i] + dt_factor * vi
+        z[i] = z0[i] + dt_factor * wi
+
+
+    @wp.kernel
+    def _rigid_motion_stage_f32(
+            body_id: wp.array(dtype=wp.int32),
+            cm: wp.array(dtype=wp.float64),
+            vc: wp.array(dtype=wp.float64),
+            omega: wp.array(dtype=wp.float64),
+            x0: wp.array(dtype=wp.float32),
+            y0: wp.array(dtype=wp.float32),
+            z0: wp.array(dtype=wp.float32),
+            x: wp.array(dtype=wp.float32),
+            y: wp.array(dtype=wp.float32),
+            z: wp.array(dtype=wp.float32),
+            u: wp.array(dtype=wp.float32),
+            v: wp.array(dtype=wp.float32),
+            w: wp.array(dtype=wp.float32),
+            dt_factor: wp.float64,
+    ):
+        i = wp.tid()
+        base = body_id[i] * wp.int32(3)
+        rx = wp.float64(x[i]) - cm[base + 0]
+        ry = wp.float64(y[i]) - cm[base + 1]
+        rz = wp.float64(z[i]) - cm[base + 2]
+        wx = omega[base + 0]
+        wy = omega[base + 1]
+        wz = omega[base + 2]
+        ui = vc[base + 0] + wy * rz - wz * ry
+        vi = vc[base + 1] + wz * rx - wx * rz
+        wi = vc[base + 2] + wx * ry - wy * rx
+        u[i] = wp.float32(ui)
+        v[i] = wp.float32(vi)
+        w[i] = wp.float32(wi)
+        x[i] = x0[i] + wp.float32(dt_factor * ui)
+        y[i] = y0[i] + wp.float32(dt_factor * vi)
+        z[i] = z0[i] + wp.float32(dt_factor * wi)
 
 
 if wp is not None:
@@ -2042,9 +2285,10 @@ def _rigid_finalize_moments(mi, omega=None, nbody=1):
     per body: total mass, centre of mass, the moment-of-inertia tensor about the
     COM (parallel-axis theorem), total force, COM acceleration, torque about the
     COM, and ``omega_dot = inv(I) (tau - omega x (I omega))``. Mirrors
-    ``RigidBodyMoments`` (rigid_body.py:128-207) exactly; this is the host half
-    of the 6-DOF solve -- the device only does the sum-reduction. ``omega`` is
-    the current per-body angular velocity (``(nbody, 3)``; defaults to rest).
+    ``RigidBodyMoments`` (rigid_body.py:128-207) exactly. This is the explicit
+    host-result oracle/debug path; production stepping uses the equivalent
+    device finalize. ``omega`` is the current per-body angular velocity
+    (``(nbody, 3)``; defaults to rest).
     """
     mi = np.asarray(mi, dtype=np.float64)
     if omega is None:
@@ -2097,6 +2341,194 @@ def _rigid_finalize_moments(mi, omega=None, nbody=1):
     return res
 
 
+class WarpRigidBodyState:
+    """Persistent compact device state for ADR-0006 rigid-body stepping."""
+
+    def __init__(self, pa, nbody=1, vc=None, omega=None, device=None):
+        if wp is None:  # pragma: no cover
+            raise ImportError("warp is required for WarpRigidBodyState")
+        if nbody < 1:
+            raise ValueError("nbody must be at least one")
+        self.device = wp.get_device(device)
+        if pa.gpu is not None and wp.get_device(pa.gpu.device) != self.device:
+            raise ValueError("rigid state and ParticleArray must share a device")
+        self.nbody = int(nbody)
+        self.particle_count = pa.get_number_of_particles()
+        if 'body_id' in pa.properties:
+            body_id = np.asarray(pa.body_id, dtype=np.int32)
+        else:
+            body_id = np.zeros(self.particle_count, dtype=np.int32)
+        if body_id.size != self.particle_count:
+            raise ValueError("body_id must contain one value per particle")
+        if body_id.size and (body_id.min() < 0 or
+                             body_id.max() >= self.nbody):
+            raise ValueError("body_id values must be in [0, nbody)")
+        # Geometry is static in a rigid body, so reject empty/zero-mass or
+        # singular bodies once at setup rather than introducing a host check in
+        # every device stage.
+        mass = np.asarray(pa.m, dtype=np.float64)
+        xyz = np.column_stack((np.asarray(pa.x, dtype=np.float64),
+                               np.asarray(pa.y, dtype=np.float64),
+                               np.asarray(pa.z, dtype=np.float64)))
+        for body in range(self.nbody):
+            selected = body_id == body
+            if not np.any(selected) or mass[selected].sum() <= 0.0:
+                raise ValueError(f"rigid body {body} has no positive mass")
+            mb = mass[selected]
+            rb = xyz[selected]
+            center = (mb[:, None] * rb).sum(axis=0) / mb.sum()
+            rel = rb - center
+            inertia = np.eye(3) * np.sum(mb * np.sum(rel * rel, axis=1))
+            inertia -= np.einsum('n,ni,nj->ij', mb, rel, rel)
+            scale = float(np.linalg.norm(inertia, ord=np.inf))
+            if scale <= 0.0 or abs(float(np.linalg.det(inertia))) <= (
+                    1.0e-14 * scale ** 3):
+                raise ValueError(f"rigid body {body} has singular inertia")
+        self.body_id = wp.array(body_id, dtype=wp.int32, device=self.device)
+
+        def body_vector(value):
+            if value is None:
+                value = np.zeros((self.nbody, 3), dtype=np.float64)
+            value = np.asarray(value, dtype=np.float64)
+            if value.size != self.nbody * 3:
+                raise ValueError(
+                    "rigid body vectors must have shape (nbody, 3)")
+            return wp.array(value.reshape(-1), dtype=wp.float64,
+                            device=self.device)
+
+        self.mi = wp.zeros(self.nbody * 16, dtype=wp.float64,
+                           device=self.device)
+        self.total_mass = wp.zeros(self.nbody, dtype=wp.float64,
+                                   device=self.device)
+        self.cm = wp.zeros(self.nbody * 3, dtype=wp.float64,
+                           device=self.device)
+        self.inertia = wp.zeros(self.nbody * 9, dtype=wp.float64,
+                                device=self.device)
+        self.force = wp.zeros(self.nbody * 3, dtype=wp.float64,
+                              device=self.device)
+        self.ac = wp.zeros(self.nbody * 3, dtype=wp.float64,
+                           device=self.device)
+        self.torque = wp.zeros(self.nbody * 3, dtype=wp.float64,
+                               device=self.device)
+        self.omega_dot = wp.zeros(self.nbody * 3, dtype=wp.float64,
+                                  device=self.device)
+        self.vc = body_vector(vc)
+        self.omega = body_vector(omega)
+        self.vc0 = wp.zeros(self.nbody * 3, dtype=wp.float64,
+                            device=self.device)
+        self.omega0 = wp.zeros(self.nbody * 3, dtype=wp.float64,
+                               device=self.device)
+        self.error = wp.zeros(self.nbody, dtype=wp.int32, device=self.device)
+
+
+def create_rigid_body_state(pa, nbody=1, vc=None, omega=None, device=None):
+    """Create reusable device buffers for one or more rigid bodies."""
+    device = wp.get_device(device)
+    for prop in ('x0', 'y0', 'z0', 'u', 'v', 'w', 'fx', 'fy', 'fz'):
+        _ensure_property(pa, prop, device)
+    return WarpRigidBodyState(pa, nbody=nbody, vc=vc, omega=omega,
+                              device=device)
+
+
+def _launch_rigid_moment_reduction(pa, mi, body_id_dev, device, push=False):
+    for prop in ('m', 'x', 'y', 'z', 'fx', 'fy', 'fz'):
+        _ensure_property(pa, prop, device)
+    gpu = pa.gpu
+    n = gpu.get_number_of_particles()
+    if push:
+        gpu.push('m', 'x', 'y', 'z', 'fx', 'fy', 'fz')
+    mi.zero_()
+    if n > 0:
+        arrays = [gpu.get_device_array(p).dev
+                  for p in ('m', 'x', 'y', 'z', 'fx', 'fy', 'fz')]
+        kernel = (_rigid_moments_reduce_f32
+                  if gpu.get_device_array('x').dtype == np.float32
+                  else _rigid_moments_reduce_f64)
+        wp.launch(kernel, dim=n, inputs=[body_id_dev] + arrays + [mi],
+                  device=device)
+    return mi
+
+
+def compute_rigid_body_moments_device(pa, state, push=False):
+    """Reduce and finalize rigid moments entirely on the active Warp stream."""
+    if state.particle_count != pa.get_number_of_particles():
+        raise ValueError("rigid state particle count no longer matches array")
+    _launch_rigid_moment_reduction(
+        pa, state.mi, state.body_id, state.device, push=push)
+    wp.launch(
+        _rigid_finalize_device,
+        dim=state.nbody,
+        inputs=[
+            state.mi, state.omega, state.total_mass, state.cm,
+            state.inertia, state.force, state.ac, state.torque,
+            state.omega_dot, state.error,
+        ],
+        device=state.device,
+    )
+    return state
+
+
+def save_rigid_body_state(pa, state, push=False):
+    """Save the start-of-step particle and compact body state on the device."""
+    gpu = pa.gpu
+    if push:
+        gpu.push('x', 'y', 'z', 'x0', 'y0', 'z0')
+    n = gpu.get_number_of_particles()
+    if n > 0:
+        kernel = (_rigid_save_particle_state_f32
+                  if gpu.x.dtype == np.float32
+                  else _rigid_save_particle_state_f64)
+        wp.launch(
+            kernel, dim=n,
+            inputs=[gpu.x.dev, gpu.y.dev, gpu.z.dev,
+                    gpu.x0.dev, gpu.y0.dev, gpu.z0.dev],
+            device=state.device,
+        )
+    wp.launch(
+        _rigid_save_body_state, dim=state.nbody * 3,
+        inputs=[state.vc, state.omega, state.vc0, state.omega0],
+        device=state.device,
+    )
+    return state
+
+
+def rigid_body_rk2_stage(pa, state, dt, stage, push=False):
+    """Run one device-resident rigid RK2 stage.
+
+    Call :func:`save_rigid_body_state` once before the midpoint stage. ``stage``
+    is ``0.5`` for the midpoint prediction and ``1.0`` for the full correction.
+    Forces in ``fx/fy/fz`` must correspond to the current particle positions.
+    The function intentionally performs no device synchronization or host copy.
+    """
+    if stage not in (0.5, 1.0):
+        raise ValueError("rigid RK2 stage must be 0.5 or 1.0")
+    compute_rigid_body_moments_device(pa, state, push=push)
+    gpu = pa.gpu
+    n = gpu.get_number_of_particles()
+    dt_factor = np.float64(dt * stage)
+    if n > 0:
+        kernel = (_rigid_motion_stage_f32
+                  if gpu.x.dtype == np.float32
+                  else _rigid_motion_stage_f64)
+        wp.launch(
+            kernel, dim=n,
+            inputs=[
+                state.body_id, state.cm, state.vc, state.omega,
+                gpu.x0.dev, gpu.y0.dev, gpu.z0.dev,
+                gpu.x.dev, gpu.y.dev, gpu.z.dev,
+                gpu.u.dev, gpu.v.dev, gpu.w.dev, dt_factor,
+            ],
+            device=state.device,
+        )
+    wp.launch(
+        _rigid_update_body_state, dim=state.nbody * 3,
+        inputs=[state.ac, state.omega_dot, state.vc0, state.omega0,
+                state.vc, state.omega, dt_factor],
+        device=state.device,
+    )
+    return state
+
+
 def compute_rigid_body_moments(pa, nbody=1, omega=None, body_id_dev=None,
                                device=None, push=False):
     """RigidBodyMoments for a rigid-body Warp array, on the device (ADR-0006).
@@ -2123,12 +2555,8 @@ def compute_rigid_body_moments(pa, nbody=1, omega=None, body_id_dev=None,
         raise ImportError("warp is required for compute_rigid_body_moments")
 
     device = wp.get_device(device)
-    for prop in ('m', 'x', 'y', 'z', 'fx', 'fy', 'fz'):
-        _ensure_property(pa, prop, device)
-    gpu = pa.gpu
-    n = gpu.get_number_of_particles()
-    if push:
-        gpu.push('m', 'x', 'y', 'z', 'fx', 'fy', 'fz')
+    _ensure_warp_helper(pa, device)
+    n = pa.gpu.get_number_of_particles()
     if body_id_dev is None:
         if 'body_id' in pa.properties:
             bid = np.asarray(pa.body_id, dtype=np.int32)
@@ -2136,15 +2564,9 @@ def compute_rigid_body_moments(pa, nbody=1, omega=None, body_id_dev=None,
             bid = np.zeros(n, dtype=np.int32)
         body_id_dev = wp.array(bid, dtype=wp.int32, device=device)
     mi = wp.zeros(nbody * 16, dtype=wp.float64, device=device)
+    _launch_rigid_moment_reduction(
+        pa, mi, body_id_dev, device, push=push)
     if n > 0:
-        arrays = [gpu.get_device_array(p).dev
-                  for p in ('m', 'x', 'y', 'z', 'fx', 'fy', 'fz')]
-        if gpu.get_device_array('x').dtype == np.float32:
-            kernel = _rigid_moments_reduce_f32
-        else:
-            kernel = _rigid_moments_reduce_f64
-        wp.launch(kernel, dim=n,
-                  inputs=[body_id_dev] + arrays + [mi], device=device)
         wp.synchronize_device(device)
     mi_host = mi.numpy()
     result = _rigid_finalize_moments(mi_host, omega=omega, nbody=nbody)
