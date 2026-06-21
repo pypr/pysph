@@ -127,6 +127,14 @@ device-resident.
   `.numpy()`, or explicit synchronization. `_rigid_finalize_moments` remains a
   NumPy parity oracle/explicit host-result helper. All additions are outside
   generated equation source, so the 2D golden source remains byte-identical.
+- Floating-body P3 (ADR-0006) adds deterministic fluid/rigid coupling without
+  source atomics: `LiuFluidAcceleration` accumulates body pressure acceleration
+  onto fluid destinations and `LiuBodyReaction` performs the reversed
+  fluid-to-body pass into destination force registers. A static
+  `RigidNumberDensity` pre-pass, device rigid density/body-force staging, and
+  sibling `wc_sph_dam_break_rigid_step` compose these with the fixed-wall EPEC
+  path and P2's GPU-resident 6-DOF RK2. The existing fixed-wall driver and 2D
+  generated source are unchanged; final Warp SPH suite `54 passed`.
 
 ## References for this aspect
 

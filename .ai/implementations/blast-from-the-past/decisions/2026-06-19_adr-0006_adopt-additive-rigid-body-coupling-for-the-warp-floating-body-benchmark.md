@@ -200,3 +200,13 @@ parts of this ADR are unchanged.
   `wp.synchronize_device` to fail if either production stage crosses the host
   boundary. Focused rigid + 2D cache guard: `10 passed`; final full Warp SPH
   regression: `49 passed`.
+- **P3 (2026-06-20):** additive `RigidNumberDensity` plus deterministic
+  two-pass `LiuFluidAcceleration`/`LiuBodyReaction`, rigid density/body-force
+  staging, and sibling `wc_sph_dam_break_rigid_step`. The rigid body is excluded
+  from the pre-existing fused fluid block and contributes to fluid/body
+  continuity exactly once in each direction. fp32/fp64 Liu results match a
+  direct NumPy/Wendland reference with equal total reaction; the final suite is
+  `54 passed`. A 7,458-particle, 241-step first-plunge transient remained finite,
+  moved and rotated from computed fluid force, and preserved relative body
+  geometry to `1.90e-6`. Review:
+  `reviews/2026-06-20_warp-liu-fluid-rigid-coupling-p3.md`.

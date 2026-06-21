@@ -18,13 +18,15 @@ import pysph.base.warp_sph as warp_sph
 from pysph.base.warp_sph import (
     apply_body_force, compute_artificial_viscosity, compute_continuity,
     compute_isothermal_eos, compute_pressure_gradient, compute_summation_density,
-    compute_rigid_body_moments, compute_rigid_body_moments_device,
+    compute_liu_fluid_rigid_coupling, compute_rigid_body_moments,
+    compute_rigid_body_moments_device, compute_rigid_number_density,
     compute_tait_eos, compute_tait_eos_hg_correction, create_rigid_body_state,
     compute_wcsph_accel_continuity, compute_wcsph_adaptive_timestep,
     compute_xsph_correction, euler_step, leapfrog_drift, leapfrog_kick,
-    rigid_body_rk2_stage, save_rigid_body_state, save_wcsph_state,
-    wc_sph_dam_break_step, wc_sph_euler_step, wc_sph_leapfrog_step,
-    wcsph_pec_stage, wrap_periodic
+    initialize_rigid_body_force, rigid_body_density_stage,
+    rigid_body_rk2_stage, save_rigid_body_density, save_rigid_body_state,
+    save_wcsph_state, wc_sph_dam_break_rigid_step, wc_sph_dam_break_step,
+    wc_sph_euler_step, wc_sph_leapfrog_step, wcsph_pec_stage, wrap_periodic
 )
 
 
@@ -2212,3 +2214,178 @@ def test_rigid_body_state_rejects_singular_geometry():
                             m=[1.0, 1.0, 1.0], backend='warp')
     with pytest.raises(ValueError, match='singular inertia'):
         create_rigid_body_state(pa)
+
+
+# ---------------------------------------------------------------------------
+# P3 Liu fluid/rigid coupling: deterministic two-pass reaction, rigid density
+# staging, and the sibling coupled dam-break driver.
+# ---------------------------------------------------------------------------
+def _make_liu_pair_arrays(use_double=False):
+    from compyle.config import get_config
+    cfg = get_config()
+    old = cfg.use_double
+    cfg.use_double = use_double
+    try:
+        fluid = get_particle_array(
+            name='fluid',
+            x=[-0.08, 0.00, 0.07, 0.02],
+            y=[0.00, -0.05, 0.03, 0.06],
+            z=[0.01, 0.04, -0.02, 0.07],
+            h=[0.14] * 4, m=[0.8, 1.0, 0.9, 1.1],
+            rho=[1010.0, 1005.0, 1008.0, 1012.0],
+            p=[1200.0, 900.0, 1050.0, 1400.0], backend='warp')
+        body = get_particle_array(
+            name='body',
+            x=[0.10, 0.16, 0.12, 0.18],
+            y=[0.00, 0.04, -0.05, -0.02],
+            z=[0.00, 0.05, 0.06, -0.04],
+            h=[0.14] * 4, m=[0.7, 0.75, 0.8, 0.72],
+            rho=[1002.0, 1004.0, 1001.0, 1003.0],
+            p=[300.0, 450.0, 250.0, 350.0], backend='warp')
+        for pa, props in ((fluid, ('au', 'av', 'aw')),
+                          (body, ('fx', 'fy', 'fz', 'V'))):
+            for prop in props:
+                pa.add_property(prop)
+    finally:
+        cfg.use_double = old
+    return fluid, body
+
+
+def _cpu_liu_reference(fluid, body):
+    kernel = WendlandQuintic(dim=3)
+    fluid_acc = np.zeros((len(fluid.x), 3))
+    body_force = np.zeros((len(body.x), 3))
+    for i in range(len(fluid.x)):
+        for j in range(len(body.x)):
+            xij = np.array([fluid.x[i] - body.x[j],
+                            fluid.y[i] - body.y[j],
+                            fluid.z[i] - body.z[j]])
+            rij = np.linalg.norm(xij)
+            hij = 0.5 * (fluid.h[i] + body.h[j])
+            if rij >= 2.0 * hij:
+                continue
+            dwij = [0.0, 0.0, 0.0]
+            kernel.gradient(xij=xij, rij=rij, h=hij, grad=dwij)
+            t1 = (body.p[j] / body.rho[j]**2 +
+                  fluid.p[i] / fluid.rho[i]**2)
+            acc = -body.m[j] * t1 * np.asarray(dwij)
+            fluid_acc[i] += acc
+            body_force[j] -= fluid.m[i] * acc
+    return fluid_acc, body_force
+
+
+@pytest.mark.parametrize('use_double', [False, True])
+def test_warp_liu_coupling_matches_reference_and_reacts_equally(use_double):
+    fluid, body = _make_liu_pair_arrays(use_double)
+    nnps = UniformGridWarpNNPS(
+        dim=3, particles=[fluid, body], radius_scale=2.0)
+    ref_acc, ref_force = _cpu_liu_reference(fluid, body)
+
+    initialize_rigid_body_force(body, gx=0.0, gy=0.0, gz=0.0, push=True)
+    compute_liu_fluid_rigid_coupling(
+        nnps, 0, 1, kernel='wendland', push=True)
+    fluid.gpu.pull('au', 'av', 'aw')
+    body.gpu.pull('fx', 'fy', 'fz')
+    got_acc = np.column_stack((fluid.au, fluid.av, fluid.aw))
+    got_force = np.column_stack((body.fx, body.fy, body.fz))
+
+    assert np.allclose(got_acc, ref_acc, rtol=2e-5, atol=2e-6)
+    assert np.allclose(got_force, ref_force, rtol=2e-5, atol=2e-6)
+    total = (fluid.m[:, None] * got_acc).sum(axis=0) + got_force.sum(axis=0)
+    assert np.allclose(total, 0.0, atol=2e-6)
+
+
+def test_warp_rigid_number_density_matches_cpu_wendland():
+    _, body = _make_liu_pair_arrays()
+    nnps = UniformGridWarpNNPS(dim=3, particles=[body], radius_scale=2.0)
+    kernel = WendlandQuintic(dim=3)
+    ref = np.zeros(len(body.x))
+    for i in range(len(body.x)):
+        for j in range(len(body.x)):
+            xij = np.array([body.x[i] - body.x[j],
+                            body.y[i] - body.y[j],
+                            body.z[i] - body.z[j]])
+            rij = np.linalg.norm(xij)
+            hij = 0.5 * (body.h[i] + body.h[j])
+            if rij < 2.0 * hij:
+                ref[i] += kernel.kernel(xij=xij, rij=rij, h=hij)
+    compute_rigid_number_density(nnps, 0, kernel='wendland', push=True)
+    body.gpu.pull('V')
+    assert np.allclose(body.V, ref, rtol=2e-5, atol=2e-5)
+
+
+def test_warp_rigid_density_and_body_force_stages():
+    x = np.array([0.0, 0.1, 0.0, 0.0])
+    pa = get_particle_array(
+        name='body', x=x, y=[0.0, 0.0, 0.1, 0.0],
+        z=[0.0, 0.0, 0.0, 0.1], m=[1.0, 2.0, 1.5, 0.5],
+        rho=[1000.0, 1001.0, 999.0, 1002.0], backend='warp')
+    pa.add_property('arho', data=[2.0, -3.0, 4.0, 1.0])
+    for prop in ('fx', 'fy', 'fz'):
+        pa.add_property(prop)
+    rho_start = pa.rho.copy()
+    save_rigid_body_density(pa, push=True)
+    rigid_body_density_stage(pa, dt=0.02, stage=0.5)
+    initialize_rigid_body_force(pa, gx=1.0, gy=-2.0, gz=-9.81, push=True)
+    pa.gpu.pull('rho', 'fx', 'fy', 'fz')
+    assert np.allclose(pa.rho, rho_start + 0.01 * pa.arho)
+    assert np.allclose(pa.fx, pa.m)
+    assert np.allclose(pa.fy, -2.0 * pa.m)
+    assert np.allclose(pa.fz, -9.81 * pa.m)
+
+
+def test_warp_dam_break_rigid_step_is_finite_and_moves_body():
+    # Small genuine 3D fluid/body interaction. The fixed wall is deliberately
+    # far away: this gates Liu + rigid EPEC without introducing contact yet.
+    fgrid = np.array(np.meshgrid(
+        [-0.12, -0.06, 0.0], [-0.06, 0.0, 0.06],
+        [-0.04, 0.02, 0.08], indexing='ij')).reshape(3, -1).T
+    bgrid = np.array(np.meshgrid(
+        [0.055, 0.105], [-0.025, 0.025], [0.015, 0.065],
+        indexing='ij')).reshape(3, -1).T
+    wgrid = np.array(np.meshgrid(
+        [0.55, 0.62], [-0.08, 0.08], [0.0, 0.12],
+        indexing='ij')).reshape(3, -1).T
+
+    def pa_from(name, xyz, mass, rho):
+        n = len(xyz)
+        return get_particle_array(
+            name=name, x=xyz[:, 0], y=xyz[:, 1], z=xyz[:, 2],
+            h=np.full(n, 0.09), m=np.full(n, mass),
+            rho=np.full(n, rho), backend='warp')
+
+    fluid = pa_from('fluid', fgrid, 0.001, 1010.0)
+    wall = pa_from('wall', wgrid, 0.001, 1000.0)
+    body = pa_from('body', bgrid, 0.002, 1000.0)
+    for pa in (fluid, wall):
+        for prop in ('p', 'cs', 'au', 'av', 'aw', 'arho', 'ax', 'ay', 'az'):
+            pa.add_property(prop)
+    for prop in ('p', 'cs', 'arho', 'fx', 'fy', 'fz', 'V'):
+        body.add_property(prop)
+
+    state = create_rigid_body_state(body, nbody=1)
+    nnps = UniformGridWarpNNPS(
+        dim=3, particles=[fluid, wall, body], radius_scale=2.0)
+    body0 = bgrid.copy()
+    wall0 = wgrid.copy()
+    dt = 1.0e-5
+    wc_sph_dam_break_rigid_step(
+        nnps, state, fluid_index=0, wall_indices=(1,), rigid_index=2,
+        dt=dt, rho0=1000.0, c0=20.0, alpha=0.0, beta=0.0,
+        kernel='wendland', xsph_eps=0.0, gz=-9.81, push=True)
+
+    fluid.gpu.pull('x', 'y', 'z', 'rho', 'u', 'v', 'w')
+    wall.gpu.pull('x', 'y', 'z')
+    body.gpu.pull('x', 'y', 'z', 'rho', 'u', 'v', 'w', 'fx', 'fy', 'fz')
+    got_body = np.column_stack((body.x, body.y, body.z))
+    got_fluid = np.column_stack((fluid.x, fluid.y, fluid.z))
+    assert np.isfinite(got_fluid).all()
+    assert np.isfinite(got_body).all()
+    assert np.isfinite(body.rho).all()
+    assert np.array_equal(state.error.numpy(), np.zeros(1, dtype=np.int32))
+    assert np.linalg.norm(got_body - body0) > 0.0
+    assert np.allclose(np.column_stack((wall.x, wall.y, wall.z)), wall0)
+    # One tiny step should preserve rigid distances to fp32 integration scale.
+    assert np.allclose(
+        np.linalg.norm(got_body - got_body[0], axis=1),
+        np.linalg.norm(body0 - body0[0], axis=1), atol=2e-7)

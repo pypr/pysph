@@ -1360,6 +1360,78 @@ if wp is not None:
         z[i] = z0[i] + wp.float32(dt_factor * wi)
 
 
+    @wp.kernel
+    def _rigid_save_density_f64(
+            rho: wp.array(dtype=wp.float64),
+            rho0: wp.array(dtype=wp.float64),
+    ):
+        i = wp.tid()
+        rho0[i] = rho[i]
+
+
+    @wp.kernel
+    def _rigid_save_density_f32(
+            rho: wp.array(dtype=wp.float32),
+            rho0: wp.array(dtype=wp.float32),
+    ):
+        i = wp.tid()
+        rho0[i] = rho[i]
+
+
+    @wp.kernel
+    def _rigid_density_stage_f64(
+            rho0: wp.array(dtype=wp.float64),
+            arho: wp.array(dtype=wp.float64),
+            rho: wp.array(dtype=wp.float64),
+            dt_factor: wp.float64,
+    ):
+        i = wp.tid()
+        rho[i] = rho0[i] + dt_factor * arho[i]
+
+
+    @wp.kernel
+    def _rigid_density_stage_f32(
+            rho0: wp.array(dtype=wp.float32),
+            arho: wp.array(dtype=wp.float32),
+            rho: wp.array(dtype=wp.float32),
+            dt_factor: wp.float32,
+    ):
+        i = wp.tid()
+        rho[i] = rho0[i] + dt_factor * arho[i]
+
+
+    @wp.kernel
+    def _rigid_body_force_f64(
+            m: wp.array(dtype=wp.float64),
+            fx: wp.array(dtype=wp.float64),
+            fy: wp.array(dtype=wp.float64),
+            fz: wp.array(dtype=wp.float64),
+            gx: wp.float64,
+            gy: wp.float64,
+            gz: wp.float64,
+    ):
+        i = wp.tid()
+        fx[i] = m[i] * gx
+        fy[i] = m[i] * gy
+        fz[i] = m[i] * gz
+
+
+    @wp.kernel
+    def _rigid_body_force_f32(
+            m: wp.array(dtype=wp.float32),
+            fx: wp.array(dtype=wp.float32),
+            fy: wp.array(dtype=wp.float32),
+            fz: wp.array(dtype=wp.float32),
+            gx: wp.float32,
+            gy: wp.float32,
+            gz: wp.float32,
+    ):
+        i = wp.tid()
+        fx[i] = m[i] * gx
+        fy[i] = m[i] * gy
+        fz[i] = m[i] * gz
+
+
 if wp is not None:
     # Device wp.func objects referenced by generated group kernels. Seeded into
     # the generated kernels' namespace so Warp can resolve them (ADR-0003).
@@ -1468,6 +1540,53 @@ class XSPHCorrection(WarpEquation):
             "        _acc_ax += xs_tmp_ * vijx\n"
             "        _acc_ay += xs_tmp_ * vijy\n"
             "        _acc_az += xs_tmp_ * vijz"
+        )
+
+
+class RigidNumberDensity(WarpEquation):
+    """Static rigid-particle volume denominator ``V = sum_j W_ij``."""
+    out_arrays = ('V',)
+    requires = ('hij', 'wij')
+
+    def loop(self):
+        return "        _acc_V += wij"
+
+
+class LiuFluidAcceleration(WarpEquation):
+    """Liu pressure coupling: rigid source acceleration on fluid dest."""
+    src_arrays = ('m', 'p', 'rho')
+    dst_arrays = ('p', 'rho')
+    out_arrays = ('au', 'av', 'aw')
+    requires = ('dx', 'dy', 'dz', 'rij', 'hij', 'grad')
+
+    def loop(self):
+        return (
+            "        liu_t1_ = s_p[j] / (s_rho[j] * s_rho[j]) + "
+            "d_p[i] / (d_rho[i] * d_rho[i])\n"
+            "        liu_fac_ = -s_m[j] * liu_t1_ * grad\n"
+            "        _acc_au += liu_fac_ * dx\n"
+            "        _acc_av += liu_fac_ * dy\n"
+            "        _acc_aw += liu_fac_ * dz"
+        )
+
+
+class LiuBodyReaction(WarpEquation):
+    """Equal-and-opposite Liu force: fluid source onto rigid destination."""
+    src_arrays = ('m', 'p', 'rho')
+    dst_arrays = ('m', 'p', 'rho')
+    out_arrays = ('fx', 'fy', 'fz')
+    requires = ('dx', 'dy', 'dz', 'rij', 'hij', 'grad')
+
+    def loop(self):
+        # Here dx = x_body - x_fluid, the opposite of LiuFluidAcceleration's
+        # pair vector. The leading minus restores the body reaction direction.
+        return (
+            "        liur_t1_ = d_p[i] / (d_rho[i] * d_rho[i]) + "
+            "s_p[j] / (s_rho[j] * s_rho[j])\n"
+            "        liur_fac_ = -d_m[i] * s_m[j] * liur_t1_ * grad\n"
+            "        _acc_fx += liur_fac_ * dx\n"
+            "        _acc_fy += liur_fac_ * dy\n"
+            "        _acc_fz += liur_fac_ * dz"
         )
 
 
@@ -2529,6 +2648,112 @@ def rigid_body_rk2_stage(pa, state, dt, stage, push=False):
     return state
 
 
+def save_rigid_body_density(pa, device=None, push=False):
+    """Save rigid density for midpoint/full continuity staging on-device."""
+    if wp is None:  # pragma: no cover
+        raise ImportError("warp is required for save_rigid_body_density")
+    device = wp.get_device(device)
+    for prop in ('rho', 'rho0', 'arho'):
+        _ensure_property(pa, prop, device)
+    if push:
+        pa.gpu.push('rho', 'rho0', 'arho')
+    gpu = pa.gpu
+    n = gpu.get_number_of_particles()
+    if n > 0:
+        kernel = (_rigid_save_density_f32
+                  if gpu.rho.dtype == np.float32
+                  else _rigid_save_density_f64)
+        wp.launch(kernel, dim=n, inputs=[gpu.rho.dev, gpu.rho0.dev],
+                  device=device)
+    return gpu.rho0
+
+
+def rigid_body_density_stage(pa, dt, stage, device=None):
+    """Apply only the continuity-density portion of a rigid EPEC stage."""
+    if stage not in (0.5, 1.0):
+        raise ValueError("rigid density stage must be 0.5 or 1.0")
+    device = wp.get_device(device)
+    gpu = pa.gpu
+    n = gpu.get_number_of_particles()
+    if n > 0:
+        if gpu.rho.dtype == np.float32:
+            kernel = _rigid_density_stage_f32
+            factor = np.float32(dt * stage)
+        else:
+            kernel = _rigid_density_stage_f64
+            factor = np.float64(dt * stage)
+        wp.launch(kernel, dim=n,
+                  inputs=[gpu.rho0.dev, gpu.arho.dev, gpu.rho.dev, factor],
+                  device=device)
+    return gpu.rho
+
+
+def initialize_rigid_body_force(pa, gx=0.0, gy=0.0, gz=-9.81,
+                                device=None, push=False):
+    """Set per-particle rigid force to mass times body acceleration."""
+    if wp is None:  # pragma: no cover
+        raise ImportError("warp is required for initialize_rigid_body_force")
+    device = wp.get_device(device)
+    for prop in ('m', 'fx', 'fy', 'fz'):
+        _ensure_property(pa, prop, device)
+    if push:
+        pa.gpu.push('m', 'fx', 'fy', 'fz')
+    gpu = pa.gpu
+    n = gpu.get_number_of_particles()
+    if n > 0:
+        if gpu.m.dtype == np.float32:
+            kernel = _rigid_body_force_f32
+            scalars = [np.float32(gx), np.float32(gy), np.float32(gz)]
+        else:
+            kernel = _rigid_body_force_f64
+            scalars = [np.float64(gx), np.float64(gy), np.float64(gz)]
+        wp.launch(kernel, dim=n,
+                  inputs=[gpu.m.dev, gpu.fx.dev, gpu.fy.dev, gpu.fz.dev,
+                          *scalars], device=device)
+    return gpu.fx, gpu.fy, gpu.fz
+
+
+def compute_rigid_number_density(nnps, rigid_index, kernel='wendland',
+                                 push=False):
+    """Compute the static rigid self-neighbor ``V = sum W`` pre-pass."""
+    rigid_index = int(rigid_index)
+    pa = nnps.particles[rigid_index]
+    _ensure_property(pa, 'V', nnps.device)
+    if push:
+        pa.gpu.push('x', 'y', 'z', 'h', 'V')
+        nnps.update(push=False)
+    _run_equation_group(
+        nnps, rigid_index, rigid_index, [RigidNumberDensity()],
+        kernel=kernel, neighbor_mode='grid')
+    return pa.gpu.V
+
+
+def compute_liu_fluid_rigid_coupling(nnps, fluid_index, rigid_index,
+                                     kernel='wendland', push=False):
+    """Apply deterministic two-pass Liu fluid/rigid pressure coupling."""
+    fluid_index = int(fluid_index)
+    rigid_index = int(rigid_index)
+    fluid = nnps.particles[fluid_index]
+    rigid = nnps.particles[rigid_index]
+    for prop in ('rho', 'p', 'au', 'av', 'aw'):
+        _ensure_property(fluid, prop, nnps.device)
+    for prop in ('rho', 'p', 'fx', 'fy', 'fz'):
+        _ensure_property(rigid, prop, nnps.device)
+    if push:
+        fluid.gpu.push('x', 'y', 'z', 'h', 'm', 'rho', 'p',
+                       'au', 'av', 'aw')
+        rigid.gpu.push('x', 'y', 'z', 'h', 'm', 'rho', 'p',
+                       'fx', 'fy', 'fz')
+        nnps.update(push=False)
+    _run_equation_group(
+        nnps, rigid_index, fluid_index, [LiuFluidAcceleration()],
+        kernel=kernel, neighbor_mode='grid', accumulate_outputs=True)
+    _run_equation_group(
+        nnps, fluid_index, rigid_index, [LiuBodyReaction()],
+        kernel=kernel, neighbor_mode='grid', accumulate_outputs=True)
+    return fluid.gpu.au, rigid.gpu.fx
+
+
 def compute_rigid_body_moments(pa, nbody=1, omega=None, body_id_dev=None,
                                device=None, push=False):
     """RigidBodyMoments for a rigid-body Warp array, on the device (ADR-0006).
@@ -3004,6 +3229,135 @@ def wc_sph_dam_break_step(nnps, fluid_index=0, solid_indices=(1,), dt=1.0e-4,
         wcsph_pec_stage(pa, dt=dt, stage=1.0, dim=dim,
                         xsph=(use_xsph and pa is fluid), device=device,
                         push=False)
+    nnps.update(push=False)
+
+    if return_dt:
+        return dt
+    return dt
+
+
+def wc_sph_dam_break_rigid_step(
+        nnps, rigid_state, fluid_index=0, wall_indices=(1,), rigid_index=2,
+        dt=1.0e-4, rho0=1000.0, c0=10.0, p0=0.0, alpha=0.1, beta=0.0,
+        gamma=7.0, kernel='wendland', xsph_eps=0.5, gx=0.0, gy=0.0,
+        gz=-9.81, adaptive_dt=False, cfl=0.25, dt_min=0.0,
+        dt_max=np.inf, adaptive_dt_scale=1.0, step_dt_max=np.inf,
+        push=False, return_dt=False):
+    """One EPEC WCSPH step with deterministic Liu rigid coupling (ADR-0006).
+
+    This is a sibling of :func:`wc_sph_dam_break_step`; fixed walls use the
+    existing PEC path while the rigid array is advanced only by its density
+    stage and device-resident 6-DOF RK2 state.
+    """
+    if wp is None:  # pragma: no cover
+        raise ImportError("warp is required for wc_sph_dam_break_rigid_step")
+    fluid_index = int(fluid_index)
+    rigid_index = int(rigid_index)
+    wall_indices = [int(i) for i in wall_indices]
+    fluid = nnps.particles[fluid_index]
+    walls = [nnps.particles[i] for i in wall_indices]
+    rigid = nnps.particles[rigid_index]
+    fixed_arrays = [fluid] + walls
+    fixed_sources = [fluid_index] + wall_indices
+    dim = nnps.dim
+    device = nnps.device
+    use_xsph = xsph_eps is not None and xsph_eps != 0.0
+    eps = 0.0 if xsph_eps is None else xsph_eps
+    out_props = ('au', 'av', 'aw', 'arho', 'ax', 'ay', 'az')
+
+    for pa in fixed_arrays:
+        for prop in ('rho', 'p', 'cs') + out_props:
+            _ensure_property(pa, prop, device)
+    for prop in ('rho', 'rho0', 'p', 'cs', 'arho', 'V',
+                 'fx', 'fy', 'fz', 'u', 'v', 'w'):
+        _ensure_property(rigid, prop, device)
+    if push:
+        for pa in fixed_arrays:
+            pa.gpu.push('x', 'y', 'z', 'h', 'm', 'rho', 'p', 'cs',
+                        'u', 'v', 'w', *out_props)
+        rigid.gpu.push('x', 'y', 'z', 'h', 'm', 'rho', 'rho0', 'p', 'cs',
+                       'arho', 'V', 'fx', 'fy', 'fz', 'u', 'v', 'w')
+    nnps.update(push=push)
+
+    if not getattr(rigid_state, 'number_density_initialized', False):
+        compute_rigid_number_density(
+            nnps, rigid_index, kernel=kernel, push=False)
+        rigid_state.number_density_initialized = True
+
+    for pa in fixed_arrays:
+        save_wcsph_state(pa, dim=dim, device=device, push=False)
+    save_rigid_body_density(rigid, device=device, push=False)
+    save_rigid_body_state(rigid, rigid_state, push=False)
+
+    def accel():
+        compute_tait_eos(fluid, rho0=rho0, c0=c0, gamma=gamma, p0=p0,
+                         device=device, push=False)
+        for wall in walls:
+            compute_tait_eos_hg_correction(
+                wall, rho0=rho0, c0=c0, gamma=gamma,
+                device=device, push=False)
+        compute_tait_eos_hg_correction(
+            rigid, rho0=rho0, c0=c0, gamma=gamma,
+            device=device, push=False)
+
+        for pa in fixed_arrays:
+            _zero_device_props(pa, out_props)
+        _zero_device_props(rigid, ('arho',))
+        initialize_rigid_body_force(
+            rigid, gx=gx, gy=gy, gz=gz, device=device, push=False)
+
+        # Existing fluid + fixed-wall physics. The rigid body is deliberately
+        # excluded from this fused block so its continuity is not double-counted.
+        for src_index in fixed_sources:
+            _run_equation_group(
+                nnps, src_index, fluid_index,
+                list(_WCSPH_DAM_BREAK_FLUID_BLOCKS),
+                scalar_values={'alpha': alpha, 'beta': beta}, kernel=kernel,
+                neighbor_mode='grid', accumulate_outputs=True)
+        # Rigid contribution to fluid density exactly once, then pressure
+        # acceleration + equal-and-opposite body force in deterministic passes.
+        _run_equation_group(
+            nnps, rigid_index, fluid_index, [ContinuityEquation()],
+            kernel=kernel, neighbor_mode='grid', accumulate_outputs=True)
+        compute_liu_fluid_rigid_coupling(
+            nnps, fluid_index, rigid_index, kernel=kernel, push=False)
+
+        if use_xsph:
+            _run_equation_group(
+                nnps, fluid_index, fluid_index, [XSPHCorrection()],
+                scalar_values={'eps': eps}, kernel=kernel,
+                neighbor_mode='grid', accumulate_outputs=True)
+        for wall_index in wall_indices:
+            _run_equation_group(
+                nnps, fluid_index, wall_index, [ContinuityEquation()],
+                kernel=kernel, neighbor_mode='grid', accumulate_outputs=True)
+        _run_equation_group(
+            nnps, fluid_index, rigid_index, [ContinuityEquation()],
+            kernel=kernel, neighbor_mode='grid', accumulate_outputs=True)
+        apply_body_force(fluid, gx=gx, gy=gy, gz=gz, dim=dim,
+                         device=device, push=False)
+
+    accel()
+    if adaptive_dt:
+        dt = compute_wcsph_adaptive_timestep(
+            nnps, pa_index=fluid_index, c0=c0, cfl=cfl, dt_min=dt_min,
+            dt_max=dt_max, push=False, neighbor_mode='grid')
+        dt = min(float(dt) * float(adaptive_dt_scale), float(step_dt_max))
+    for pa in fixed_arrays:
+        wcsph_pec_stage(pa, dt=dt, stage=0.5, dim=dim,
+                        xsph=(use_xsph and pa is fluid), device=device,
+                        push=False)
+    rigid_body_density_stage(rigid, dt=dt, stage=0.5, device=device)
+    rigid_body_rk2_stage(rigid, rigid_state, dt=dt, stage=0.5, push=False)
+    nnps.update(push=False)
+
+    accel()
+    for pa in fixed_arrays:
+        wcsph_pec_stage(pa, dt=dt, stage=1.0, dim=dim,
+                        xsph=(use_xsph and pa is fluid), device=device,
+                        push=False)
+    rigid_body_density_stage(rigid, dt=dt, stage=1.0, device=device)
+    rigid_body_rk2_stage(rigid, rigid_state, dt=dt, stage=1.0, push=False)
     nnps.update(push=False)
 
     if return_dt:

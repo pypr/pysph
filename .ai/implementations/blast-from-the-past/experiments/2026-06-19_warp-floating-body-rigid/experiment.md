@@ -7,7 +7,7 @@ agent: claude
 aspect: validation-benchmarks
 adr: ADR-0006
 status: active
-last_checked: 2026-06-20T13:52:29 CEST
+last_checked: 2026-06-21T02:02:00 CEST
 ---
 
 # Experiment: Warp floating / rigid body coupled to SPH (3D dam-break)
@@ -77,9 +77,14 @@ CPU baseline). Tier-2 (real CPU Application) is deferred behind a compyle fix.
   asymmetric two-body fp32/fp64 cases; pure translation preserves body geometry
   and bodies remain isolated. Focused P1/P2 + 2D cache guard: `10 passed`;
   final full Warp SPH regression: `49 passed`.
-- **P3 (next).** Liu coupling group + `NumberDensity` pre-pass + sibling driver
-  `wc_sph_dam_break_rigid_step` (body excluded from the PEC stage); resolve the
-  `arho` double-count.
+- **P3 (DONE; review approved).** Added deterministic two-pass Liu coupling:
+  body->fluid acceleration plus reversed fluid->body reaction, avoiding the
+  nondeterministic fp32 source atomics rejected in P0. Added a static
+  `RigidNumberDensity` pre-pass, rigid density/body-force staging, and sibling
+  `wc_sph_dam_break_rigid_step`; the body is excluded from fluid PEC and its
+  contribution to fluid `arho` is evaluated exactly once. Primitive parity
+  checks (Liu/reference + equal reaction, Wendland number density, density/body
+  force) pass; the complete coupled EPEC smoke test passes.
 - **P4.** EPEC fidelity + existing-driver behaviour guard; assemble the 3D
   surge-tosses-a-box case; render.
 
@@ -104,7 +109,33 @@ relative_pair_distance_drift: 9.386771416218177e-07
 ```
 
 This validates repeated GPU-resident rigid stepping and expected force/torque
-response. It is not a fluid-coupled floating-body claim; Liu coupling is P3.
+response. It is not a fluid-coupled floating-body claim; see P3 below.
+
+## P3 coupled runtime cases (2026-06-20)
+
+Coarse end-to-end smoke (`dx=0.10`, 1,000 fluid + 3,824 wall + 44 body, 20
+adaptive steps, `t=0.00310`): finite, device error 0, body moved under computed
+force/torque, relative rigid-geometry drift `2.16e-7`.
+
+First substantial collision-free transient (`dx=0.08`, body initially inside
+the collapsing column, 1,800 fluid + 5,592 wall + 66 body = 7,458 total):
+
+```text
+steps / time:            241 / 0.200603 s
+all_finite / error:      true / 0
+body COM displacement:   [0.02396, -0.01009, -0.08081] m
+body vc:                 [0.24182, -0.06702, -0.65823] m/s
+body omega:              [-0.14531, 0.70659, 0.20398] rad/s
+final body force:        [29.23, -5.27, 14.18] N
+fluid rho range:         991.68 .. 1015.78 kg/m^3
+body rho range:          912.75 .. 1015.08 kg/m^3
+relative geometry drift: 1.90e-6
+```
+
+The positive final vertical force despite body weight demonstrates developed
+fluid reaction (not prescribed P2 force). The horizon avoids wall contact,
+which remains P4 scope. Hero image:
+`reviews/2026-06-20_warp-liu-fluid-rigid-coupling-p3_assets/coupled-column-dx080-t020-hero.png`.
 
 ## How to run
 
@@ -115,9 +146,12 @@ $PY .ai/implementations/blast-from-the-past/experiments/2026-06-19_warp-floating
 # P1 backend tests + cache guard
 $PY -m pytest -q pysph/base/tests/test_warp_sph.py -k rigid \
    pysph/base/tests/test_warp_codegen.py::test_2d_path_generated_source_is_byte_identical_to_golden
+# P3 coupled transient
+$PY .ai/implementations/blast-from-the-past/experiments/2026-06-19_warp-floating-body-rigid/warp_floating_box_runner.py \
+  --dx 0.08 --tf 0.2 --steps 2000 --box-x 1.50 --box-z 0.72
 ```
 
 ## Out of scope (follow-ups)
 
-- The fluid<->body coupling physics + collision (P3); the assembled 3D animation
-  case; tier-2 CPU parity (needs the compyle py3.14 fix).
+- Rigid-wall collision/contact and the assembled photorealistic animation (P4);
+  tier-2 CPU parity (needs the compyle py3.14 fix).
