@@ -7,7 +7,7 @@ plan: .ai/implementations/blast-from-the-past/plans/2026-06-18_warp-3d-dam-break
 adrs: [ADR-0005]
 aspects_touched: [warp-backend, validation-benchmarks, gpu-nnps]
 host_files: [pysph/base/warp_sph.py, pysph/base/tests/test_warp_codegen.py]
-status: pending
+status: approved
 ---
 
 # Review: Warp 3D dam-break (Lobovsky no-obstacle)
@@ -118,6 +118,26 @@ end view (cross-channel particle layers), and a subsampled 3D scatter:
 multi-layer y-structure explicit; the simulation runs `dim=3` NNPS + 3D physics
 throughout.)
 
+### Medium-resolution developed showcase (2026-06-20)
+
+Fresh `dx=0.025` run: **59,280 fluid + 66,407 wall = 125,687 particles**.
+Warp measured `0.03140 s/step` versus `0.42733 s/step` for single-threaded
+PySPH CPU (`13.61x`). The adaptive run reached `t=0.8016 s` in 2,837 steps,
+remained finite, and kept density in `989.74..1014.13 kg/m^3`.
+
+The collapse-phase hero at `t=0.3996 s` uses the actual Warp particles coloured
+by speed (not a generative rendering):
+
+![Warp GPU 3D dam-break collapse, 125,687 particles coloured by speed](2026-06-19_warp-3d-dam-break-lobovsky_assets/showcase-dx025-t040-hero.png)
+
+The developed `t=0.8016 s` state is shown in four verification views:
+
+![Warp GPU developed 3D dam-break, 125,687 particles, four views](2026-06-19_warp-3d-dam-break-lobovsky_assets/showcase-dx025-t080-3d-snapshot.png)
+
+Splashsurf reconstruction was exercised successfully. Blender/ffmpeg are not
+installed on this host, so the retained hero is explicitly a polished particle
+visualization rather than a photorealistic animation.
+
 ## Diff summary
 
 Implements plan step 5 (the experiment packet) on top of the already-present
@@ -197,4 +217,7 @@ performance/cross-GPU characterisation.
 
 ## Sign-off
 
-- [ ] @prabhu LGTM (pending)
+- Reviewer: @prabhu
+- Verdict, verbatim quote:
+  > @prabhu: LGTM
+- Timestamp: 2026-06-21T02:06:46 CEST

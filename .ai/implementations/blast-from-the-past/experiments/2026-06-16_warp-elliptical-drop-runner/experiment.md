@@ -4,8 +4,8 @@ id: 2026-06-16_warp-elliptical-drop-runner
 created: 2026-06-16T12:30:00 CEST
 author: @kunalpuri-prediqt
 aspect: validation-benchmarks
-status: active
-last_checked: 2026-06-17T18:40:00 CEST
+status: complete
+last_checked: 2026-06-20T06:04:44 CEST
 ---
 
 # Experiment: Warp Elliptical-Drop Runner

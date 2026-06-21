@@ -1,6 +1,6 @@
 # Current - blast-from-the-past
 
-Updated: 2026-06-21T01:58:26 CEST by codex
+Updated: 2026-06-21T02:06:46 CEST by codex
 
 **Status:** The Warp backend has device-mirrored particle state, grid-direct
 3D WCSPH, generated/fused equation groups, periodic neighbors, validated 2D
@@ -26,9 +26,8 @@ reaction, and preserved relative geometry to `1.90e-6`. The review image and
 metrics are in
 `reviews/2026-06-20_warp-liu-fluid-rigid-coupling-p3.md`.
 
-**Open approvals:** P3 review
-`reviews/2026-06-20_warp-liu-fluid-rigid-coupling-p3.md` is approved. The 3D
-dam-break review remains pending upstream review in PR #435.
+**Open approvals:** P3 and 3D dam-break reviews are approved by @prabhu. PR
+#435 remains an upstream publication item, not a local review blocker.
 
 **Next action:** Plan P4: rigid-wall contact, longer EPEC/geometry-drift
 validation, assembled

@@ -4,8 +4,8 @@ id: 2026-06-15_warp-summation-density
 created: 2026-06-15T12:05:00 CET
 author: @kunalpuri-prediqt
 aspect: gpu-nnps
-status: active
-last_checked: 2026-06-15T12:30:00 CET
+status: complete
+last_checked: 2026-06-20T06:04:44 CEST
 ---
 
 # Experiment: Warp Summation Density

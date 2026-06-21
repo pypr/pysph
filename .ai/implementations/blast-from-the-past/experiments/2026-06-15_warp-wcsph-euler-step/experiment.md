@@ -4,8 +4,8 @@ id: 2026-06-15_warp-wcsph-euler-step
 created: 2026-06-15T23:27:00 CET
 author: @kunalpuri-prediqt
 aspect: gpu-nnps
-status: active
-last_checked: 2026-06-16T12:32:00 CEST
+status: complete
+last_checked: 2026-06-20T06:04:44 CEST
 ---
 
 # Experiment: Warp WCSPH Euler and Leapfrog Step

@@ -35,11 +35,16 @@ The set of host files, modules, and interfaces this implementation interacts wit
   NNPS, and SPH equation/integrator checkpoints.
 - `pysph/base/tests/test_warp_*.py` - focused tests for the Python Warp
   prototype helpers.
+- `CODEBASE_UNDERSTANDING.md` - repository architecture snapshot retained as a
+  host-level reference at the implementation owner's request.
 
 ## Boundary amendments
 
 - 2026-06-16 - Added Python Warp prototype files and focused Warp tests to the
   active implementation boundary for the repeated-step leapfrog checkpoint.
+- 2026-06-21 - Added the owner-provided root `CODEBASE_UNDERSTANDING.md`
+  architecture snapshot so it can be versioned with the curated implementation
+  spec rather than left as an unexplained untracked file.
 
 ## Aspects
 

@@ -4,8 +4,8 @@ id: 2026-06-15_initial-warp-benchmark-placeholder
 created: 2026-06-15T07:19:08 CET
 author: @kunalpuri-prediqt
 aspect: validation-benchmarks
-status: active
-last_checked: 2026-06-15T10:32:00 CET
+status: complete
+last_checked: 2026-06-20T06:04:44 CEST
 ---
 
 # Experiment: Warp ParticleArray Mutation And Sync Baseline

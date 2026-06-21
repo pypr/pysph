@@ -6,8 +6,8 @@ author: @kunalpuri-prediqt
 agent: claude
 aspect: validation-benchmarks
 adr: ADR-0005
-status: active
-last_checked: 2026-06-19T10:30:00 CEST
+status: complete
+last_checked: 2026-06-20T18:58:02 CEST
 ---
 
 # Experiment: Warp 3D dam-break (Lobovsky no-obstacle)
@@ -212,6 +212,36 @@ Artifacts: `results-smoke.npz`, `comparison-tier1-summary.json` (+ warp npz),
 `comparison-resolved-summary.json`, `cpu-vs-warp-perf.json`,
 `cpu-vs-warp-snapshot.png`, `bench-1M-perf.json`, `bench-1Mplus-perf.json`,
 `bench-1M-3d-snapshot.png`.
+
+### Medium-resolution showcase run (2026-06-20)
+
+Ran a developed Warp-only case at `dx=0.025`: 59,280 fluid + 66,407 wall =
+125,687 total particles. A 10-step timing slice measured `0.03140 s/step`
+versus `0.42733 s/step` for the single-threaded PySPH CPU baseline (`13.61x`).
+The adaptive GPU run then advanced 2,837 steps to `t=0.8016 s`:
+
+```text
+all_finite: true
+rho_min / rho_max: 989.7354 / 1014.1267 kg/m^3
+surge_front_x: 5.08698 m
+max_height: 0.84473 m
+kinetic_energy: 1226.1269
+wall_p_min / wall_p_max: 0.0 / 24391.78 Pa
+```
+
+Also captured the visually stronger collapse phase at 1,415 steps / `t=0.3996`
+s (`all_finite=true`, surge front 3.1553 m, max height 0.9391 m). Artifacts:
+
+- `showcase-dx025-t080-perf.json`
+- `reviews/2026-06-19_warp-3d-dam-break-lobovsky_assets/showcase-dx025-t080-3d-snapshot.png`
+  (four-view verification figure, embedded in the review)
+- `reviews/2026-06-19_warp-3d-dam-break-lobovsky_assets/showcase-dx025-t040-hero.png`
+  (PyVista hero frame, particles coloured by speed, embedded in the review)
+
+Splashsurf surface reconstruction was exercised successfully, but Blender and
+ffmpeg are not installed on this host; large intermediate PLY meshes were not
+retained. The hero is an honest particle visualization, not a photorealistic
+render.
 
 ## What to expect
 

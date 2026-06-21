@@ -1,0 +1,24 @@
+{
+  "c0": 32.849657532461435,
+  "case": "Lobovsky 3D dam-break, no obstacle (~1M particles)",
+  "cpu_pysph_fp64": {
+    "particle_steps_per_s": 294120.6924978172,
+    "s_per_step": 0.42733137520044695,
+    "solve_s": 2.1366568760022346,
+    "steps": 5
+  },
+  "device": "RTX 4060 Laptop (fp32) vs single-thread PySPH Cython (fp64)",
+  "dx": 0.025,
+  "kernel": "wendland",
+  "n_fluid": 59280,
+  "n_total": 125687,
+  "n_wall": 66407,
+  "snapshot_image": "/home/kunalp/work/particles/pysph/.ai/implementations/blast-from-the-past/experiments/2026-06-18_warp-dam-break-3d-runner/showcase-dx025-t080-3d-snapshot.png",
+  "snapshot_t": 0.8000625194274892,
+  "speedup_per_step": 13.609282932344543,
+  "warp_gpu_fp32": {
+    "particle_steps_per_s": 4002771.7204599013,
+    "s_per_step": 0.03139999199993326,
+    "steps": 10
+  }
+}
