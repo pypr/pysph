@@ -18,8 +18,7 @@ except ImportError:  # pragma: no cover
     wp = None
 
 from pysph.base.warp_nnps import (
-    UniformGridWarpNNPS, assign_particle_levels, _copy_i32,
-    _scatter_cell_particles,
+    UniformGridWarpNNPS, _copy_i32, _scatter_cell_particles,
 )
 
 
@@ -33,6 +32,98 @@ if wp is not None:
     # fixed +/-1 stencil) with a +/-1 guard band, then applies the exact
     # symmetric cutoff. The lengths and fill kernels are structurally identical
     # so their counts can never diverge (unlike the separate brute/grid passes).
+
+    @wp.kernel
+    def _ml_assign_reduce_f64(
+            h: wp.array(dtype=wp.float64),
+            x: wp.array(dtype=wp.float64),
+            y: wp.array(dtype=wp.float64),
+            z: wp.array(dtype=wp.float64),
+            edges: wp.array(dtype=wp.float64),
+            nlevels: wp.int32,
+            dim: wp.int32,
+            level_of: wp.array(dtype=wp.int32),
+            counts: wp.array(dtype=wp.int32),
+            hmax: wp.array(dtype=wp.float64),
+            xmin: wp.array(dtype=wp.float64),
+            xmax: wp.array(dtype=wp.float64),
+            ymin: wp.array(dtype=wp.float64),
+            ymax: wp.array(dtype=wp.float64),
+            zmin: wp.array(dtype=wp.float64),
+            zmax: wp.array(dtype=wp.float64),
+            oob: wp.array(dtype=wp.int32),
+    ):
+        # Assign each particle to its half-open level and reduce per-level
+        # count, max-h and AABB on the device, so x/y/z/h never leave the GPU.
+        i = wp.tid()
+        hi = h[i]
+        k = wp.int32(-1)
+        for m in range(nlevels):
+            if hi >= edges[m] and hi < edges[m + 1]:
+                k = m
+        if hi == edges[nlevels]:          # inclusive top edge -> top level
+            k = nlevels - wp.int32(1)
+        if k < wp.int32(0):               # below finest or above top -> loud
+            wp.atomic_add(oob, 0, wp.int32(1))
+            level_of[i] = wp.int32(0)
+            return
+        level_of[i] = k
+        wp.atomic_add(counts, k, wp.int32(1))
+        wp.atomic_max(hmax, k, hi)
+        wp.atomic_min(xmin, k, x[i])
+        wp.atomic_max(xmax, k, x[i])
+        if dim > 1:
+            wp.atomic_min(ymin, k, y[i])
+            wp.atomic_max(ymax, k, y[i])
+        if dim > 2:
+            wp.atomic_min(zmin, k, z[i])
+            wp.atomic_max(zmax, k, z[i])
+
+
+    @wp.kernel
+    def _ml_assign_reduce_f32(
+            h: wp.array(dtype=wp.float32),
+            x: wp.array(dtype=wp.float32),
+            y: wp.array(dtype=wp.float32),
+            z: wp.array(dtype=wp.float32),
+            edges: wp.array(dtype=wp.float32),
+            nlevels: wp.int32,
+            dim: wp.int32,
+            level_of: wp.array(dtype=wp.int32),
+            counts: wp.array(dtype=wp.int32),
+            hmax: wp.array(dtype=wp.float32),
+            xmin: wp.array(dtype=wp.float32),
+            xmax: wp.array(dtype=wp.float32),
+            ymin: wp.array(dtype=wp.float32),
+            ymax: wp.array(dtype=wp.float32),
+            zmin: wp.array(dtype=wp.float32),
+            zmax: wp.array(dtype=wp.float32),
+            oob: wp.array(dtype=wp.int32),
+    ):
+        i = wp.tid()
+        hi = h[i]
+        k = wp.int32(-1)
+        for m in range(nlevels):
+            if hi >= edges[m] and hi < edges[m + 1]:
+                k = m
+        if hi == edges[nlevels]:
+            k = nlevels - wp.int32(1)
+        if k < wp.int32(0):
+            wp.atomic_add(oob, 0, wp.int32(1))
+            level_of[i] = wp.int32(0)
+            return
+        level_of[i] = k
+        wp.atomic_add(counts, k, wp.int32(1))
+        wp.atomic_max(hmax, k, hi)
+        wp.atomic_min(xmin, k, x[i])
+        wp.atomic_max(xmax, k, x[i])
+        if dim > 1:
+            wp.atomic_min(ymin, k, y[i])
+            wp.atomic_max(ymax, k, y[i])
+        if dim > 2:
+            wp.atomic_min(zmin, k, z[i])
+            wp.atomic_max(zmax, k, z[i])
+
 
     @wp.kernel
     def _multilevel_cell_ids_f64(
@@ -469,6 +560,11 @@ class MultilevelGridWarpNNPS(UniformGridWarpNNPS):
             raise ValueError("MultilevelGridWarpNNPS requires an h_ref")
         if nlevels < 1:
             raise ValueError("nlevels must be >= 1; got %r" % (nlevels,))
+        if h_ref <= 0.0:
+            raise ValueError("h_ref must be > 0; got %r" % (h_ref,))
+        if level_ratio <= 1.0:
+            raise ValueError("level_ratio must be > 1 so level edges are "
+                             "strictly ascending; got %r" % (level_ratio,))
         self.h_ref = h_ref
         self.level_ratio = level_ratio
         self.nlevels = nlevels
@@ -494,12 +590,14 @@ class MultilevelGridWarpNNPS(UniformGridWarpNNPS):
                 _multilevel_neighbor_lengths_f32,
                 _multilevel_neighbor_fill_f32,
                 np.float32(self.radius_scale), wp.float32, np.float32,
+                _ml_assign_reduce_f32,
             )
         return (
             _multilevel_cell_ids_f64,
             _multilevel_neighbor_lengths_f64,
             _multilevel_neighbor_fill_f64,
             np.float64(self.radius_scale), wp.float64, np.float64,
+            _ml_assign_reduce_f64,
         )
 
     def _build_multilevel(self, src_index):
@@ -512,21 +610,53 @@ class MultilevelGridWarpNNPS(UniformGridWarpNNPS):
         dim = self.dim
         nlevels = self.nlevels
         dev = self.device
-        cell_ids_k, _, _, _, wpf, npf = self._ml_kernels_for(gpu)
+        cell_ids_k, _, _, _, wpf, npf, assign_k = self._ml_kernels_for(gpu)
 
-        # Host-first per-level metadata (device-residency refactor deferred).
-        x = gpu.x.get()
-        y = gpu.y.get()
-        z = gpu.z.get()
-        h = gpu.h.get()
+        # Level edges in the device float precision; an fp32 h sitting exactly
+        # on an edge then bins like the edge instead of tripping the guard.
+        edges_host = (self.h_ref
+                      * self.level_ratio ** np.arange(nlevels + 1)).astype(npf)
+
+        # GPU level assignment + per-level reductions. Only O(nlevels) scalar
+        # metadata is read back below -- x/y/z/h never leave the device.
+        level_of = wp.zeros(nsrc if nsrc > 0 else 1, dtype=wp.int32, device=dev)
+        counts_l = wp.zeros(nlevels, dtype=wp.int32, device=dev)
+        hmax_l = wp.zeros(nlevels, dtype=wpf, device=dev)
+        xmin_l = wp.array(np.full(nlevels, np.inf, npf), dtype=wpf, device=dev)
+        xmax_l = wp.array(np.full(nlevels, -np.inf, npf), dtype=wpf, device=dev)
+        ymin_l = wp.array(np.full(nlevels, np.inf, npf), dtype=wpf, device=dev)
+        ymax_l = wp.array(np.full(nlevels, -np.inf, npf), dtype=wpf, device=dev)
+        zmin_l = wp.array(np.full(nlevels, np.inf, npf), dtype=wpf, device=dev)
+        zmax_l = wp.array(np.full(nlevels, -np.inf, npf), dtype=wpf, device=dev)
+        oob = wp.zeros(1, dtype=wp.int32, device=dev)
+        edges_dev = wp.array(edges_host, dtype=wpf, device=dev)
         if nsrc > 0:
-            levels, support = assign_particle_levels(
-                h, self.h_ref, self.level_ratio, nlevels, self.radius_scale
+            wp.launch(
+                assign_k, dim=nsrc,
+                inputs=[
+                    gpu.h.dev, gpu.x.dev, gpu.y.dev, gpu.z.dev, edges_dev,
+                    np.int32(nlevels), np.int32(dim), level_of, counts_l,
+                    hmax_l, xmin_l, xmax_l, ymin_l, ymax_l, zmin_l, zmax_l,
+                    oob,
+                ],
+                device=dev,
             )
-        else:
-            levels = np.zeros(0, dtype=np.int32)
-            support = np.zeros(nlevels, dtype=np.float64)
+            wp.synchronize_device(dev)
 
+        # O(nlevels) metadata readback (permitted; not the coordinate arrays).
+        counts = counts_l.numpy()
+        hmax = hmax_l.numpy()
+        xmn, xmx = xmin_l.numpy(), xmax_l.numpy()
+        ymn, ymx = ymin_l.numpy(), ymax_l.numpy()
+        zmn, zmx = zmin_l.numpy(), zmax_l.numpy()
+        if nsrc > 0 and int(oob.numpy()[0]) > 0:
+            raise ValueError(
+                "smoothing length outside configured level range "
+                "[%g, %g]; particles are not silently clipped"
+                % (float(edges_host[0]), float(edges_host[-1]))
+            )
+
+        support = np.zeros(nlevels, dtype=np.float64)
         ox = np.zeros(nlevels, dtype=np.float64)
         oy = np.zeros(nlevels, dtype=np.float64)
         oz = np.zeros(nlevels, dtype=np.float64)
@@ -535,25 +665,19 @@ class MultilevelGridWarpNNPS(UniformGridWarpNNPS):
         ny = np.ones(nlevels, dtype=np.int32)
         nz = np.ones(nlevels, dtype=np.int32)
         for k in range(nlevels):
-            mask = levels == k
-            if not np.any(mask):
+            if counts[k] <= 0:
                 continue
-            cs = float(support[k])
+            cs = float(self.radius_scale * hmax[k])
+            support[k] = cs
             cell_size[k] = cs
-            xmn = float(np.min(x[mask]))
-            xmx = float(np.max(x[mask]))
-            ox[k] = xmn - cs
-            nx[k] = max(1, int(np.ceil((xmx + cs - ox[k]) / cs)))
+            ox[k] = float(xmn[k]) - cs
+            nx[k] = max(1, int(np.ceil((float(xmx[k]) + cs - ox[k]) / cs)))
             if dim > 1:
-                ymn = float(np.min(y[mask]))
-                ymx = float(np.max(y[mask]))
-                oy[k] = ymn - cs
-                ny[k] = max(1, int(np.ceil((ymx + cs - oy[k]) / cs)))
+                oy[k] = float(ymn[k]) - cs
+                ny[k] = max(1, int(np.ceil((float(ymx[k]) + cs - oy[k]) / cs)))
             if dim > 2:
-                zmn = float(np.min(z[mask]))
-                zmx = float(np.max(z[mask]))
-                oz[k] = zmn - cs
-                nz[k] = max(1, int(np.ceil((zmx + cs - oz[k]) / cs)))
+                oz[k] = float(zmn[k]) - cs
+                nz[k] = max(1, int(np.ceil((float(zmx[k]) + cs - oz[k]) / cs)))
 
         sizes = nx.astype(np.int64) * ny.astype(np.int64) * nz.astype(np.int64)
         cell_offset = np.zeros(nlevels, dtype=np.int32)
@@ -561,10 +685,8 @@ class MultilevelGridWarpNNPS(UniformGridWarpNNPS):
             cell_offset[1:] = np.cumsum(sizes)[:-1].astype(np.int32)
         total_cells = int(sizes.sum())
 
-        lv = levels if nsrc > 0 else np.zeros(1, dtype=np.int32)
         ml = {
-            'level_of': wp.array(lv.astype(np.int32), dtype=wp.int32,
-                                 device=dev),
+            'level_of': level_of,   # device, per-particle levels (GPU-computed)
             'origin_x': wp.array(ox.astype(npf), dtype=wpf, device=dev),
             'origin_y': wp.array(oy.astype(npf), dtype=wpf, device=dev),
             'origin_z': wp.array(oz.astype(npf), dtype=wpf, device=dev),
@@ -575,7 +697,7 @@ class MultilevelGridWarpNNPS(UniformGridWarpNNPS):
             'cell_offset': wp.array(cell_offset, dtype=wp.int32, device=dev),
             'support': wp.array(support.astype(npf), dtype=wpf, device=dev),
             'total_cells': total_cells,
-            'levels_host': levels,
+            'nsrc': nsrc,
             'support_host': support,
             # Host copies in the SAME precision the GPU sees (npf), for the
             # device-residency-free diagnostics used by boundary tests.
@@ -586,7 +708,7 @@ class MultilevelGridWarpNNPS(UniformGridWarpNNPS):
 
         ncells_alloc = total_cells if total_cells > 0 else 1
         nsrc_alloc = nsrc if nsrc > 0 else 1
-        counts = wp.zeros(ncells_alloc, dtype=wp.int32, device=dev)
+        counts_g = wp.zeros(ncells_alloc, dtype=wp.int32, device=dev)
         starts = wp.zeros(ncells_alloc, dtype=wp.int32, device=dev)
         cursor = wp.zeros(ncells_alloc, dtype=wp.int32, device=dev)
         cell_particles = wp.zeros(nsrc_alloc, dtype=wp.uint32, device=dev)
@@ -599,17 +721,17 @@ class MultilevelGridWarpNNPS(UniformGridWarpNNPS):
                     gpu.x.dev, gpu.y.dev, gpu.z.dev, ml['level_of'],
                     ml['origin_x'], ml['origin_y'], ml['origin_z'],
                     ml['cell_size'], ml['nx'], ml['ny'], ml['nz'],
-                    ml['cell_offset'], np.int32(dim), cell_ids, counts,
+                    ml['cell_offset'], np.int32(dim), cell_ids, counts_g,
                 ],
                 device=dev,
             )
-            wp.utils.array_scan(counts, starts, inclusive=False)
+            wp.utils.array_scan(counts_g, starts, inclusive=False)
             wp.launch(_copy_i32, dim=total_cells, inputs=[starts, cursor],
                       device=dev)
             wp.launch(_scatter_cell_particles, dim=nsrc,
                       inputs=[cell_ids, cursor, cell_particles], device=dev)
             wp.synchronize_device(dev)
-        ml['counts'] = counts
+        ml['counts'] = counts_g
         ml['starts'] = starts
         ml['cell_particles'] = cell_particles
 
@@ -629,7 +751,8 @@ class MultilevelGridWarpNNPS(UniformGridWarpNNPS):
         dst = self.particles[dst_index].gpu
         dev = self.device
         ndst = dst.get_number_of_particles()
-        _, lengths_k, fill_k, radius_scale, wpf, npf = self._ml_kernels_for(src)
+        _, lengths_k, fill_k, radius_scale, wpf, npf, _ = \
+            self._ml_kernels_for(src)
 
         lengths = wp.zeros(ndst if ndst > 0 else 1, dtype=wp.int32, device=dev)
         starts = wp.zeros(ndst if ndst > 0 else 1, dtype=wp.int32, device=dev)
@@ -676,8 +799,12 @@ class MultilevelGridWarpNNPS(UniformGridWarpNNPS):
         binning kernel's clamp, which would otherwise mask a padding defect.
         """
         ml = self._build_multilevel(src_index)
+        # Per-particle levels are read back from the device here (diagnostic
+        # path only -- NOT on the warm update/traversal path).
+        levels = (ml['level_of'].numpy()[:ml['nsrc']] if ml['nsrc'] > 0
+                  else np.zeros(0, dtype=np.int32))
         return {
-            'levels': ml['levels_host'],
+            'levels': levels,
             'support': ml['support_host'],
             'origin_x': ml['ox_host'], 'origin_y': ml['oy_host'],
             'origin_z': ml['oz_host'], 'cell_size': ml['cs_host'],

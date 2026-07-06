@@ -694,3 +694,240 @@ def test_multilevel_fp32_per_level_grid_boundary_padding_1d():
     # Cross-level pair reaching the far-edge fine particle (idx4 at x=0.9) from
     # the coarse particle (idx5): its 0.8 support spans the fine AABB.
     assert 4 in ml_sets[5].tolist() and 5 in ml_sets[4].tolist()
+
+
+def test_multilevel_empty_interior_levels_are_well_formed_2d():
+    # Levels 1 and 3 are unpopulated: their per-level metadata must be
+    # degenerate-safe (no cells, no NaN origin) and traversal must skip them,
+    # while cross-level (level 0 <-> level 2) neighbors stay exact.
+    x = [0.0, 0.15, 0.2, 0.8]
+    h = [0.1, 0.15, 0.5, 0.7]   # edges [0.1,0.2,0.4,0.8,1.6] -> levels [0,0,2,2]
+    zeros = [0.0] * 4
+    pa = get_particle_array(
+        name='fluid', x=x, y=zeros, z=zeros, h=h, backend='warp'
+    )
+    ml = MultilevelGridWarpNNPS(
+        dim=2, particles=[pa], radius_scale=2.0,
+        h_ref=0.1, level_ratio=2.0, nlevels=4,
+    )
+    levels, support = assign_particle_levels(
+        np.array(h), h_ref=0.1, level_ratio=2.0, nlevels=4, radius_scale=2.0
+    )
+    assert list(levels) == [0, 0, 2, 2]
+    assert np.allclose(support, [0.3, 0.0, 1.4, 0.0])
+
+    # Empty levels 1 and 3 allocate no cells (nx == 0), not a degenerate grid.
+    info = ml.level_grid_info(0)
+    assert info['nx'][1] == 0 and info['nx'][3] == 0
+    assert info['nx'][0] > 0 and info['nx'][2] > 0
+
+    tup = (np.array(x), np.array(zeros), np.array(zeros), np.array(h))
+    oracle = brute_force_neighbor_sets(tup, tup, radius_scale=2.0, dim=2)
+    bf = BruteForceWarpNNPS(dim=2, particles=[pa], radius_scale=2.0)
+    _assert_all_neighbors_match(bf, ml, [pa], [(0, 0)])
+    ml.set_context(0, 0)
+    ml_sets = [_neighbors(ml, 0, 0, i) for i in range(4)]
+    for i in range(4):
+        assert np.array_equal(ml_sets[i], oracle[i]), (i, ml_sets[i], oracle[i])
+        assert len(ml_sets[i]) == len(set(ml_sets[i].tolist())), i
+
+    # Accepted level-pair matrix: empty levels 1,3 have all-zero rows/cols;
+    # only the (0,0),(0,2),(2,0),(2,2) blocks are populated.
+    counts = accepted_level_pair_counts(ml_sets, levels, levels, nlevels=4)
+    assert counts[1].sum() == 0 and counts[3].sum() == 0
+    assert counts[:, 1].sum() == 0 and counts[:, 3].sum() == 0
+    assert counts[0, 2] > 0 and counts[2, 0] > 0
+
+    # Repeated update() rebuilds empty-level metadata cleanly (idempotent sets).
+    ml.update()
+    ml.set_context(0, 0)
+    for i in range(4):
+        assert np.array_equal(_neighbors(ml, 0, 0, i), oracle[i]), i
+
+
+def test_multilevel_gradual_ratio_1_2_adjacent_levels_2d():
+    # Four closely-spaced levels (ratio 1.2) with near-equal per-level cell
+    # sizes; guards adjacent-level edge binning and the coarse-into-finer
+    # query-cell-range rounding. h are strictly interior to their bins so the
+    # fp32 device path bins identically to the fp64 oracle. p5 is isolated to
+    # exercise exclusion, not just connectivity.
+    x = [0.0, 0.1, 0.2, 0.3, 0.15, 2.0]
+    y = [0.0, 0.0, 0.0, 0.0, 0.15, 0.0]
+    h = [0.11, 0.13, 0.15, 0.19, 0.19, 0.11]
+    zeros = [0.0] * 6
+    pa = get_particle_array(
+        name='fluid', x=x, y=y, z=zeros, h=h, backend='warp'
+    )
+    ml = MultilevelGridWarpNNPS(
+        dim=2, particles=[pa], radius_scale=2.0,
+        h_ref=0.1, level_ratio=1.2, nlevels=4,
+    )
+    levels, support = assign_particle_levels(
+        np.array(h), h_ref=0.1, level_ratio=1.2, nlevels=4, radius_scale=2.0
+    )
+    assert list(levels) == [0, 1, 2, 3, 3, 0]
+    assert np.allclose(support, [0.22, 0.26, 0.30, 0.38])
+
+    tup = (np.array(x), np.array(y), np.array(zeros), np.array(h))
+    oracle = brute_force_neighbor_sets(tup, tup, radius_scale=2.0, dim=2)
+    bf = BruteForceWarpNNPS(dim=2, particles=[pa], radius_scale=2.0)
+    _assert_all_neighbors_match(bf, ml, [pa], [(0, 0)])
+    ml.set_context(0, 0)
+    ml_sets = [_neighbors(ml, 0, 0, i) for i in range(6)]
+    for i in range(6):
+        assert np.array_equal(ml_sets[i], oracle[i]), (i, ml_sets[i], oracle[i])
+        assert len(ml_sets[i]) == len(set(ml_sets[i].tolist())), i
+    # p5 is isolated (only itself); adjacent-level pairs are found.
+    assert list(ml_sets[5]) == [5]
+    counts = accepted_level_pair_counts(ml_sets, levels, levels, nlevels=4)
+    for a, b in [(0, 1), (1, 0), (1, 2), (2, 1), (2, 3), (3, 2)]:
+        assert counts[a, b] > 0, (a, b)
+
+
+def test_multilevel_cross_array_traversal_and_ownership_2d():
+    # Two independently-leveled arrays; every source/destination context must
+    # match brute force, neighbor indices stay in the SOURCE array's own 0-based
+    # space, and each source array owns one cached multilevel structure.
+    fx, fy = [0.0, 0.2, 0.5], [0.0, 0.0, 0.0]
+    fh = [0.1, 0.15, 0.4]                 # edges [0.1,0.2,0.4,0.8] -> [0,0,2]
+    sx, sy = [0.1, 0.6], [0.0, 0.0]
+    sh = [0.2, 0.6]                        # -> [1,2]
+    fluid = get_particle_array(
+        name='fluid', x=fx, y=fy, z=[0.0] * 3, h=fh, backend='warp'
+    )
+    solid = get_particle_array(
+        name='solid', x=sx, y=sy, z=[0.0] * 2, h=sh, backend='warp'
+    )
+    particles = [fluid, solid]
+    ml = MultilevelGridWarpNNPS(
+        dim=2, particles=particles, radius_scale=2.0,
+        h_ref=0.1, level_ratio=2.0, nlevels=3,
+    )
+    bf = BruteForceWarpNNPS(dim=2, particles=particles, radius_scale=2.0)
+
+    # Per-array level assignment is independent.
+    fl, _ = assign_particle_levels(np.array(fh), 0.1, 2.0, 3, 2.0)
+    sl, _ = assign_particle_levels(np.array(sh), 0.1, 2.0, 3, 2.0)
+    assert list(fl) == [0, 0, 2] and list(sl) == [1, 2]
+
+    arrays = {0: (np.array(fx), np.array(fy), np.zeros(3), np.array(fh)),
+              1: (np.array(sx), np.array(sy), np.zeros(2), np.array(sh))}
+    contexts = [(0, 0), (1, 1), (0, 1), (1, 0)]
+    _assert_all_neighbors_match(bf, ml, particles, contexts)
+    for src_index, dst_index in contexts:
+        oracle = brute_force_neighbor_sets(
+            arrays[dst_index], arrays[src_index], radius_scale=2.0, dim=2
+        )
+        ml.set_context(src_index, dst_index)
+        ndst = particles[dst_index].get_number_of_particles()
+        for d_idx in range(ndst):
+            got = _neighbors(ml, src_index, dst_index, d_idx)
+            assert np.array_equal(got, oracle[d_idx]), (src_index, dst_index,
+                                                        d_idx, got, oracle[d_idx])
+            # Indices are in the source array's own 0-based space.
+            nsrc = particles[src_index].get_number_of_particles()
+            assert got.size == 0 or int(got.max()) < nsrc
+
+    # Each source array owns a distinct cached multilevel structure.
+    assert set(ml._ml.keys()) == {0, 1}
+    assert ml._ml[0] is not ml._ml[1]
+
+
+def test_multilevel_particles_at_spatial_bounds_3d():
+    # Particles at the geometric min/max corners of each level's occupied
+    # region (all axes) must bin to valid cells via per-level padding, and keep
+    # their colocated cross-level neighbors. edges [0.1,0.2,0.4].
+    corners = [(0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1),
+               (1, 1, 0), (1, 0, 1), (0, 1, 1), (1, 1, 1)]
+    fx = [c[0] for c in corners] + [0.5]
+    fy = [c[1] for c in corners] + [0.5]
+    fz = [c[2] for c in corners] + [0.5]
+    fh = [0.1] * 9                                  # fine, level 0
+    cx, cy, cz, ch = [0.0, 1.0], [0.0, 1.0], [0.0, 1.0], [0.4, 0.4]  # coarse l1
+    x = fx + cx
+    y = fy + cy
+    z = fz + cz
+    h = fh + ch
+    pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=h, backend='warp')
+    ml = MultilevelGridWarpNNPS(
+        dim=3, particles=[pa], radius_scale=2.0,
+        h_ref=0.1, level_ratio=2.0, nlevels=2,
+    )
+    levels, support = assign_particle_levels(
+        np.array(h), 0.1, 2.0, 2, 2.0
+    )
+    assert list(levels) == [0] * 9 + [1, 1]
+    assert np.allclose(support, [0.2, 0.8])
+
+    # Every particle -- including the 8 corner extremes -- floors to a valid
+    # in-range cell on every axis (pre-clamp), via per-level origin padding.
+    info = ml.level_grid_info(0)
+    ox, oy, oz = info['origin_x'], info['origin_y'], info['origin_z']
+    cs, nxs, nys, nzs = (info['cell_size'], info['nx'], info['ny'], info['nz'])
+    xa = np.asarray(x, dtype=ox.dtype)
+    ya = np.asarray(y, dtype=ox.dtype)
+    za = np.asarray(z, dtype=ox.dtype)
+    for i in range(len(x)):
+        k = int(levels[i])
+        ix = int(np.floor((xa[i] - ox[k]) / cs[k]))
+        iy = int(np.floor((ya[i] - oy[k]) / cs[k]))
+        iz = int(np.floor((za[i] - oz[k]) / cs[k]))
+        assert 0 <= ix < nxs[k] and 0 <= iy < nys[k] and 0 <= iz < nzs[k], (
+            i, ix, iy, iz, nxs[k], nys[k], nzs[k])
+
+    tup = (np.array(x), np.array(y), np.array(z), np.array(h))
+    oracle = brute_force_neighbor_sets(tup, tup, radius_scale=2.0, dim=3)
+    bf = BruteForceWarpNNPS(dim=3, particles=[pa], radius_scale=2.0)
+    _assert_all_neighbors_match(bf, ml, [pa], [(0, 0)])
+    ml.set_context(0, 0)
+    for i in range(len(x)):
+        got = _neighbors(ml, 0, 0, i)
+        assert np.array_equal(got, oracle[i]), (i, got, oracle[i])
+        assert len(got) == len(set(got.tolist())), i
+    # Corner colocated cross-level pairs retained: coarse idx9 at (0,0,0) <->
+    # fine idx0 at (0,0,0); coarse idx10 at (1,1,1) <-> fine idx7 at (1,1,1).
+    assert 0 in _neighbors(ml, 0, 0, 9).tolist()
+    assert 7 in _neighbors(ml, 0, 0, 10).tolist()
+
+
+def test_multilevel_no_coordinate_host_readback_on_warm_update_3d():
+    # Device residency: a warm update(push=False) followed by a query must NOT
+    # pull per-particle x/y/z/h back to the host. Only O(nlevels) scalar
+    # metadata readback is permitted (and is not on the coordinate arrays).
+    x = [0.0, 0.8, 0.5, 1.0, 0.2, 2.0, 0.1, 5.0]
+    h = [1.6, 0.8, 0.6, 0.4, 0.3, 0.2, 0.15, 0.1]
+    zeros = [0.0] * 8
+    pa = get_particle_array(
+        name='fluid', x=x, y=zeros, z=zeros, h=h, backend='warp'
+    )
+    ml = MultilevelGridWarpNNPS(
+        dim=3, particles=[pa], radius_scale=2.0,
+        h_ref=0.1, level_ratio=2.0, nlevels=4,
+    )
+
+    reads = []
+
+    def _spy(name, orig):
+        def wrapped():
+            reads.append(name)
+            return orig()
+        return wrapped
+
+    patched = [n for n in ('x', 'y', 'z', 'h')]
+    for name in patched:
+        arr = getattr(pa.gpu, name)
+        arr.get = _spy(name, arr.get)
+    try:
+        ml.update(push=False)          # warm rebuild
+        ml.set_context(0, 0)
+        for i in range(8):             # traversal / neighbor build
+            _neighbors(ml, 0, 0, i)
+    finally:
+        for name in patched:
+            arr = getattr(pa.gpu, name)
+            if 'get' in arr.__dict__:
+                del arr.__dict__['get']
+
+    assert reads == [], (
+        "warm update/query pulled coordinates to host: %r" % reads
+    )
