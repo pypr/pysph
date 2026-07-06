@@ -810,3 +810,50 @@ class MultilevelGridWarpNNPS(UniformGridWarpNNPS):
             'origin_z': ml['oz_host'], 'cell_size': ml['cs_host'],
             'nx': ml['nx_host'], 'ny': ml['ny_host'], 'nz': ml['nz_host'],
         }
+
+    def candidate_pairs(self, src_index, dst_index):
+        """Total candidate pairs the multilevel traversal distance-tests.
+
+        Host-side diagnostic (benchmark path, NOT the residency-constrained
+        query path): mirrors the traversal's per-level variable cell-range scan
+        and sums the source-particle counts in every scanned cell. Used to show
+        the candidate-work reduction versus the global-hmax uniform grid. The
+        accepted set is always a subset of the candidate set.
+        """
+        ml = self._build_multilevel(src_index)
+        dst = self.particles[dst_index].gpu
+        nlevels, dim, rs = self.nlevels, self.dim, self.radius_scale
+        d_x, d_y, d_z, d_h = (dst.x.get(), dst.y.get(), dst.z.get(),
+                              dst.h.get())
+        counts = ml['counts'].numpy()
+        ox, oy, oz = ml['ox_host'], ml['oy_host'], ml['oz_host']
+        cs, sup = ml['cs_host'], ml['support_host']
+        nx, ny, nz = ml['nx_host'], ml['ny_host'], ml['nz_host']
+        sizes = (nx.astype(np.int64) * ny.astype(np.int64)
+                 * nz.astype(np.int64))
+        offset = np.zeros(nlevels, dtype=np.int64)
+        if nlevels > 1:
+            offset[1:] = np.cumsum(sizes)[:-1]
+
+        def _rng(c, o, csk, n):
+            lo = int(np.floor((c - qr - o) / csk)) - 1
+            hi = int(np.floor((c + qr - o) / csk)) + 1
+            return max(0, lo), min(int(n) - 1, hi)
+
+        total = 0
+        for i in range(len(d_x)):
+            for k in range(nlevels):
+                if nx[k] <= 0:
+                    continue
+                csk = float(cs[k])
+                qr = max(rs * float(d_h[i]), float(sup[k]))
+                ixlo, ixhi = _rng(float(d_x[i]), float(ox[k]), csk, nx[k])
+                iylo, iyhi = ((0, 0) if dim < 2 else
+                              _rng(float(d_y[i]), float(oy[k]), csk, ny[k]))
+                izlo, izhi = ((0, 0) if dim < 3 else
+                              _rng(float(d_z[i]), float(oz[k]), csk, nz[k]))
+                for iz in range(izlo, izhi + 1):
+                    for iy in range(iylo, iyhi + 1):
+                        base = offset[k] + iz * nx[k] * ny[k] + iy * nx[k]
+                        total += int(counts[base + ixlo: base + ixhi + 1].sum())
+        return total

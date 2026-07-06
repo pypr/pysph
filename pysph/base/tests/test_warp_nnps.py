@@ -931,3 +931,84 @@ def test_multilevel_no_coordinate_host_readback_on_warm_update_3d():
     assert reads == [], (
         "warm update/query pulled coordinates to host: %r" % reads
     )
+
+
+def _uniform_candidate_pairs(uniform, src_index, dst_index):
+    # Total source particles the uniform grid's fixed 3x3x3 stencil scans,
+    # summed over destinations -- the candidate work to beat.
+    grid = uniform._build_grid(src_index)
+    counts = grid['counts'].numpy()
+    b = uniform._bounds
+    cs = uniform.cell_size
+    nx, ny, nz = b['nx'], b['ny'], b['nz']
+    dim = uniform.dim
+    dst = uniform.particles[dst_index].gpu
+    dx, dy, dz = dst.x.get(), dst.y.get(), dst.z.get()
+
+    def cell0(c, cmin, n):
+        return min(max(int(np.floor((c - cmin) / cs)), 0), n - 1)
+
+    total = 0
+    for i in range(len(dx)):
+        ix0 = cell0(dx[i], b['xmin'], nx)
+        iy0 = cell0(dy[i], b['ymin'], ny) if dim > 1 else 0
+        iz0 = cell0(dz[i], b['zmin'], nz) if dim > 2 else 0
+        for dzc in (-1, 0, 1):
+            for dyc in (-1, 0, 1):
+                for dxc in (-1, 0, 1):
+                    ix, iy, iz = ix0 + dxc, iy0 + dyc, iz0 + dzc
+                    if 0 <= ix < nx and 0 <= iy < ny and 0 <= iz < nz:
+                        total += int(counts[ix + iy * nx + iz * nx * ny])
+    return total
+
+
+def test_multilevel_clustered_refinement_candidate_scaling_3d():
+    # Localized refinement: a few coarse particles (h=0.8) far enough to inflate
+    # the global hmax plus a dense fine cluster (h=0.05, spacing 0.08 != the
+    # 0.1 support so no pair sits exactly on the cutoff). The uniform grid's
+    # global cell (rs*hmax=1.6) lumps the whole fine cluster into ~one cell, so
+    # every fine destination scans it entirely; the multilevel grid confines
+    # fine-fine scanning to local fine cells. Accepted sets stay identical;
+    # candidate work drops >=4x.
+    g = np.linspace(0.0, 0.8, 11)                            # spacing 0.08
+    FX, FY, FZ = np.meshgrid(g, g, g, indexing='ij')
+    fx, fy, fz = FX.ravel(), FY.ravel(), FZ.ravel()          # 1331 fine
+    fh = np.full(fx.size, 0.05)
+    corners = np.array([(a, b_, c) for a in (0.0, 4.0)
+                        for b_ in (0.0, 4.0) for c in (0.0, 4.0)])
+    cx, cy, cz = corners[:, 0], corners[:, 1], corners[:, 2]  # 8 coarse
+    ch = np.full(cx.size, 0.8)
+    x = np.concatenate([fx, cx])
+    y = np.concatenate([fy, cy])
+    z = np.concatenate([fz, cz])
+    h = np.concatenate([fh, ch])
+    pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=h, backend='warp')
+
+    ml = MultilevelGridWarpNNPS(
+        dim=3, particles=[pa], radius_scale=2.0,
+        h_ref=0.05, level_ratio=2.0, nlevels=4,
+    )
+    nfine = fx.size
+    levels, _ = assign_particle_levels(h, 0.05, 2.0, 4, 2.0)
+    assert set(levels[:nfine].tolist()) == {0}
+    assert set(levels[nfine:].tolist()) == {3}
+
+    # Accepted-set parity: multilevel == numpy oracle == uniform grid.
+    tup = (x, y, z, h)
+    oracle = brute_force_neighbor_sets(tup, tup, radius_scale=2.0, dim=3)
+    uniform = UniformGridWarpNNPS(dim=3, particles=[pa], radius_scale=2.0)
+    ml.set_context(0, 0)
+    uniform.set_context(0, 0)
+    accepted = 0
+    for i in range(len(x)):
+        ml_i = _neighbors(ml, 0, 0, i)
+        assert np.array_equal(ml_i, oracle[i]), i
+        assert np.array_equal(_neighbors(uniform, 0, 0, i), oracle[i]), i
+        assert len(ml_i) == len(set(ml_i.tolist())), i
+        accepted += len(oracle[i])
+
+    # Candidate work: multilevel <= 0.25 * uniform (>= 4x reduction).
+    ml_cand = ml.candidate_pairs(0, 0)
+    uniform_cand = _uniform_candidate_pairs(uniform, 0, 0)
+    assert ml_cand >= accepted            # candidates are a superset of accepted
+    assert ml_cand * 4 <= uniform_cand, (ml_cand, uniform_cand, accepted)
