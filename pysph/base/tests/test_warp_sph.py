@@ -14,6 +14,7 @@ from pysph.base.kernels import CubicSpline, Gaussian, WendlandQuintic
 from pysph.base.nnps import LinkedListNNPS
 from pysph.base.utils import get_particle_array
 from pysph.base.warp_nnps import UniformGridWarpNNPS
+from pysph.base.warp_multilevel_nnps import MultilevelGridWarpNNPS
 import pysph.base.warp_sph as warp_sph
 from pysph.base.warp_sph import (
     apply_body_force, compute_artificial_viscosity, compute_continuity,
@@ -2389,3 +2390,77 @@ def test_warp_dam_break_rigid_step_is_finite_and_moves_body():
     assert np.allclose(
         np.linalg.norm(got_body - got_body[0], axis=1),
         np.linalg.norm(body0 - body0[0], axis=1), atol=2e-7)
+
+
+# ---------------------------------------------------------------------------
+# Multilevel equation-group integration (ADR-0007, plan step 3): a generated
+# group kernel in neighbor_mode='multilevel' walks the multilevel cell list and
+# must produce the same physics as the uniform grid (identical accepted sets;
+# only fp32 summation order differs).
+# ---------------------------------------------------------------------------
+def _mixed_resolution_2d():
+    x = [0.0, 0.15, 0.3, 0.1, 0.4]
+    y = [0.0, 0.0, 0.0, 0.05, 0.05]
+    h = [0.1, 0.1, 0.1, 0.2, 0.2]      # edges [0.1,0.2,0.4] -> levels [0,0,0,1,1]
+    m = [1.0, 1.0, 1.0, 1.0, 1.0]
+    return x, y, h, m
+
+
+def test_warp_summation_density_multilevel_matches_grid_2d():
+    x, y, h, m = _mixed_resolution_2d()
+    z = [0.0] * len(x)
+    ml_pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=h, m=m,
+                               rho=[0.0] * len(x), backend='warp')
+    g_pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=h, m=m,
+                              rho=[0.0] * len(x), backend='warp')
+    ml = MultilevelGridWarpNNPS(dim=2, particles=[ml_pa], radius_scale=2.0,
+                                h_ref=0.1, level_ratio=2.0, nlevels=2)
+    grid = UniformGridWarpNNPS(dim=2, particles=[g_pa], radius_scale=2.0)
+    rho_ml = warp_sph.compute_summation_density(
+        ml, kernel='cubic', neighbor_mode='multilevel').get()
+    rho_g = warp_sph.compute_summation_density(
+        grid, kernel='cubic', neighbor_mode='grid').get()
+    assert np.all(rho_ml > 0.0)
+    assert np.allclose(rho_ml, rho_g, rtol=1e-4, atol=1e-5), (rho_ml, rho_g)
+
+
+def test_warp_summation_density_multilevel_matches_grid_3d():
+    # 3D mixed resolution (the hard acceptance dim): a 3x3x3 fine block plus two
+    # coarse particles. Multilevel-generated density == uniform-grid density.
+    g = np.linspace(0.0, 0.2, 3)
+    FX, FY, FZ = np.meshgrid(g, g, g, indexing='ij')
+    fx, fy, fz = FX.ravel(), FY.ravel(), FZ.ravel()      # 27 fine, h=0.1
+    x = np.concatenate([fx, [0.05, 0.15]])
+    y = np.concatenate([fy, [0.05, 0.15]])
+    z = np.concatenate([fz, [0.05, 0.15]])
+    h = np.concatenate([np.full(27, 0.1), [0.2, 0.2]])   # coarse level 1
+    m = np.ones(x.size)
+    ml_pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=h, m=m,
+                               rho=np.zeros(x.size), backend='warp')
+    g_pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=h, m=m,
+                              rho=np.zeros(x.size), backend='warp')
+    ml = MultilevelGridWarpNNPS(dim=3, particles=[ml_pa], radius_scale=2.0,
+                                h_ref=0.1, level_ratio=2.0, nlevels=2)
+    grid = UniformGridWarpNNPS(dim=3, particles=[g_pa], radius_scale=2.0)
+    rho_ml = warp_sph.compute_summation_density(
+        ml, kernel='wendland', neighbor_mode='multilevel').get()
+    rho_g = warp_sph.compute_summation_density(
+        grid, kernel='wendland', neighbor_mode='grid').get()
+    assert np.all(rho_ml > 0.0)
+    assert np.allclose(rho_ml, rho_g, rtol=1e-4, atol=1e-5), (rho_ml, rho_g)
+
+
+def test_warp_multilevel_rejects_periodic_domain():
+    # Per-level periodic tiling is deferred (ADR-0007): a multilevel run over a
+    # periodic box must raise, not silently use the non-periodic walk.
+    x = [0.1, 0.3, 0.5]
+    pa = get_particle_array(
+        name='fluid', x=x, y=[0.0] * 3, z=[0.0] * 3,
+        h=[0.1, 0.1, 0.1], m=[1.0] * 3, rho=[0.0] * 3, backend='warp',
+    )
+    ml = MultilevelGridWarpNNPS(dim=1, particles=[pa], radius_scale=2.0,
+                                h_ref=0.1, level_ratio=2.0, nlevels=2)
+    ml.set_periodic_box({'xmin': 0.0, 'xmax': 0.6})
+    with pytest.raises(ValueError):
+        warp_sph.compute_summation_density(
+            ml, kernel='cubic', neighbor_mode='multilevel')

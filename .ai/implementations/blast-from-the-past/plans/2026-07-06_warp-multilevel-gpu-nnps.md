@@ -317,5 +317,15 @@ does not start until they pass.
   per-level grid-boundary kill-gate fixtures) landed. The multilevel Warp
   kernels live in a new `pysph/base/warp_multilevel_nnps.py` module so they add
   no PTX footprint to the WCSPH path. Suites are gated as separate pytest
-  invocations (sph 54, nnps 28, codegen 10 all pass); the combined
-  single-process command hangs pre-existingly on WSL2 PTX-JIT accumulation.
+  invocations; the combined single-process command hangs pre-existingly on WSL2
+  PTX-JIT accumulation.
+- Implementation note (2026-07-07): all eight step-2 kill-gate fixtures pass
+  plus device residency (GPU assign/AABB, no coordinate readback) and the
+  clustered ~9x candidate-reduction gate; ADR-0007 recorded (Proposed). Step 3
+  landed: `neighbor_mode='multilevel'` in `warp_codegen` (flat/grid source
+  byte-identical) + `_multilevel_grid_launch_args` + `_run_equation_group`
+  routing, with multilevel-mode summation density matching the uniform grid in
+  2D and 3D and a periodic-multilevel guard. Suites separate: nnps 34,
+  codegen 10, sph 57. Remaining: adaptive-timestep + fused continuity/pressure
+  multilevel parity, fp64 exercise, ADR-0007 accept after the dense-vs-sparse
+  memory check.

@@ -143,7 +143,7 @@ def _collect(equations, neighbor_mode='flat'):
     unknown = requires - set(SHARED_QUANTITIES)
     if unknown:
         raise ValueError("unknown shared quantities: %s" % sorted(unknown))
-    if neighbor_mode == 'grid':
+    if neighbor_mode in ('grid', 'multilevel'):
         # The cell walk + support cutoff always needs positions and h.
         requires |= {'dx', 'dy', 'dz', 'rij2'}
 
@@ -160,7 +160,7 @@ def _collect(equations, neighbor_mode='flat'):
     needs_pos = requires & {'dx', 'dy', 'dz', 'rij2', 'rij', 'grad', 'wij'}
     needs_h = requires & {'hij', 'grad', 'wij'}
     needs_vel = requires & {'vijx', 'vijy', 'vijz'}
-    if neighbor_mode == 'grid':
+    if neighbor_mode in ('grid', 'multilevel'):
         # The support cutoff reads radius_scale * h on both i and j.
         needs_h = needs_h | {'h'}
     if needs_pos:
@@ -283,8 +283,9 @@ def generate_group_source(equations, dtype, func_name='_warp_group_kernel',
 
     Returns ``(source, src_names, dst_names, scalar_names, out_names)``.
     """
-    if neighbor_mode not in ('flat', 'grid'):
-        raise ValueError("neighbor_mode must be 'flat' or 'grid'")
+    if neighbor_mode not in ('flat', 'grid', 'multilevel'):
+        raise ValueError(
+            "neighbor_mode must be 'flat', 'grid' or 'multilevel'")
     if periodic and neighbor_mode != 'grid':
         raise ValueError("periodic minimum-image requires neighbor_mode='grid'")
     type_token, func_suffix, _ = _dtype_tokens(dtype)
@@ -308,6 +309,23 @@ def generate_group_source(equations, dtype, func_name='_warp_group_kernel',
         L("        starts: wp.array(dtype=wp.int32),")
         L("        lengths: wp.array(dtype=wp.int32),")
         L("        neighbors: wp.array(dtype=wp.uint32),")
+    elif neighbor_mode == 'multilevel':
+        # One flattened global cell list across all levels, plus per-level
+        # (length nlevels) metadata arrays for the variable-stencil walk.
+        L("        cell_starts: wp.array(dtype=wp.int32),")
+        L("        cell_counts: wp.array(dtype=wp.int32),")
+        L("        cell_particles: wp.array(dtype=wp.uint32),")
+        L("        origin_x: wp.array(dtype=%s)," % type_token)
+        L("        origin_y: wp.array(dtype=%s)," % type_token)
+        L("        origin_z: wp.array(dtype=%s)," % type_token)
+        L("        cell_size: wp.array(dtype=%s)," % type_token)
+        L("        lnx: wp.array(dtype=wp.int32),")
+        L("        lny: wp.array(dtype=wp.int32),")
+        L("        lnz: wp.array(dtype=wp.int32),")
+        L("        cell_offset: wp.array(dtype=wp.int32),")
+        L("        support: wp.array(dtype=%s)," % type_token)
+        L("        nlevels: wp.int32,")
+        L("        radius_scale: %s," % type_token)
     else:
         L("        cell_starts: wp.array(dtype=wp.int32),")
         L("        cell_counts: wp.array(dtype=wp.int32),")
@@ -360,7 +378,7 @@ def generate_group_source(equations, dtype, func_name='_warp_group_kernel',
             snippet = eq.loop()
             if snippet:
                 L(subst(snippet))
-    else:
+    elif neighbor_mode == 'grid':
         # --- direct uniform-grid cell-list walk (ADR-0004) ---
         # Geometry/snippet lines are authored at the flat 8-space loop indent;
         # reindent them to sit inside the cell walk (pre-cutoff at +20 -> col
@@ -410,6 +428,72 @@ def generate_group_source(equations, dtype, func_name='_warp_group_kernel',
         L("                            j = wp.int32(cell_particles[pos])")
         pre = _emit_geometry(requires, type_token, func_suffix, phase='pre',
                              periodic=periodic)
+        for line in pre:
+            L(_reindent(line, 20))
+        L("                            hi_ = radius_scale * d_h[i]")
+        L("                            hj_ = radius_scale * s_h[j]")
+        L("                            if rij2 < hi_*hi_ or rij2 < hj_*hj_:")
+        post = _emit_geometry(requires, type_token, func_suffix, phase='post')
+        for line in post:
+            L(_reindent(line, 24))
+        for eq in equations:
+            snippet = eq.loop()
+            if snippet:
+                L(_reindent(subst(snippet), 24))
+    else:
+        # --- direct multilevel cell-list walk (ADR-0007) ---
+        # Loop over levels; per level convert the query radius
+        # max(radius_scale*h_i, support[k]) into a variable cell-index range
+        # (not a fixed 3x3x3 stencil) with a +/-1 guard band, then apply the
+        # exact symmetric cutoff. Reindents match the grid walk: pre-cutoff at
+        # +20 (col 28), post-cutoff body at +24 (col 32).
+        L("    for lk in range(nlevels):")
+        L("        nxk = lnx[lk]")
+        L("        if nxk > wp.int32(0):")
+        L("            csk = cell_size[lk]")
+        L("            qr = radius_scale * d_h[i]")
+        L("            if support[lk] > qr:")
+        L("                qr = support[lk]")
+        L("            ixlo = wp.int32(wp.floor((d_x[i] - qr - origin_x[lk]) /"
+          " csk)) - wp.int32(1)")
+        L("            ixhi = wp.int32(wp.floor((d_x[i] + qr - origin_x[lk]) /"
+          " csk)) + wp.int32(1)")
+        L("            ixlo = wp.clamp(ixlo, wp.int32(0), nxk - wp.int32(1))")
+        L("            ixhi = wp.clamp(ixhi, wp.int32(0), nxk - wp.int32(1))")
+        L("            iylo = wp.int32(0)")
+        L("            iyhi = wp.int32(0)")
+        L("            nyk = lny[lk]")
+        L("            if dim > wp.int32(1):")
+        L("                iylo = wp.int32(wp.floor((d_y[i] - qr -"
+          " origin_y[lk]) / csk)) - wp.int32(1)")
+        L("                iyhi = wp.int32(wp.floor((d_y[i] + qr -"
+          " origin_y[lk]) / csk)) + wp.int32(1)")
+        L("                iylo = wp.clamp(iylo, wp.int32(0), nyk -"
+          " wp.int32(1))")
+        L("                iyhi = wp.clamp(iyhi, wp.int32(0), nyk -"
+          " wp.int32(1))")
+        L("            izlo = wp.int32(0)")
+        L("            izhi = wp.int32(0)")
+        L("            nzk = lnz[lk]")
+        L("            if dim > wp.int32(2):")
+        L("                izlo = wp.int32(wp.floor((d_z[i] - qr -"
+          " origin_z[lk]) / csk)) - wp.int32(1)")
+        L("                izhi = wp.int32(wp.floor((d_z[i] + qr -"
+          " origin_z[lk]) / csk)) + wp.int32(1)")
+        L("                izlo = wp.clamp(izlo, wp.int32(0), nzk -"
+          " wp.int32(1))")
+        L("                izhi = wp.clamp(izhi, wp.int32(0), nzk -"
+          " wp.int32(1))")
+        L("            off = cell_offset[lk]")
+        L("            for iz in range(izlo, izhi + 1):")
+        L("                for iy in range(iylo, iyhi + 1):")
+        L("                    for ix in range(ixlo, ixhi + 1):")
+        L("                        cid = off + ix + iy * nxk + iz * nxk * nyk")
+        L("                        c_start_ = cell_starts[cid]")
+        L("                        c_stop_ = c_start_ + cell_counts[cid]")
+        L("                        for pos in range(c_start_, c_stop_):")
+        L("                            j = wp.int32(cell_particles[pos])")
+        pre = _emit_geometry(requires, type_token, func_suffix, phase='pre')
         for line in pre:
             L(_reindent(line, 20))
         L("                            hi_ = radius_scale * d_h[i]")

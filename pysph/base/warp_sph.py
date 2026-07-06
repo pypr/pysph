@@ -1691,6 +1691,15 @@ def _run_equation_group(nnps, src_index, dst_index, blocks, scalar_values=None,
     inputs += [dst.get_device_array(n).dev for n in group.dst_names]
     if neighbor_mode == 'grid':
         inputs += _grid_launch_args(nnps, src_index, dtype, periodic=periodic)
+    elif neighbor_mode == 'multilevel':
+        # Correct per-level periodic tiling is deferred (ADR-0007); refuse
+        # rather than silently walk a non-periodic domain.
+        if getattr(nnps, '_periodic_box', None) is not None:
+            raise ValueError(
+                "multilevel neighbor_mode does not support periodic domains; "
+                "per-level periodic tiling is deferred (ADR-0007)"
+            )
+        inputs += _multilevel_grid_launch_args(nnps, src_index, dtype)
     else:
         if cache is None:
             cache = nnps.build_neighbor_cache_gpu(src_index, dst_index)
@@ -2916,6 +2925,27 @@ def _grid_launch_args(nnps, src_index, dtype, periodic=False):
             np.int32(1 if b['periodic_z'] else 0),
         ]
     return args
+
+
+def _multilevel_grid_launch_args(nnps, src_index, dtype):
+    """Ordered multilevel-query launch inputs for a multilevel-direct kernel.
+
+    Mirrors the signature emitted by ``warp_codegen`` in ``multilevel`` mode:
+    the flattened global cell list (``cell_starts/cell_counts/cell_particles``)
+    followed by the per-level (length ``nlevels``) metadata arrays -- origins,
+    cell sizes, ``(nx,ny,nz)``, ``cell_offset``, ``support`` -- then ``nlevels``
+    and ``radius_scale``. Built once per source array per ``update()`` by
+    ``MultilevelGridWarpNNPS._build_multilevel`` (ADR-0007). Does not overload
+    the scalar ``_grid_launch_args`` contract.
+    """
+    ml = nnps._build_multilevel(src_index)
+    return [
+        ml['starts'], ml['counts'], ml['cell_particles'],
+        ml['origin_x'], ml['origin_y'], ml['origin_z'], ml['cell_size'],
+        ml['nx'], ml['ny'], ml['nz'], ml['cell_offset'], ml['support'],
+        np.int32(nnps.nlevels),
+        dtype(nnps.radius_scale),
+    ]
 
 
 def compute_wcsph_accel_continuity(nnps, src_index=0, dst_index=0, alpha=0.1,
