@@ -9,6 +9,7 @@ flowchart TD
   end
   subgraph gpu_nnps[gpu-nnps]
     ADR_0004["ADR-0004<br/>Accepted"]
+    ADR_0007["ADR-0007<br/>Proposed"]
   end
   subgraph particle_memory[particle-memory]
     ADR_0002["ADR-0002<br/>Accepted"]
@@ -29,6 +30,9 @@ flowchart TD
   ADR_0006 -. relates_to .-> ADR_0003
   ADR_0006 -. relates_to .-> ADR_0004
   ADR_0006 -. relates_to .-> ADR_0005
+  ADR_0007 -- depends_on --> ADR_0004
+  ADR_0007 -. relates_to .-> ADR_0003
+  ADR_0007 -. relates_to .-> ADR_0004
   classDef Accepted fill:#d5f5d5,stroke:#2c7a2c;
   classDef Proposed fill:#fff3bf,stroke:#9a7500;
   classDef Superseded fill:#e5e7eb,stroke:#6b7280;
@@ -39,4 +43,5 @@ flowchart TD
   class ADR_0004 Accepted;
   class ADR_0005 Accepted;
   class ADR_0006 Accepted;
+  class ADR_0007 Proposed;
 ```

@@ -54,6 +54,21 @@
       "from": "ADR-0006",
       "to": "ADR-0005",
       "type": "depends_on"
+    },
+    {
+      "from": "ADR-0007",
+      "to": "ADR-0003",
+      "type": "relates_to"
+    },
+    {
+      "from": "ADR-0007",
+      "to": "ADR-0004",
+      "type": "relates_to"
+    },
+    {
+      "from": "ADR-0007",
+      "to": "ADR-0004",
+      "type": "depends_on"
     }
   ],
   "nodes": [
@@ -98,6 +113,13 @@
       "id": "ADR-0006",
       "scope": "warp-backend",
       "status": "Accepted"
+    },
+    {
+      "date": "2026-07-07",
+      "file": "decisions/2026-07-07_adr-0007_device-built-multilevel-cell-list-nnps-for-adaptive-resolution.md",
+      "id": "ADR-0007",
+      "scope": "gpu-nnps",
+      "status": "Proposed"
     }
   ]
 }
