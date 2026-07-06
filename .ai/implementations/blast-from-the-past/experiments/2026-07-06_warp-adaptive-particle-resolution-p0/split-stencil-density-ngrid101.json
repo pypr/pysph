@@ -1,0 +1,33 @@
+{
+  "cubic_plus_center": {
+    "alpha": 0.7,
+    "center_mass_fraction": 0.1190748679598036,
+    "daughters_with_center": 9,
+    "epsilon": 0.65,
+    "equal_mass_integrated_density_error": 0.0012687077198617184,
+    "grid_points_per_axis": 101,
+    "integrated_density_error": 0.0012586502578159197,
+    "mass_sum": 1.0,
+    "min_max_mass_ratio": 0.9247597195925219,
+    "vertex_mass_fraction": 0.11011564150502455,
+    "vertices": 8
+  },
+  "icosahedron_plus_center": {
+    "alpha": 0.7,
+    "center_mass_fraction": 0.11262799518247202,
+    "daughters_with_center": 13,
+    "epsilon": 0.65,
+    "equal_mass_integrated_density_error": 0.0005587294531998937,
+    "grid_points_per_axis": 101,
+    "integrated_density_error": 0.00035803203580248407,
+    "mass_sum": 1.0,
+    "min_max_mass_ratio": 0.6565655985292331,
+    "vertex_mass_fraction": 0.07394766706812733,
+    "vertices": 12
+  },
+  "kernel": "PySPH WendlandQuintic C2 3D",
+  "paper_icosahedron_reference": {
+    "integrated_density_error": 8.326e-05,
+    "min_max_mass_ratio": 0.33
+  }
+}

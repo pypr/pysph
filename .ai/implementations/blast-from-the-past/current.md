@@ -1,6 +1,6 @@
 # Current - blast-from-the-past
 
-Updated: 2026-06-21T02:06:46 CEST by codex
+Updated: 2026-07-06T10:49:00 CEST by codex
 
 **Status:** The Warp backend has device-mirrored particle state, grid-direct
 3D WCSPH, generated/fused equation groups, periodic neighbors, validated 2D
@@ -19,6 +19,17 @@ validation-benchmarks, host-integration.
 P3 is approved by @prabhu and committed locally. P4 contact/long-horizon fidelity and the
 photorealistic animation remain.
 
+`experiments/2026-07-06_warp-adaptive-particle-resolution-p0` is active under
+the approved dynamic-APR plan. The first checkpoint proves the existing
+multi-solid driver can run a fixed Kleefsman obstacle: a warm 1,000-fluid +
+3,824-wall + 4-obstacle case ran 250 steps to `t=0.258455`, remained finite,
+developed 150.147 kPa maximum obstacle pressure, and kept obstacle device
+coordinates bit-identical. Reference audit found the open PySPH adaptive code
+is process-relevant but not a ready 3D/GPU implementation. A converged NumPy
+kill test confirms icosahedron-plus-center beats cubic-plus-center, but does not
+yet reproduce Vacondio's published Wendland error/mass ratio under the current
+PySPH kernel convention; ADR-0007 remains intentionally deferred.
+
 **Latest validation:** Final P3 Warp SPH suite: `54 passed, 2 warnings`.
 The 7,458-particle coupled first-plunge transient ran 241 steps to `t=0.200603`,
 remained finite with device error 0, moved/rotated the body from computed fluid
@@ -29,10 +40,9 @@ metrics are in
 **Open approvals:** P3 and 3D dam-break reviews are approved by @prabhu. PR
 #435 remains an upstream publication item, not a local review blocker.
 
-**Next action:** Plan P4: rigid-wall contact, longer EPEC/geometry-drift
-validation, assembled
-surge-tosses-a-box checkpoints, and `splashsurf -> Blender Cycles -> ffmpeg`
-rendering.
+**Next action:** Resolve the Vacondio/PySPH stencil-convention mismatch, then
+add obstacle probes and uniform coarse/fine baselines. Floating-body P4 remains
+queued: contact, longer-horizon fidelity, cinematic checkpoints, and rendering.
 
 **Known validation limitation:** Compyle 0.9.1 on Python 3.14 cannot run the
 shipped CPU rigid Application (`ast.Str` removal). P3 uses direct NumPy

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Application-style Warp runner for the 3D dam-break (Lobovsky no-obstacle).
+"""Application-style Warp runner for the 3D dam-break.
 
-Mirrors the PySPH ``dam_break_3d_lobovsky.py`` reference (ADR-0005): a fluid
-column collapsing under gravity inside a closed container, with a single solid
-wall array. The initial condition is built by the *same* ``DamBreak3DGeometry``
-the reference uses, then advanced with the additive Warp dam-break step::
+The default mirrors the PySPH ``dam_break_3d_lobovsky.py`` no-obstacle
+reference (ADR-0005). ``--with-obstacle`` enables the fixed Kleefsman obstacle
+already supported by the same ``DamBreak3DGeometry``. Both are advanced with
+the additive Warp dam-break step::
 
-    UniformGridWarpNNPS(dim=3, [fluid, wall])
+    UniformGridWarpNNPS(dim=3, [fluid, wall(, obstacle)])
     wc_sph_dam_break_step      # EPEC, WendlandQuintic, Tait + Tait-HG walls
 
 Physics parity notes (vs the reference scheme):
@@ -64,7 +64,7 @@ class WarpDamBreak3DRunner:
                  p0=0.0, gamma=7.0, alpha=0.25, beta=0.0, kernel='wendland',
                  radius_scale=2.0, xsph_eps=0.5, gz=-GRAVITY, n_damp=50,
                  nboundary_layers=1, adaptive_dt=True, cfl=0.3, dt=None,
-                 dt_min=0.0, dt_max=None, output=None):
+                 dt_min=0.0, dt_max=None, with_obstacle=False, output=None):
         self.dx = float(dx)
         self.hdx = float(hdx)
         self.steps = int(steps)
@@ -95,6 +95,7 @@ class WarpDamBreak3DRunner:
         # like the reference). Capping at ref_dt would make Warp take ~1.7x more,
         # smaller steps than PySPH to the same physical time.
         self.dt_max = float('inf') if dt_max is None else float(dt_max)
+        self.with_obstacle = bool(with_obstacle)
         self.output = Path(output) if output is not None else None
         self.dt_history = []
         self.geom = None
@@ -105,7 +106,8 @@ class WarpDamBreak3DRunner:
             container_length=161 * H / 30.0, fluid_column_height=H,
             fluid_column_width=H / 2.0, fluid_column_length=2.0 * H,
             dx=self.dx, nboundary_layers=self.nboundary_layers,
-            hdx=self.hdx, rho0=self.rho0, with_obstacle=False,
+            hdx=self.hdx, rho0=self.rho0,
+            with_obstacle=self.with_obstacle,
         )
 
     def _to_warp(self, src, name):
@@ -131,22 +133,27 @@ class WarpDamBreak3DRunner:
 
     def create_particles(self):
         self.geom = self._build_geometry()
-        fluid_cpu, boundary_cpu = self.geom.create_particles()
-        fluid = self._to_warp(fluid_cpu, 'fluid')
-        wall = self._to_warp(boundary_cpu, 'wall')
-        return fluid, wall
+        cpu_particles = self.geom.create_particles()
+        names = ('fluid', 'wall', 'obstacle')
+        return tuple(
+            self._to_warp(pa, names[i])
+            for i, pa in enumerate(cpu_particles)
+        )
 
     def run(self):
-        fluid, wall = self.create_particles()
+        particles = list(self.create_particles())
+        fluid = particles[0]
+        solids = particles[1:]
         nnps = UniformGridWarpNNPS(
-            dim=3, particles=[fluid, wall], radius_scale=self.radius_scale
+            dim=3, particles=particles, radius_scale=self.radius_scale
         )
 
         time = 0.0
         for step in range(self.steps):
             scale = damp_factor(step, self.n_damp)
             dt_used = wc_sph_dam_break_step(
-                nnps, fluid_index=0, solid_indices=(1,), dt=self.dt,
+                nnps, fluid_index=0,
+                solid_indices=tuple(range(1, len(particles))), dt=self.dt,
                 rho0=self.rho0, c0=self.c0, p0=self.p0, alpha=self.alpha,
                 beta=self.beta, gamma=self.gamma, kernel=self.kernel,
                 xsph_eps=self.xsph_eps, gx=0.0, gy=0.0, gz=self.gz,
@@ -161,21 +168,24 @@ class WarpDamBreak3DRunner:
         pull = ['x', 'y', 'z', 'rho', 'p', 'cs', 'u', 'v', 'w',
                 'au', 'av', 'aw', 'arho']
         fluid.gpu.pull(*pull)
-        wall.gpu.pull('x', 'y', 'z', 'rho', 'p')  # walls fixed: no u/v/w
-        metrics = self._metrics(fluid, wall, time)
+        for solid in solids:
+            solid.gpu.pull('x', 'y', 'z', 'rho', 'p')
+        metrics = self._metrics(fluid, solids, time)
         if self.output is not None:
-            self._write_output(fluid, wall, metrics)
+            self._write_output(fluid, solids, metrics)
         return metrics
 
-    def _metrics(self, fluid, wall, time):
+    def _metrics(self, fluid, solids, time):
+        wall = solids[0]
+        obstacle = solids[1] if len(solids) > 1 else None
         finite_fluid = all(
             np.all(np.isfinite(getattr(fluid, n)))
             for n in ('x', 'y', 'z', 'rho', 'p', 'u', 'v', 'w', 'au', 'av',
                       'aw', 'arho')
         )
-        finite_wall = all(
-            np.all(np.isfinite(getattr(wall, n)))
-            for n in ('x', 'y', 'z', 'rho', 'p')
+        finite_solids = all(
+            np.all(np.isfinite(getattr(solid, n)))
+            for solid in solids for n in ('x', 'y', 'z', 'rho', 'p')
         )
         ke = 0.5 * float(np.sum(
             fluid.m * (fluid.u**2 + fluid.v**2 + fluid.w**2)
@@ -184,6 +194,10 @@ class WarpDamBreak3DRunner:
         return {
             'fluid_particles': int(fluid.get_number_of_particles()),
             'wall_particles': int(wall.get_number_of_particles()),
+            'obstacle_particles': (
+                0 if obstacle is None else
+                int(obstacle.get_number_of_particles())
+            ),
             'steps': self.steps,
             'time': float(time),
             'dx': self.dx,
@@ -211,19 +225,25 @@ class WarpDamBreak3DRunner:
             'p_max': float(np.max(fluid.p)),
             'wall_p_min': float(np.min(wall.p)),
             'wall_p_max': float(np.max(wall.p)),
+            'obstacle_p_min': (
+                None if obstacle is None else float(np.min(obstacle.p))
+            ),
+            'obstacle_p_max': (
+                None if obstacle is None else float(np.max(obstacle.p))
+            ),
             'x_min': float(np.min(fluid.x)),
             'surge_front_x': float(np.max(fluid.x)),
             'z_min': float(np.min(fluid.z)),
             'max_height': float(np.max(fluid.z)),
             'w_mean': float(np.mean(fluid.w)),
             'kinetic_energy': ke,
-            'all_finite': bool(finite_fluid and finite_wall),
+            'all_finite': bool(finite_fluid and finite_solids),
         }
 
-    def _write_output(self, fluid, wall, metrics):
+    def _write_output(self, fluid, solids, metrics):
+        wall = solids[0]
         self.output.parent.mkdir(parents=True, exist_ok=True)
-        np.savez(
-            self.output,
+        data = dict(
             fluid_x=fluid.x, fluid_y=fluid.y, fluid_z=fluid.z,
             fluid_h=fluid.h, fluid_m=fluid.m, fluid_rho=fluid.rho,
             fluid_p=fluid.p, fluid_cs=fluid.cs,
@@ -235,6 +255,14 @@ class WarpDamBreak3DRunner:
             dt_history=np.asarray(self.dt_history),
             metrics=json.dumps(metrics, sort_keys=True),
         )
+        if len(solids) > 1:
+            obstacle = solids[1]
+            data.update(
+                obstacle_x=obstacle.x, obstacle_y=obstacle.y,
+                obstacle_z=obstacle.z, obstacle_rho=obstacle.rho,
+                obstacle_p=obstacle.p,
+            )
+        np.savez(self.output, **data)
 
 
 def _parse_args():
@@ -262,6 +290,8 @@ def _parse_args():
     p.add_argument('--dt', type=float, default=None)
     p.add_argument('--dt-min', type=float, default=0.0)
     p.add_argument('--dt-max', type=float, default=None)
+    p.add_argument('--with-obstacle', action='store_true',
+                   help='Include the fixed Kleefsman obstacle as a third array.')
     p.add_argument('--output', default=None)
     return p.parse_args()
 
@@ -275,7 +305,8 @@ def main():
         xsph_eps=None if args.no_xsph else args.xsph_eps, gz=args.gz,
         n_damp=args.n_damp, nboundary_layers=args.nboundary_layers,
         adaptive_dt=not args.no_adaptive_dt, cfl=args.cfl, dt=args.dt,
-        dt_min=args.dt_min, dt_max=args.dt_max, output=args.output,
+        dt_min=args.dt_min, dt_max=args.dt_max,
+        with_obstacle=args.with_obstacle, output=args.output,
     )
     metrics = runner.run()
     print(json.dumps(metrics, indent=2, sort_keys=True))
@@ -283,6 +314,8 @@ def main():
         raise SystemExit("No fluid particles were created")
     if metrics['wall_particles'] <= 0:
         raise SystemExit("No wall particles were created")
+    if args.with_obstacle and metrics['obstacle_particles'] <= 0:
+        raise SystemExit("No obstacle particles were created")
     if not metrics['all_finite']:
         raise SystemExit("Non-finite values in final state")
     return 0
