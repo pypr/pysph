@@ -40,9 +40,12 @@ metrics are in
 **Open approvals:** P3 and 3D dam-break reviews are approved by @prabhu. PR
 #435 remains an upstream publication item, not a local review blocker.
 
-**Next action:** Resolve the Vacondio/PySPH stencil-convention mismatch, then
-add obstacle probes and uniform coarse/fine baselines. Floating-body P4 remains
-queued: contact, longer-horizon fidelity, cinematic checkpoints, and rendering.
+**Next action:** Detailed plan
+`plans/2026-07-06_warp-multilevel-gpu-nnps.md` is pending owner approval for
+the first runtime APR GPU milestone. P0 stencil-convention reconciliation and
+uniform obstacle baselines remain prerequisites for production APR weights,
+but do not block synthetic exact-set multilevel-NNPS work. Floating-body P4
+remains queued.
 
 **Known validation limitation:** Compyle 0.9.1 on Python 3.14 cannot run the
 shipped CPU rigid Application (`ast.Str` removal). P3 uses direct NumPy

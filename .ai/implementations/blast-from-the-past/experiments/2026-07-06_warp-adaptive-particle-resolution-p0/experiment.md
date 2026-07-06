@@ -5,7 +5,7 @@ created: 2026-07-06T10:45:00 CEST
 author: @kunalpuri-prediqt
 aspect: validation-benchmarks
 status: active
-last_checked: 2026-07-06T10:47:48 CEST
+last_checked: 2026-07-06T11:18:54 CEST
 ---
 
 # Experiment: Warp adaptive particle resolution P0

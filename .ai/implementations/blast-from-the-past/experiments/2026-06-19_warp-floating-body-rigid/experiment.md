@@ -7,7 +7,7 @@ agent: claude
 aspect: validation-benchmarks
 adr: ADR-0006
 status: active
-last_checked: 2026-06-21T02:02:00 CEST
+last_checked: 2026-07-06T11:18:54 CEST
 ---
 
 # Experiment: Warp floating / rigid body coupled to SPH (3D dam-break)
