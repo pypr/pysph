@@ -4,10 +4,11 @@ id: 2026-07-06_warp-multilevel-gpu-nnps
 author: @kunalpuri-prediqt
 agent: codex
 created: 2026-07-06T11:18:54 CEST
-status: draft
+status: in-progress
 aspects: [gpu-nnps, warp-backend, particle-memory, validation-benchmarks]
 host_files:
   - pysph/base/warp_nnps.py
+  - pysph/base/warp_multilevel_nnps.py
   - pysph/base/warp_codegen.py
   - pysph/base/warp_sph.py
   - pysph/base/tests/test_warp_nnps.py
@@ -308,6 +309,13 @@ does not start until they pass.
 ## Approval
 
 - [x] Plan posted in chat
-- Approved by: @____ at 2026-07-06T__:__:__ CEST
+- Approved by: @kunalpuri-prediqt on 2026-07-06 CEST
 - Approval, verbatim quote:
-  > {{exact user message}}
+  > begin
+- Implementation note (2026-07-06): step 1 (CPU-oracle contract) and step 2
+  (`MultilevelGridWarpNNPS` with the single-level, four-level h16, and fp32
+  per-level grid-boundary kill-gate fixtures) landed. The multilevel Warp
+  kernels live in a new `pysph/base/warp_multilevel_nnps.py` module so they add
+  no PTX footprint to the WCSPH path. Suites are gated as separate pytest
+  invocations (sph 54, nnps 28, codegen 10 all pass); the combined
+  single-process command hangs pre-existingly on WSL2 PTX-JIT accumulation.

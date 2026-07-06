@@ -12,7 +12,12 @@ from cyarray.carray import UIntArray
 
 from pysph.base.nnps import LinkedListNNPS
 from pysph.base.utils import get_particle_array
-from pysph.base.warp_nnps import BruteForceWarpNNPS, UniformGridWarpNNPS
+from pysph.base.warp_nnps import (
+    BruteForceWarpNNPS, UniformGridWarpNNPS,
+    assign_particle_levels, brute_force_neighbor_sets,
+    accepted_level_pair_counts,
+)
+from pysph.base.warp_multilevel_nnps import MultilevelGridWarpNNPS
 
 
 def _neighbors(nnps, src_index, dst_index, d_idx):
@@ -451,3 +456,241 @@ def test_uniform_grid_warp_nnps_neighbor_sum_rebuilds_after_update():
     expected = _neighbor_sum(cpu, particles, 0, 0, 'm')
     assert np.allclose(grid.compute_neighbor_sum(0, 0, 'm').numpy(),
                        expected)
+
+
+# --- Multilevel GPU NNPS: level-assignment contract (kill gate, step 1) ---
+#
+# Range-bin, half-open convention frozen for the multilevel NNPS:
+#   level k covers h in [h_ref*ratio**k, h_ref*ratio**(k+1)); level 0 is finest.
+#   The top edge (h == h_ref*ratio**nlevels) is inclusive -> top level.
+#   h strictly outside [h_ref, h_ref*ratio**nlevels] fails loudly.
+#   Per-level support bound = radius_scale * max(assigned h) (conservative).
+
+def test_assign_particle_levels_bins_by_half_open_ranges():
+    # h_ref=0.1, ratio=2, nlevels=4 -> edges [0.1, 0.2, 0.4, 0.8, 1.6]
+    #   level 0: [0.1, 0.2)  level 1: [0.2, 0.4)
+    #   level 2: [0.4, 0.8)  level 3: [0.8, 1.6]
+    h = np.array([0.1, 0.15, 0.2, 0.5, 0.8, 1.6], dtype=np.float64)
+    levels, support = assign_particle_levels(
+        h, h_ref=0.1, level_ratio=2.0, nlevels=4, radius_scale=2.0
+    )
+    # 0.2 and 0.8 sit on lower-closed boundaries; 1.6 is the inclusive top edge.
+    assert list(levels) == [0, 0, 1, 2, 3, 3]
+
+
+def test_assign_particle_levels_rejects_invalid_level_parameters():
+    # Level edges h_ref*ratio**k are only strictly ascending for h_ref > 0 and
+    # level_ratio > 1; otherwise binning silently inverts. Fail loudly instead.
+    h = np.array([1.0])
+    with pytest.raises(ValueError):  # ratio == 1 collapses all edges
+        assign_particle_levels(h, h_ref=1.0, level_ratio=1.0, nlevels=3,
+                               radius_scale=2.0)
+    with pytest.raises(ValueError):  # ratio < 1 -> descending edges
+        assign_particle_levels(h, h_ref=1.0, level_ratio=0.5, nlevels=3,
+                               radius_scale=2.0)
+    with pytest.raises(ValueError):  # non-positive h_ref
+        assign_particle_levels(h, h_ref=0.0, level_ratio=2.0, nlevels=3,
+                               radius_scale=2.0)
+    with pytest.raises(ValueError):  # nlevels must be >= 1
+        assign_particle_levels(h, h_ref=1.0, level_ratio=2.0, nlevels=0,
+                               radius_scale=2.0)
+
+
+def test_assign_particle_levels_rejects_out_of_range_h():
+    # No silent clipping: h below the finest edge or above the top edge fails.
+    with pytest.raises(ValueError):
+        assign_particle_levels(
+            np.array([0.05]), h_ref=0.1, level_ratio=2.0, nlevels=4,
+            radius_scale=2.0,
+        )
+    with pytest.raises(ValueError):
+        assign_particle_levels(
+            np.array([2.0]), h_ref=0.1, level_ratio=2.0, nlevels=4,
+            radius_scale=2.0,
+        )
+
+
+def test_assign_particle_levels_support_bound_is_conservative_max():
+    # support[k] = radius_scale * max(h in level k); empty levels stay 0.
+    h = np.array([0.1, 0.15, 0.5, 0.7], dtype=np.float64)
+    # edges [0.1,0.2,0.4,0.8,1.6] -> levels [0,0,2,2]; levels 1 and 3 empty.
+    levels, support = assign_particle_levels(
+        h, h_ref=0.1, level_ratio=2.0, nlevels=4, radius_scale=2.0
+    )
+    assert list(levels) == [0, 0, 2, 2]
+    assert np.allclose(support, [2.0 * 0.15, 0.0, 2.0 * 0.7, 0.0])
+
+
+# --- Multilevel GPU NNPS: host brute-force neighbor oracle (kill gate) ---
+#
+# Independent pure-numpy reference for the exact symmetric pair contract
+#   rij^2 < (radius_scale*h_i)^2  OR  rij^2 < (radius_scale*h_j)^2
+# matching _neighbor_flags in warp_nnps (self is included: an array vs itself
+# has rij=0 < support). Cross-checked against BruteForceWarpNNPS below.
+
+def test_brute_force_neighbor_sets_matches_symmetric_cutoff_1d():
+    # positions [0.0, 0.3, 1.0], h=0.2, radius_scale=2 -> support radius 0.4.
+    #   dst 0: self + 0.3<0.4 -> [0,1];  dst 1: 0.3<0.4 + self -> [0,1]
+    #   dst 2: 0.7 and 1.0 both > 0.4 -> [2] (self only)
+    zeros = np.zeros(3)
+    pa = (np.array([0.0, 0.3, 1.0]), zeros, zeros, np.full(3, 0.2))
+    sets = brute_force_neighbor_sets(pa, pa, radius_scale=2.0, dim=1)
+    assert [list(s) for s in sets] == [[0, 1], [0, 1], [2]]
+
+
+def test_brute_force_oracle_agrees_with_brute_force_warp_nnps_2d():
+    # Variable h exercises the asymmetric OR in the symmetric cutoff; the
+    # host oracle must reproduce the trusted GPU BruteForceWarpNNPS exactly.
+    x = [0.0, 0.2, 0.5, 0.55, 1.2]
+    y = [0.0, 0.1, 0.5, 0.5, 0.0]
+    h = [0.3, 0.1, 0.2, 0.05, 0.4]
+    pa = get_particle_array(
+        name='fluid', x=x, y=y, z=[0.0] * 5, h=h, backend='warp'
+    )
+    warp = BruteForceWarpNNPS(dim=2, particles=[pa], radius_scale=2.0)
+    warp.set_context(0, 0)
+    tup = (np.array(x), np.array(y), np.zeros(5), np.array(h))
+    oracle = brute_force_neighbor_sets(tup, tup, radius_scale=2.0, dim=2)
+    for d_idx in range(5):
+        actual = _neighbors(warp, 0, 0, d_idx)
+        assert np.array_equal(actual, oracle[d_idx]), (d_idx, actual,
+                                                       oracle[d_idx])
+
+
+def test_accepted_level_pair_counts_bins_pairs_by_level():
+    # 2 destinations at levels [0, 1]; 3 sources at levels [0, 0, 1].
+    #   dst 0 (level 0) -> src {0(l0), 2(l1)}: (0,0)+1, (0,1)+1
+    #   dst 1 (level 1) -> src {1(l0)}:        (1,0)+1
+    neighbor_sets = [np.array([0, 2]), np.array([1])]
+    d_levels = np.array([0, 1])
+    s_levels = np.array([0, 0, 1])
+    counts = accepted_level_pair_counts(
+        neighbor_sets, d_levels, s_levels, nlevels=2
+    )
+    assert counts.tolist() == [[1, 1], [1, 0]]
+
+
+# --- Multilevel GPU NNPS: MultilevelGridWarpNNPS (kill gate, step 2) ---
+
+def test_multilevel_single_level_matches_brute_force_2d():
+    # nlevels=1: the multilevel class must degenerate to exact uniform-grid /
+    # brute-force behavior (cheapest kill gate). Reuses the trusted 2D config.
+    x = [0.0, 0.2, 0.4, 1.5]
+    y = [0.0, 0.0, 0.1, 1.5]
+    h = [0.25, 0.25, 0.25, 0.25]
+    pa = get_particle_array(
+        name='fluid', x=x, y=y, z=[0.0] * 4, h=h, backend='warp'
+    )
+    ml = MultilevelGridWarpNNPS(
+        dim=2, particles=[pa], radius_scale=2.0,
+        h_ref=0.25, level_ratio=2.0, nlevels=1,
+    )
+    bf = BruteForceWarpNNPS(dim=2, particles=[pa], radius_scale=2.0)
+    _assert_all_neighbors_match(bf, ml, [pa], [(0, 0)])
+    # Also pin against the independent numpy oracle.
+    tup = (np.array(x), np.array(y), np.zeros(4), np.array(h))
+    oracle = brute_force_neighbor_sets(tup, tup, radius_scale=2.0, dim=2)
+    ml.set_context(0, 0)
+    for d_idx in range(4):
+        assert np.array_equal(_neighbors(ml, 0, 0, d_idx), oracle[d_idx])
+
+
+def test_multilevel_four_levels_h16_cross_level_parity_3d():
+    # Four discrete levels spanning h_max/h_min = 16 with genuine cross-level
+    # pairs (coarse dst <-> fine src). Exact-set parity here is the core
+    # correctness kill gate; the variable stencil must find neighbors whose
+    # support far exceeds a fine level's cell size.
+    x = [0.0, 0.8, 0.5, 1.0, 0.2, 2.0, 0.1, 5.0]
+    h = [1.6, 0.8, 0.6, 0.4, 0.3, 0.2, 0.15, 0.1]
+    zeros = [0.0] * 8
+    pa = get_particle_array(
+        name='fluid', x=x, y=zeros, z=zeros, h=h, backend='warp'
+    )
+    ml = MultilevelGridWarpNNPS(
+        dim=3, particles=[pa], radius_scale=2.0,
+        h_ref=0.1, level_ratio=2.0, nlevels=4,
+    )
+    # Level assignment / support contract.
+    levels, support = assign_particle_levels(
+        np.array(h), h_ref=0.1, level_ratio=2.0, nlevels=4, radius_scale=2.0
+    )
+    assert list(levels) == [3, 3, 2, 2, 1, 1, 0, 0]
+    assert np.allclose(support, [0.3, 0.6, 1.2, 3.2])
+
+    # Exact-set parity vs the verified numpy oracle and the (uncached, robust)
+    # brute-force GPU NNPS.
+    tup = (np.array(x), np.array(zeros), np.array(zeros), np.array(h))
+    oracle = brute_force_neighbor_sets(tup, tup, radius_scale=2.0, dim=3)
+    bf = BruteForceWarpNNPS(dim=3, particles=[pa], radius_scale=2.0)
+    _assert_all_neighbors_match(bf, ml, [pa], [(0, 0)])
+    ml.set_context(0, 0)
+    ml_sets = [_neighbors(ml, 0, 0, i) for i in range(8)]
+    for i in range(8):
+        assert np.array_equal(ml_sets[i], oracle[i]), (i, ml_sets[i], oracle[i])
+        assert len(ml_sets[i]) == len(set(ml_sets[i].tolist())), i  # no dupes
+
+    # The isolated fine particle (x=5.0) has only itself.
+    assert list(ml_sets[7]) == [7]
+
+    # Accepted (dst-level, src-level) matrix has real cross-level (off-diagonal)
+    # mass, and matches the oracle-derived matrix.
+    counts_ml = accepted_level_pair_counts(ml_sets, levels, levels, nlevels=4)
+    counts_oracle = accepted_level_pair_counts(oracle, levels, levels, nlevels=4)
+    assert np.array_equal(counts_ml, counts_oracle)
+    off_diagonal = counts_ml.sum() - np.trace(counts_ml)
+    assert off_diagonal > 0
+
+
+def test_multilevel_fp32_per_level_grid_boundary_padding_1d():
+    # P0 silent-omission guard: a fine particle sitting exactly on its level's
+    # far edge must floor to a valid cell in [0, nx) via per-level PADDING, not
+    # via the binning kernel's clamp (which would mask a padding defect).
+    # h_ref=0.1, level_ratio=4, nlevels=2 -> edges [0.1, 0.4, 1.6].
+    # Fine level 0 (h=0.1 -> cell_size 0.2) spans x=[0.1..0.9], extent
+    # 0.8 == 4*cell_size exactly, so WITHOUT padding x=0.9 floors to cell 4==nx.
+    # Spacings are deliberately off the 0.2 support so no PAIR sits on the
+    # neighbor cutoff (which would make fp32 and the fp64 oracle disagree); this
+    # fixture isolates grid-cell-boundary padding, not cutoff rounding. The
+    # coarse particle sits at 0.5 so its 0.8 support clearly covers every fine
+    # particle (max dist 0.4), again avoiding a cutoff-boundary pair.
+    x = [0.1, 0.25, 0.55, 0.72, 0.9, 0.5]
+    h = [0.1, 0.1, 0.1, 0.1, 0.1, 0.4]  # last is the coarse (level 1) particle
+    zeros = [0.0] * 6
+    pa = get_particle_array(
+        name='fluid', x=x, y=zeros, z=zeros, h=h, backend='warp'
+    )
+    ml = MultilevelGridWarpNNPS(
+        dim=1, particles=[pa], radius_scale=2.0,
+        h_ref=0.1, level_ratio=4.0, nlevels=2,
+    )
+
+    info = ml.level_grid_info(0)
+    lv = info['levels']
+    ox = info['origin_x']
+    cs = info['cell_size']
+    nxs = info['nx']
+    assert list(lv) == [0, 0, 0, 0, 0, 1]
+    # Pre-clamp cell index (computed in the device fp32 precision) is in range
+    # for every particle -- especially the far-edge fine particle at x=0.9.
+    xf = np.asarray(x, dtype=ox.dtype)
+    for i in range(6):
+        k = int(lv[i])
+        ix = int(np.floor((xf[i] - ox[k]) / cs[k]))
+        assert 0 <= ix < nxs[k], (i, ix, nxs[k])
+    # Regression witness: WITHOUT padding the far fine particle would land on
+    # cell nx (out of range) -- documents why the per-level origin is padded.
+    unpadded_nx = int(np.ceil((0.9 - 0.1) / 0.2))
+    assert int(np.floor((0.9 - 0.1) / 0.2)) == unpadded_nx  # == nx => OOB
+
+    # Full neighbor-set parity (fp32 GPU) vs oracle and uncached brute force.
+    tup = (np.array(x), np.array(zeros), np.array(zeros), np.array(h))
+    oracle = brute_force_neighbor_sets(tup, tup, radius_scale=2.0, dim=1)
+    bf = BruteForceWarpNNPS(dim=1, particles=[pa], radius_scale=2.0)
+    _assert_all_neighbors_match(bf, ml, [pa], [(0, 0)])
+    ml.set_context(0, 0)
+    ml_sets = [_neighbors(ml, 0, 0, i) for i in range(6)]
+    for i in range(6):
+        assert np.array_equal(ml_sets[i], oracle[i]), (i, ml_sets[i], oracle[i])
+    # Cross-level pair reaching the far-edge fine particle (idx4 at x=0.9) from
+    # the coarse particle (idx5): its 0.8 support spans the fine AABB.
+    assert 4 in ml_sets[5].tolist() and 5 in ml_sets[4].tolist()

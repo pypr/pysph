@@ -12,6 +12,99 @@ from cyarray.carray import UIntArray
 from pysph.base.warp_device_helper import WarpDeviceHelper
 
 
+def assign_particle_levels(h, h_ref, level_ratio, nlevels, radius_scale):
+    """Bin smoothing lengths into discrete resolution levels (multilevel NNPS).
+
+    Range-bin, half-open contract: level ``k`` covers ``h`` in
+    ``[h_ref*level_ratio**k, h_ref*level_ratio**(k+1))`` with level 0 the
+    finest. The overall top edge ``h_ref*level_ratio**nlevels`` is inclusive.
+
+    Returns ``(levels, support)``: ``levels`` is an ``int32`` array of
+    per-particle level indices; ``support`` is a length-``nlevels`` array (its
+    per-level conservative support bound is driven by a later test).
+    """
+    if nlevels < 1:
+        raise ValueError("nlevels must be >= 1; got %r" % (nlevels,))
+    if h_ref <= 0.0:
+        raise ValueError("h_ref must be > 0; got %r" % (h_ref,))
+    if level_ratio <= 1.0:
+        raise ValueError(
+            "level_ratio must be > 1 so level edges h_ref*level_ratio**k are "
+            "strictly ascending; got %r" % (level_ratio,)
+        )
+    h = np.asarray(h)
+    if h.dtype.kind != 'f':
+        h = h.astype(np.float64)
+    # Compute the level edges in the same float precision as h. When h comes
+    # from an fp32 device array, an h sitting exactly on a level edge (e.g. the
+    # inclusive top edge) rounds to the same fp32 value as the edge, so it bins
+    # correctly instead of tripping the range guard by one fp32 ULP.
+    edges = h_ref * level_ratio ** np.arange(nlevels + 1, dtype=np.float64)
+    edges = edges.astype(h.dtype)
+    if h.size and (np.min(h) < edges[0] or np.max(h) > edges[-1]):
+        raise ValueError(
+            "smoothing length outside configured level range "
+            "[%g, %g]; particles are not silently clipped" % (
+                edges[0], edges[-1])
+        )
+    levels = np.searchsorted(edges, h, side='right') - 1
+    # Fold the inclusive top edge (which searchsorted maps to nlevels) down
+    # into the top level.
+    levels = np.where(h == edges[-1], nlevels - 1, levels)
+    support = np.zeros(nlevels, dtype=np.float64)
+    if h.size:
+        np.maximum.at(support, levels, radius_scale * h)
+    return levels.astype(np.int32), support
+
+
+def brute_force_neighbor_sets(dst, src, radius_scale, dim):
+    """Exact symmetric neighbor sets by an O(N*M) host scan (test oracle).
+
+    ``dst`` and ``src`` are ``(x, y, z, h)`` tuples of numpy arrays. Returns a
+    list with one sorted ``int`` array per destination, containing every source
+    index ``j`` satisfying the symmetric contract
+
+        rij^2 < (radius_scale*h_i)^2  OR  rij^2 < (radius_scale*h_j)^2
+
+    matching ``_neighbor_flags``. Self is included when ``src is dst`` (rij=0).
+    This is an independent reference used to triangulate ``BruteForceWarpNNPS``
+    and the multilevel NNPS; it is not on any runtime path.
+    """
+    d_x, d_y, d_z, d_h = (np.asarray(a, dtype=np.float64) for a in dst)
+    s_x, s_y, s_z, s_h = (np.asarray(a, dtype=np.float64) for a in src)
+    sets = []
+    hj = radius_scale * s_h
+    for i in range(d_x.size):
+        dist2 = (d_x[i] - s_x) ** 2
+        if dim > 1:
+            dist2 = dist2 + (d_y[i] - s_y) ** 2
+        if dim > 2:
+            dist2 = dist2 + (d_z[i] - s_z) ** 2
+        hi = radius_scale * d_h[i]
+        mask = (dist2 < hi * hi) | (dist2 < hj * hj)
+        sets.append(np.nonzero(mask)[0].astype(np.int32))
+    return sets
+
+
+def accepted_level_pair_counts(neighbor_sets, d_levels, s_levels, nlevels):
+    """Bin accepted neighbor pairs by ``(destination-level, source-level)``.
+
+    ``neighbor_sets[i]`` holds the accepted source indices for destination
+    ``i``. Returns an ``(nlevels, nlevels)`` integer matrix whose ``[ld, ls]``
+    entry counts accepted pairs whose destination is at level ``ld`` and source
+    at level ``ls`` -- the breakdown the decision gate uses to see where
+    traversal work concentrates (coarse-destination x fine-level).
+    """
+    d_levels = np.asarray(d_levels)
+    s_levels = np.asarray(s_levels)
+    counts = np.zeros((nlevels, nlevels), dtype=np.int64)
+    for i, nbrs in enumerate(neighbor_sets):
+        nbrs = np.asarray(nbrs, dtype=np.intp)
+        if nbrs.size:
+            np.add.at(counts[int(d_levels[i])], s_levels[nbrs], 1)
+    return counts
+
+
 if wp is not None:
     @wp.kernel
     def _copy_i32(src: wp.array(dtype=wp.int32),
