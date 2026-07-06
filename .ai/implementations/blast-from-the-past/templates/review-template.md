@@ -7,6 +7,7 @@ plan: session-log LP-N
 adrs: []
 aspects_touched: []
 host_files: []
+review_mode: promotion
 status: pending
 ---
 
@@ -42,6 +43,14 @@ Comparison table, Mermaid diagram, generated chart, convergence plot, or one-lin
 
 ## Sign-off
 
-- Reviewer: @prabhu
-- Verdict, verbatim quote:
+- Review mode: promotion | prototype-owner
+- Promotion reviewer: @prabhu
+- Promotion verdict, verbatim quote:
   > {{exact LGTM message}} - {{timestamp}}
+- Prototype owner: @kunalpuri-prediqt
+- Prototype authorization, verbatim quote:
+  > {{exact owner authorization}} - {{timestamp}}
+
+Delete the unused sign-off route. `prototype-owner` is valid only under the
+narrow exception in Rule 4; it does not authorize upstream publication,
+production promotion, or out-of-boundary changes.

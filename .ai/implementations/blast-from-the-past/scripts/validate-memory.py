@@ -155,8 +155,22 @@ def validate() -> tuple[list[str], list[str]]:
             for adr in fm.get("adrs", []):
                 if adr not in adr_ids:
                     errors.append(f"{path}: unknown ADR {adr}")
-            if fm.get("status") == "lgtm" and ">" not in text.split("## Sign-off", 1)[-1]:
-                errors.append(f"{path}: lgtm review lacks verbatim quote block")
+            status = fm.get("status")
+            signoff = text.split("## Sign-off", 1)[-1]
+            if status in ("lgtm", "prototype-approved") and ">" not in signoff:
+                errors.append(
+                    f"{path}: {status} review lacks verbatim quote block"
+                )
+            if status == "prototype-approved":
+                if fm.get("review_mode") != "prototype-owner":
+                    errors.append(
+                        f"{path}: prototype-approved review requires "
+                        "review_mode: prototype-owner"
+                    )
+                if "@kunalpuri-prediqt" not in signoff:
+                    errors.append(
+                        f"{path}: prototype-approved review lacks owner sign-off"
+                    )
 
     proc = subprocess.run(
         [sys.executable, str(ROOT / "scripts" / "update-decision-graph.py"), "--check"],

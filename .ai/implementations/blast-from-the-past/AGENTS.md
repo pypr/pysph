@@ -58,15 +58,39 @@ For non-trivial design/modeling choices:
 
 ADR frontmatter is the single source of truth. Do not hand-edit `.ai/implementations/blast-from-the-past/decisions/index.json` or `.ai/implementations/blast-from-the-past/decisions/graph.md`.
 
-### Rule 4 - Review Before Commit
+### Rule 4 - Review Before Commit; Owner Exception for Prototypes
 
 Before any commit:
 
 1. Produce a review artifact in `.ai/implementations/blast-from-the-past/reviews/`.
 2. Include diff summary, aspects, host files, behavioral/numerical changes, raw validation output, `validate-memory.py` output, risks, unresolved questions, and at least one visual aid or a one-line waiver.
 3. Post the review in chat.
-4. Wait for `@prabhu` to reply `LGTM` and quote the verdict verbatim in the review.
+4. Choose and record one review mode:
+   - **Promotion review (default):** wait for `@prabhu` to reply `LGTM` and
+     quote the verdict verbatim in the review.
+   - **Prototype-owner review:** `@kunalpuri-prediqt` may explicitly authorize
+     the commit without external `LGTM`; quote that authorization verbatim in
+     the review and set `status: prototype-approved`.
 5. Only then commit. The commit message references the review and touched ADRs.
+
+The prototype-owner exception is narrow. Every condition below must hold:
+
+- the work is exploratory/prototype work inside the approved implementation
+  boundary: `.ai/` memory, experiments, `pysph/base/warp_*.py`, and focused
+  `pysph/base/tests/test_warp_*.py` files;
+- the approved plan is recorded when Rule 2 requires one;
+- the change does not alter generic public API/ABI, non-Warp host behavior,
+  dependencies/build/release configuration, or files outside the boundary;
+- the review clearly labels unvalidated behavior, incomplete phases, and
+  performance claims as prototype evidence rather than production results;
+- the commit subject begins with `prototype:`.
+
+Prototype-owner approval is not promotion approval. A cumulative promotion
+review with exact `@prabhu: LGTM` is still required before any prototype change
+is pushed to an upstream PR, merged into a production/release branch, presented
+as completed production work, or used to amend generic host interfaces. If
+scope crosses a condition above, stop and use the promotion-review path before
+committing the expanded change.
 
 ### Rule 5 - Do Not Cut Long-Running Tasks Short
 
