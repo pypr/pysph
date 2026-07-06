@@ -89,9 +89,22 @@ only `x/y/z/h`; no daughter stencil is embedded in this checkpoint.
   single-level, four-level `h_max/h_min=16`, gradual 1.2 ratio, empty levels,
   level-boundary values, clustered refinement, multiple source/destination
   arrays, and particles near spatial bounds.
+- Add a fp32 per-level grid-boundary fixture: particles placed exactly on a
+  level's cell-origin and far-edge coordinates in fp32. This guards the one
+  silent failure mode (a boundary particle flooring to cell `-1` or `nx` and
+  dropping a cross-level pair) and is the direct test for the per-level padding
+  requirement in step 2.
 - Record current uniform-grid accepted and candidate counts for the clustered
   fixture. Accepted sets must stay identical; candidate counts are the
   optimization target.
+- Record candidate/accepted counts broken down by `(destination-level,
+  source-level)` pair, not only as totals. The cost of exact multilevel
+  traversal concentrates in coarse-destination x fine-level queries (query
+  radius `radius_scale*h_i` against a fine cell size gives an index range of
+  order the level ratio, up to ~`(2*16+1)^3` cell visits per coarse destination
+  at `h_max/h_min=16` in 3D). The per-pair breakdown is what distinguishes real
+  cross-scale neighbors from iterating empty fine cells, and is the evidence the
+  decision gate uses to choose dense per-level grids versus sparse hash/sort.
 
 ### 2. Add an explicit multilevel NNPS prototype
 
@@ -103,6 +116,12 @@ only `x/y/z/h`; no daughter stencil is embedded in this checkpoint.
 - Give each populated level its own origin, dimensions, and cell size based on
   that level's conservative support bound. This avoids allocating a fine grid
   over the spatial extent occupied only by coarse particles.
+- Pad each per-level origin/extent by that level's cell size before flooring,
+  matching the existing uniform-grid padding in
+  `_compute_bounds_and_cell_size()`. fp32 AABB reductions can produce a bound
+  tight enough to floor a boundary particle to cell `-1` or `nx`; the padding
+  plus the fp32 boundary fixture in step 1 keep this from becoming a silent
+  cross-level omission.
 - Flatten per-level cell arrays into device storage with metadata arrays:
   level cell offsets, particle offsets/counts, origins, cell sizes,
   `(nx,ny,nz)`, and maximum source support. Keep source particle indices in
@@ -157,6 +176,10 @@ only `x/y/z/h`; no daughter stencil is embedded in this checkpoint.
 - Benchmark warm grid build and one representative fused consumer separately.
   Report candidate pairs, accepted pairs, metadata bytes read back, build time,
   kernel time, and peak device memory.
+- Break the candidate/accepted pair counts down by `(destination-level,
+  source-level)` pair so the concentration of work in coarse-destination x
+  fine-level queries is visible, not hidden inside a single aggregate. This is
+  the measurement the dense-versus-sparse decision gate consumes.
 
 ## Acceptance criteria
 
@@ -195,6 +218,11 @@ only `x/y/z/h`; no daughter stencil is embedded in this checkpoint.
 - ADR-0007 is created only after the exact-set and candidate-scaling kill tests
   pass. It records the level representation, device metadata contract,
   cross-level traversal, permitted scalar readback, and periodic deferral.
+- ADR-0007 must record the `O(nlevels*narrays)` metadata readback as a
+  prototype-only allowance, not the production device-residency contract. It is
+  a per-`update()` host synchronization; the eventual production APR path is
+  expected to eliminate it with a persistent max-levels allocation, and that
+  constraint must not be silently inherited from this checkpoint.
 - If exact traversal requires unbounded work or dense level grids consume more
   memory than the saved particle state on representative cases, stop and
   compare sparse hash/sort alternatives before accepting the ADR.
