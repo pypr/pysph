@@ -100,7 +100,7 @@ class DeviceHelper(object):
                 pname = self.properties[0]
                 stride = self._particle_array.stride.get(pname, 1)
                 prop0 = self._data[pname]
-                return len(prop0.dev) // stride
+                return len(prop0) // stride
             else:
                 return 0
 
@@ -319,10 +319,10 @@ class DeviceHelper(object):
 
         self.align(indices)
 
-        self.num_real_particles = int(num_real_particles.get())
+        self.num_real_particles = int(np.asarray(num_real_particles.get()).item())
 
     def _build_indices_with_strides(self, tag_arr, stride):
-        num_particles = len(tag_arr.dev)
+        num_particles = len(tag_arr)
 
         new_indices = array.empty(num_particles * stride,
                                   dtype=np.int32,
@@ -387,7 +387,8 @@ class DeviceHelper(object):
                    num_removed_particles=num_removed_particles,
                    num_particles=num_particles)
 
-        new_num_particles = num_particles - int(num_removed_particles.get())
+        removed = int(np.asarray(num_removed_particles.get()).item())
+        new_num_particles = num_particles - removed
 
         strides = set(self._particle_array.stride.values())
         s_indices = {1: new_indices}

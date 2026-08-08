@@ -1,5 +1,6 @@
 import pytest
 import numpy as np
+from types import SimpleNamespace
 
 from pysph.base.utils import get_particle_array  # noqa: E402
 from pysph.base.device_helper import DeviceHelper
@@ -474,3 +475,22 @@ class TestDeviceHelper(object):
 
         assert h.h.minimum == 100.0
         assert h.h.maximum == 4.0
+
+    def test_get_number_of_particles_uses_array_length_not_storage_length(self):
+        class _FakeDeviceArray:
+            def __len__(self):
+                return 16
+
+        class _FakeArray:
+            def __init__(self):
+                self.dev = _FakeDeviceArray()
+
+            def __len__(self):
+                return 8
+
+        helper = object.__new__(DeviceHelper)
+        helper.properties = ['x']
+        helper._particle_array = SimpleNamespace(stride={'x': 2})
+        helper._data = {'x': _FakeArray()}
+
+        assert helper.get_number_of_particles() == 4
