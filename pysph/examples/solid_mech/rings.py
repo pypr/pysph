@@ -70,7 +70,7 @@ class Rings(Application):
 
         print('Ellastic Collision with %d particles' % (x.size))
         print("Shear modulus G = %g, Young's modulus = %g, Poisson's ratio =%g"
-              % (pa.G, pa.E, pa.nu))
+              % (pa.G[0], pa.E[0], pa.nu[0]))
 
         u_f = 0.059
         pa.u = pa.cs * u_f * (2 * (x < 0) - 1)
