@@ -104,7 +104,7 @@ def main():
     H1 = numpy.ones_like(X1) * hdx * dx
     RHO1 = numpy.zeros_like(X1)
 
-    gathers = (numpy.ones(size) * numMyPoints, None)
+    gathers = (numpy.ones(size, dtype=int) * numMyPoints, None)
 
     comm.Gatherv(sendbuf=[x1, mpi.DOUBLE], recvbuf=[X1, gathers, mpi.DOUBLE])
     comm.Gatherv(sendbuf=[y1, mpi.DOUBLE], recvbuf=[Y1, gathers, mpi.DOUBLE])
