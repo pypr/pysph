@@ -224,7 +224,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                     self.pid_keys[src_index], self.cids[src_index],
                     self.src.get_number_of_particles(), self.max_cid_src)
 
-            overflow_size = <unsigned int>(self.max_cid_src.get()) - \
+            overflow_size = <unsigned int>(self.max_cid_src.get()[0]) - \
                     self.max_cid[src_index]
 
             self.overflow_cid_to_idx.resize(max(1, 27 * overflow_size))

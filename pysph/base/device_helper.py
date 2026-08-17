@@ -319,7 +319,7 @@ class DeviceHelper(object):
 
         self.align(indices)
 
-        self.num_real_particles = int(num_real_particles.get())
+        self.num_real_particles = int(num_real_particles.get()[0])
 
     def _build_indices_with_strides(self, tag_arr, stride):
         num_particles = len(tag_arr.dev)
@@ -387,7 +387,7 @@ class DeviceHelper(object):
                    num_removed_particles=num_removed_particles,
                    num_particles=num_particles)
 
-        new_num_particles = num_particles - int(num_removed_particles.get())
+        new_num_particles = num_particles - int(num_removed_particles.get()[0])
 
         strides = set(self._particle_array.stride.values())
         s_indices = {1: new_indices}
