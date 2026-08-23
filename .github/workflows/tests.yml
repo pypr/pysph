@@ -44,10 +44,10 @@ jobs:
           mkdir -p ~/.compyle
           touch ~/.compyle/config.py
           echo "import os" >> ~/.compyle/config.py
-          echo "os.environ['CC'] = '$(brew --prefix llvm@18)/bin/clang'" >> ~/.compyle/config.py
-          echo "os.environ['CXX'] = '$(brew --prefix llvm@18)/bin/clang++'" >> ~/.compyle/config.py
-          export CPPFLAGS="-I$(brew --prefix libomp)/include -I$(brew --prefix llvm@18)/include -Xclang -fopenmp"
-          export LDFLAGS="-L$(brew --prefix libomp)/lib -L$(brew --prefix llvm@18)/lib -lomp"
+          echo "os.environ['CC'] = 'clang'" >> ~/.compyle/config.py
+          echo "os.environ['CXX'] = 'clang++'" >> ~/.compyle/config.py
+          export CPPFLAGS="-I$(brew --prefix libomp)/include -Xclang -fopenmp"
+          export LDFLAGS="-L$(brew --prefix libomp)/lib -lomp"
           python -c "import os; OMP_CFLAGS=os.environ.get('CPPFLAGS').split(' '); print(f'{OMP_CFLAGS=}')" >> ~/.compyle/config.py
           python -c "import os; OMP_LINK=os.environ.get('LDFLAGS').split(' '); print(f'{OMP_LINK=}')" >> ~/.compyle/config.py
           cat ~/.compyle/config.py

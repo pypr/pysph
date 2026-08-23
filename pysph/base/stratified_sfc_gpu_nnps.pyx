@@ -130,7 +130,7 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
         self.pid_keys[pa_index].set_data(sorted_keys)
 
         #FIXME: This will only work on OpenCL and CUDA backends
-        cdef unsigned long long key = <unsigned long long> (sorted_keys[0].get())
+        cdef unsigned long long key = <unsigned long long> (sorted_keys[0].get().item())
 
         self.start_idx_levels[pa_index][key >> self.max_num_bits] = 0
 
