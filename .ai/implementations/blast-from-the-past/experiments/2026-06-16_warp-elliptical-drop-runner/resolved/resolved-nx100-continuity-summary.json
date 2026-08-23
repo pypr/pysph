@@ -1,0 +1,215 @@
+{
+  "case": {
+    "alpha": 0.1,
+    "beta": 0.0,
+    "c0": 1400.0,
+    "cfl": 0.3,
+    "dt": 2.1090201168072683e-06,
+    "gamma": 7.0,
+    "hdx": 1.3,
+    "n_damp": 50,
+    "nx": 100,
+    "output_times": [
+      0.0008,
+      0.0038
+    ],
+    "p0": 0.0,
+    "rho0": 1.0,
+    "warp_density_mode": "continuity",
+    "xsph_eps": 0.5
+  },
+  "comparisons": {
+    "t0p0008000": {
+      "deltas": {
+        "axis_major_estimate": 3.6375168877000874e-08,
+        "axis_minor_estimate": -5.055619545224488e-08,
+        "kinetic_energy": -0.0014183510375005426,
+        "rho_max": 3.1868925693956385e-06,
+        "rho_min": -9.867360156734506e-07,
+        "x_max": -2.2937012955637215e-07,
+        "x_min": 5.055619545224488e-08,
+        "y_max": -2.020434095584278e-07,
+        "y_min": -3.6375168877000874e-08
+      },
+      "image": ".ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved/resolved-nx100-continuity-t0p0008000.png",
+      "time": 0.0008
+    },
+    "t0p0038000": {
+      "deltas": {
+        "axis_major_estimate": 1.5947661098358878e-06,
+        "axis_minor_estimate": 2.1943316564909665e-06,
+        "kinetic_energy": -0.00043376772100600647,
+        "rho_max": 8.755722542552746e-07,
+        "rho_min": -4.816405699936688e-06,
+        "x_max": 1.5386805650718927e-06,
+        "x_min": -2.1943316564909665e-06,
+        "y_max": 1.594766110279977e-06,
+        "y_min": -1.5947661098358878e-06
+      },
+      "image": ".ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved/resolved-nx100-continuity-t0p0038000.png",
+      "time": 0.0038
+    }
+  },
+  "cpu": {
+    "average_step_time_s": 0.16386048366547867,
+    "backend": "pysph-application",
+    "checkpoints": {
+      "t0p0008000": {
+        "metrics": {
+          "all_finite": true,
+          "axis_major_estimate": 1.0816640490130147,
+          "axis_minor_estimate": 0.9220712094421513,
+          "axis_x_abs": 0.9220712094421513,
+          "axis_y_abs": 1.0816640490130147,
+          "exact_major_axis": 1.0831034701687434,
+          "exact_minor_axis": 0.9232728243814081,
+          "kinetic_energy": 7818.556269923258,
+          "p_max": 11071.301686731818,
+          "p_min": -835.6697397960966,
+          "particles": 31417,
+          "rho_max": 1.0055542309769985,
+          "rho_min": 0.9995725485493702,
+          "time": 0.0008,
+          "x_max": 0.922071209442151,
+          "x_min": -0.9220712094421513,
+          "y_max": 1.081664049013014,
+          "y_min": -1.0816640490130147
+        },
+        "path": ".ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved/resolved-nx100-continuity-pysph-app-output/resolved-nx100-continuity-pysph_00313.hdf5"
+      },
+      "t0p0038000": {
+        "metrics": {
+          "all_finite": true,
+          "axis_major_estimate": 1.4365264918961826,
+          "axis_minor_estimate": 0.6964109650387659,
+          "axis_x_abs": 0.6964109650387659,
+          "axis_y_abs": 1.4365264918961826,
+          "exact_major_axis": 1.4392190525454083,
+          "exact_minor_axis": 0.6948212631228,
+          "kinetic_energy": 7797.707446258537,
+          "p_max": 4204.864301278084,
+          "p_min": -4743.656305926694,
+          "particles": 31417,
+          "rho_max": 1.002131063362072,
+          "rho_min": 0.9975631121324761,
+          "time": 0.0038,
+          "x_max": 0.6964109650387648,
+          "x_min": -0.6964109650387659,
+          "y_max": 1.4365264918961822,
+          "y_min": -1.4365264918961826
+        },
+        "path": ".ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved/resolved-nx100-continuity-pysph-app-output/resolved-nx100-continuity-pysph_01393.hdf5"
+      }
+    },
+    "command": [
+      "/home/kunalp/.pqt_venv_e0b41259/bin/python",
+      "pysph/examples/elliptical_drop_no_scheme.py",
+      "--nx",
+      "100",
+      "--tf",
+      "0.0038",
+      "--timestep",
+      "2.1090201168072683e-06",
+      "--adaptive-timestep",
+      "--cfl",
+      "0.3",
+      "--n-damp",
+      "50",
+      "--fname",
+      "resolved-nx100-continuity-pysph",
+      "--directory",
+      ".ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved/resolved-nx100-continuity-pysph-app-output",
+      "--logfile",
+      "",
+      "--quiet"
+    ],
+    "dt_max": 2.780917055777183e-06,
+    "dt_mean": 2.7404840979225977e-06,
+    "dt_min": 2.2023818173548364e-06,
+    "final_time": 0.0038,
+    "output_dir": ".ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved/resolved-nx100-continuity-pysph-app-output",
+    "stdout_tail": "/home/kunalp/work/particles/pysph/pysph/solver/output.py:257: H5pyDeprecationWarning: Creating a dataset without passing data or dtype is deprecated. Pass an explicit dtype. Using dtype='f4' will keep the current default behaviour.\n  prop = ptype_grp.create_dataset(propname, (0,))\nCreate our own solver.\nCreate our own equations.\nElliptical drop :: 31417 particles\n",
+    "steps": 1393,
+    "wall_time_s": 228.25765374601178
+  },
+  "hardware": {
+    "platform": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+    "processor": "",
+    "python": "3.14.4",
+    "warp_device": "cuda:0",
+    "warp_version": "1.14.0"
+  },
+  "performance": {
+    "cpu_average_step_time_s": 0.16386048366547867,
+    "cpu_wall_time_s": 228.25765374601178,
+    "speedup_wall_time": 7.606547218180963,
+    "warp_average_step_time_s": 0.01663417438525551,
+    "warp_wall_time_s": 30.008050591000938
+  },
+  "warp": {
+    "average_step_time_s": 0.01663417438525551,
+    "backend": "warp",
+    "checkpoints": {
+      "t0p0008000": {
+        "metrics": {
+          "all_finite": true,
+          "axis_major_estimate": 1.0816640853881836,
+          "axis_minor_estimate": 0.9220711588859558,
+          "axis_x_abs": 0.9220711588859558,
+          "axis_y_abs": 1.0816640853881836,
+          "dt_max": 2.1090202153573046e-06,
+          "dt_mean": 2.1052631579646245e-06,
+          "dt_min": 6.813384061388206e-07,
+          "exact_major_axis": 1.0831034701716546,
+          "exact_minor_axis": 0.9232728243789265,
+          "kinetic_energy": 7818.55485157222,
+          "p_max": 11078.0234375,
+          "p_min": -839.121337890625,
+          "particles": 31417,
+          "rho_max": 1.0055574178695679,
+          "rho_min": 0.9995715618133545,
+          "steps": 380,
+          "time": 0.0008000000000265572,
+          "x_max": 0.9220709800720215,
+          "x_min": -0.9220711588859558,
+          "y_max": 1.0816638469696045,
+          "y_min": -1.0816640853881836
+        },
+        "path": ".ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved/resolved-nx100-continuity-warp-t0p0008000.npz"
+      },
+      "t0p0038000": {
+        "metrics": {
+          "all_finite": true,
+          "axis_major_estimate": 1.4365280866622925,
+          "axis_minor_estimate": 0.6964131593704224,
+          "axis_x_abs": 0.6964131593704224,
+          "axis_y_abs": 1.4365280866622925,
+          "dt_max": 2.1090202153573046e-06,
+          "dt_mean": 2.106430155210643e-06,
+          "dt_min": 4.4383333813735604e-14,
+          "exact_major_axis": 1.4392190525454083,
+          "exact_minor_axis": 0.6948212631228,
+          "kinetic_energy": 7797.707012490816,
+          "p_max": 4205.4365234375,
+          "p_min": -4750.826171875,
+          "particles": 31417,
+          "rho_max": 1.0021319389343262,
+          "rho_min": 0.9975582957267761,
+          "steps": 1804,
+          "time": 0.0038,
+          "x_max": 0.6964125037193298,
+          "x_min": -0.6964131593704224,
+          "y_max": 1.4365280866622925,
+          "y_min": -1.4365280866622925
+        },
+        "path": ".ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/resolved/resolved-nx100-continuity-warp-t0p0038000.npz"
+      }
+    },
+    "dt_max": 2.1090202153573046e-06,
+    "dt_mean": 2.106430155210643e-06,
+    "dt_min": 4.4383333813735604e-14,
+    "final_time": 0.0038,
+    "steps": 1804,
+    "wall_time_s": 30.008050591000938
+  }
+}

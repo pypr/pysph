@@ -33,6 +33,12 @@ cdef extern from "limits.h":
 
 _UINT_MAX = UINT_MAX
 
+
+def _get_particle_array_backend(backend):
+    if backend == 'warp':
+        return 'warp'
+    return get_backend(backend)
+
 # Declares various tags for particles, and functions to check them.
 
 # Note that these tags are the ones set in the 'tag' property of the
@@ -129,7 +135,7 @@ cdef class ParticleArray:
             for each property.
 
         """
-        self.backend = get_backend(backend)
+        self.backend = _get_particle_array_backend(backend)
         self.time = 0.0
         self.name = name
 
@@ -150,7 +156,11 @@ cdef class ParticleArray:
         # list of output property arrays
         self.output_property_arrays = []
 
-        if self.backend is not 'cython':
+        if self.backend == 'warp':
+            from pysph.base.warp_device_helper import WarpDeviceHelper
+            h = WarpDeviceHelper(self, backend=self.backend)
+            self.set_device_helper(h)
+        elif self.backend is not 'cython':
             h = DeviceHelper(self, backend=self.backend)
             self.set_device_helper(h)
         else:
@@ -296,7 +306,7 @@ cdef class ParticleArray:
     # `Public` interface
     ######################################################################
     def update_backend(self, backend=None):
-        self.backend = get_backend(backend)
+        self.backend = _get_particle_array_backend(backend)
 
     def set_output_arrays(self, list props):
         """Set the list of output arrays for this ParticleArray
@@ -423,7 +433,7 @@ cdef class ParticleArray:
     cpdef int get_number_of_particles(self, bint real=False):
         """ Return the number of particles """
         if self.gpu is not None and self.backend is not 'cython':
-            return self.gpu.get_number_of_particles()
+            return self.gpu.get_number_of_particles(real)
         if real:
             return self.num_real_particles
         else:
@@ -465,6 +475,10 @@ cdef class ParticleArray:
 
         """
         if self.gpu is not None and self.backend is not 'cython':
+            if self.backend == 'warp':
+                if isinstance(indices, BaseArray):
+                    indices = indices.get_npy_array()
+                return self.gpu.remove_particles(indices, align=align)
             if type(indices) != Array:
                 if isinstance(indices, BaseArray):
                     indices = indices.get_npy_array()
@@ -559,6 +573,8 @@ cdef class ParticleArray:
             self._check_property(prop)
 
         if self.gpu is not None and self.backend is not 'cython':
+            if self.backend == 'warp':
+                return self.gpu.add_particles(align=align, **particle_props)
             gpu_particle_props = {}
             for prop, ary in particle_props.items():
                 if prop in self.gpu.properties:
@@ -1269,6 +1285,9 @@ cdef class ParticleArray:
 
         """
         if self.gpu is not None and self.backend is not 'cython':
+            if self.backend == 'warp':
+                return self.gpu.extract_particles(indices, dest_array=dest_array,
+                                                  align=align, props=props)
             if type(indices) != Array:
                 indices = to_device(
                         numpy.array(indices, dtype=numpy.uint32),

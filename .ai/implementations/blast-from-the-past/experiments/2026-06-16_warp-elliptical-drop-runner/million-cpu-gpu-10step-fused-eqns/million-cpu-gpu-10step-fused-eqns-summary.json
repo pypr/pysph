@@ -1,0 +1,163 @@
+{
+  "adaptive_guard_nx100_resolved": {
+    "committed_steps": 1393,
+    "committed_warp_wall_s": 23.629107111992198,
+    "deltas_vs_committed_warp": {
+      "axis_major": 4.768e-07,
+      "axis_minor": 4.768e-07,
+      "kinetic_energy": 0.0001449,
+      "rho_max": 1.073e-06,
+      "rho_min": -9.537e-07
+    },
+    "fused_all_finite": true,
+    "fused_steps": 1393,
+    "fused_wall_s_samples": [
+      10.83,
+      14.33
+    ],
+    "note": "adaptive path now runs fused(1)+dt_factors(1)=2 traversals/stage vs 5; step count identical, near-fp parity; per-step-compute-bound so the fusion shows in wall time here",
+    "output_time": 0.0038,
+    "particles": 31417
+  },
+  "case": {
+    "alpha": 0.1,
+    "beta": 0.0,
+    "c0": 1400.0,
+    "density_mode": "continuity",
+    "dt": 3.732778967800475e-07,
+    "gamma": 7.0,
+    "kernel": "Gaussian",
+    "mode": "fixed timestep",
+    "nx": 565,
+    "optimization": "ADR-0003 dynamic equation-group code generation; fuse continuity + pressure gradient + artificial viscosity + XSPH into one generated kernel (1 equation launch per PEC half-stage)",
+    "particles": 1002885,
+    "rho0": 1.0,
+    "steps": 10,
+    "tf": 3.732778967800475e-06,
+    "xsph_eps": 0.5
+  },
+  "cpu": {
+    "metrics": {
+      "all_finite": true,
+      "axis_x_abs": 0.999184493010564,
+      "axis_y_abs": 0.9999306197161054,
+      "kinetic_energy": 7854.129614325726,
+      "p_max": 131.6238816019233,
+      "p_min": -138.08411842127555,
+      "particles": 1002885,
+      "rho_max": 1.000068054002785,
+      "rho_min": 0.9999282369195914,
+      "steps": 10,
+      "time": 3.732778967800475e-06,
+      "x_max": 0.999184493010564,
+      "x_min": -0.9982998675927736,
+      "y_max": 0.9999306197161054,
+      "y_min": -0.9990453336294709
+    },
+    "note": "recorded baseline, unchanged (CPU inputs identical); output HDF5 was cleaned up, metrics retained"
+  },
+  "deltas_vs_cpu": {
+    "kinetic_energy": 8.518917638866697e-06,
+    "p_max": 0.18822166956107367,
+    "p_min": 0.030224378306797917,
+    "rho_max": 1.4501548406542497e-08,
+    "rho_min": -9.119009991565008e-10,
+    "x_max": -1.2296967044633789e-07,
+    "x_min": -1.4833358752408543e-07,
+    "y_max": 4.773760275966765e-10,
+    "y_min": 8.082948310672577e-08
+  },
+  "deltas_vs_prior_warp_separate_kernels": {
+    "kinetic_energy": -6.4310370362363756e-09,
+    "p_max": 0.0,
+    "p_min": 0.0,
+    "rho_max": 0.0,
+    "rho_min": 0.0,
+    "x_max": 0.0,
+    "x_min": 0.0,
+    "y_max": 0.0,
+    "y_min": 0.0
+  },
+  "performance": {
+    "cpu_wall_time_s": 57.48,
+    "note": "10-step headline wall is overhead/IO-bound (Warp init + 1M-particle mgrid creation + 282MB npz write); per-step compute is the meaningful metric below",
+    "prior_cache_reuse_speedup": 12.7450110864745,
+    "prior_cache_reuse_warp_wall_time_s": 4.51,
+    "speedup_wall_time_best": 15.246684350132625,
+    "warp_wall_time_s_best": 3.77,
+    "warp_wall_time_s_cold_first_compile": 6.15,
+    "warp_wall_time_s_warm_samples": [
+      6.04,
+      5.94,
+      4.89,
+      3.77,
+      4.05
+    ]
+  },
+  "segmented_profile_per_step": {
+    "cache_build_s_per_step_range": [
+      0.033743,
+      0.045973
+    ],
+    "cache_builds_per_step": 2,
+    "equation_kernel_time_s_per_step_range": [
+      0.011272,
+      0.014
+    ],
+    "equation_launches_per_step": 2,
+    "equation_time_reduction_factor_approx": "5-6x",
+    "note": "cache build is now the dominant per-step cost (~45-50% of step wall)",
+    "prior_equation_kernel_time_s_per_step_estimate_range": [
+      0.064,
+      0.088
+    ],
+    "prior_equation_launches_per_step": 8,
+    "prior_step_wall_s_range": [
+      0.098335,
+      0.13829
+    ],
+    "step_wall_s_steady_state_range": [
+      0.075883,
+      0.097561
+    ]
+  },
+  "warp": {
+    "metrics": {
+      "adaptive_dt": false,
+      "all_finite": true,
+      "alpha": 0.1,
+      "beta": 0.0,
+      "c0": 1400.0,
+      "cfl": 0.25,
+      "cs_max": 1400.2823486328125,
+      "cs_min": 1399.7041015625,
+      "density_mode": "continuity",
+      "dt": 3.732778967800475e-07,
+      "dt_last": 3.732778967800475e-07,
+      "dt_max": 3.732778967800475e-07,
+      "dt_max_used": 3.732778967800475e-07,
+      "dt_min": 0.0,
+      "dt_min_used": 3.732778967800475e-07,
+      "eos": "tait",
+      "gamma": 7.0,
+      "kernel": "gaussian",
+      "kinetic_energy": 7854.129622844644,
+      "nx": 565,
+      "p_max": 131.81210327148438,
+      "p_min": -138.05389404296875,
+      "particles": 1002885,
+      "radius_max": 1.0003696716858386,
+      "radius_scale": 3.0,
+      "rho_max": 1.0000680685043335,
+      "rho_min": 0.9999282360076904,
+      "steps": 10,
+      "time": 3.732778967800476e-06,
+      "x_max": 0.9991843700408936,
+      "x_min": -0.9983000159263611,
+      "xsph_eps": 0.5,
+      "y_max": 0.9999306201934814,
+      "y_min": -0.9990452527999878
+    },
+    "path": ".ai/implementations/blast-from-the-past/experiments/2026-06-16_warp-elliptical-drop-runner/million-cpu-gpu-10step-fused-eqns/warp/million-warp.npz"
+  }
+}

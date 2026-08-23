@@ -1,0 +1,42 @@
+{
+  "benchmark": "warp grid-direct WCSPH continuity PEC step (fp32)",
+  "hardware": {
+    "name": "NVIDIA L40S",
+    "arch": "sm_89",
+    "memory_gib": 44.4,
+    "warp": "1.14.0",
+    "cuda_toolkit": "12.9",
+    "driver_cuda": "12.7",
+    "host": "brev-f96p16hkk",
+    "run_by": "@kunalpuri-prediqt",
+    "date": "2026-06-18"
+  },
+  "config": {
+    "dt": 3.732778967800475e-07,
+    "steps": 20,
+    "warmup_discarded": 8,
+    "physics": {
+      "rho0": 1.0,
+      "c0": 1400.0,
+      "p0": 0.0,
+      "alpha": 0.1,
+      "beta": 0.0,
+      "eos": "tait",
+      "gamma": 7.0,
+      "kernel": "gaussian",
+      "xsph_eps": 0.5,
+      "density_mode": "continuity"
+    },
+    "cold_compile_s": 89.11
+  },
+  "results": [
+    {"nx": 100, "particles": 31417, "setup_s": 0.0, "per_step_s_min": 0.001498, "per_step_s_median": 0.001509, "per_step_s_max": 0.001533, "throughput_particle_steps_per_s": 20814796.2, "all_finite": true},
+    {"nx": 200, "particles": 125629, "setup_s": 0.0, "per_step_s_min": 0.002583, "per_step_s_median": 0.002607, "per_step_s_max": 0.003151, "throughput_particle_steps_per_s": 48191832.9, "all_finite": true},
+    {"nx": 400, "particles": 502625, "setup_s": 0.0, "per_step_s_min": 0.006182, "per_step_s_median": 0.006209, "per_step_s_max": 0.006236, "throughput_particle_steps_per_s": 80950765.0, "all_finite": true},
+    {"nx": 565, "particles": 1002885, "setup_s": 0.0, "per_step_s_min": 0.010867, "per_step_s_median": 0.010915, "per_step_s_max": 0.011021, "throughput_particle_steps_per_s": 91884908.4, "all_finite": true},
+    {"nx": 1000, "particles": 3141549, "setup_s": 0.0, "per_step_s_min": 0.032031, "per_step_s_median": 0.032157, "per_step_s_max": 0.032343, "throughput_particle_steps_per_s": 97695297.7, "all_finite": true},
+    {"nx": 1400, "particles": 6157477, "setup_s": 0.0002, "per_step_s_min": 0.062852, "per_step_s_median": 0.063098, "per_step_s_max": 0.063477, "throughput_particle_steps_per_s": 97586559.3, "all_finite": true},
+    {"nx": 1800, "particles": 10178545, "setup_s": 0.0002, "per_step_s_min": 0.102138, "per_step_s_median": 0.102492, "per_step_s_max": 0.103182, "throughput_particle_steps_per_s": 99310562.3, "all_finite": true},
+    {"nx": 2600, "particles": 21236953, "setup_s": 0.0083, "per_step_s_min": 0.354146, "per_step_s_median": 0.356544, "per_step_s_max": 0.358542, "throughput_particle_steps_per_s": 59563296.4, "all_finite": true}
+  ]
+}

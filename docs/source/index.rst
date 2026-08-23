@@ -49,6 +49,7 @@ Installation and getting started
    installation.rst
    tutorial/circular_patch_simple.rst
    tutorial/circular_patch.rst
+   tutorial/warp_particle_array.rst
 
 
 ***************************

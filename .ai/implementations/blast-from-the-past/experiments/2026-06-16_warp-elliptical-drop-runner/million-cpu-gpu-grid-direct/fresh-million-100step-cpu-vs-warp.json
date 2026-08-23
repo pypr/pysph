@@ -1,0 +1,56 @@
+{
+  "case": {
+    "cpu_backend": "pysph Application (elliptical_drop_no_scheme), single-threaded, --no-adaptive-timestep",
+    "density_mode": "continuity",
+    "dt": 3.732778967800475e-07,
+    "eos": "tait",
+    "kernel": "gaussian",
+    "mode": "fixed timestep",
+    "nx": 565,
+    "particles": 1002885,
+    "steps": 100,
+    "warp_path": "grid-direct (ADR-0004)"
+  },
+  "cpu": {
+    "all_finite": true,
+    "command": [
+      "/home/kunalp/.pqt_venv_e0b41259/bin/python",
+      "pysph/examples/elliptical_drop_no_scheme.py",
+      "--nx",
+      "565",
+      "--tf",
+      "3.732778967800475e-05",
+      "--timestep",
+      "3.732778967800475e-07",
+      "--no-adaptive-timestep",
+      "--n-damp",
+      "0",
+      "--pfreq",
+      "100",
+      "--fname",
+      "cpu",
+      "--directory",
+      "/tmp/headline_million/cpu-app-output",
+      "--logfile",
+      "",
+      "--quiet"
+    ],
+    "kinetic_energy": 7854.038960953369,
+    "particles": 1002885,
+    "per_step_s": 3.4450491134000187,
+    "steps_recorded": 100,
+    "total_s": 344.50491134000185
+  },
+  "kinetic_energy_rel_delta": 1.6373507657086987e-09,
+  "speedup_per_step": 57.64458860827358,
+  "speedup_total_wall": 41.17249293352525,
+  "warp": {
+    "all_finite": true,
+    "kinetic_energy": 7854.038948093552,
+    "particles": 1002885,
+    "per_step_s": 0.059763616959971844,
+    "setup_s": 2.390994438988855,
+    "steps_s": 5.976361695997184,
+    "total_s": 8.36735613498604
+  }
+}

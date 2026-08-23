@@ -1,0 +1,217 @@
+{
+  "case": {
+    "alpha": 0.1,
+    "beta": 0.0,
+    "c0": 1400.0,
+    "cfl": 0.3,
+    "dt": 2.1090201168072683e-06,
+    "gamma": 7.0,
+    "hdx": 1.3,
+    "n_damp": 50,
+    "nx": 100,
+    "output_times": [
+      0.0008,
+      0.0038
+    ],
+    "p0": 0.0,
+    "rho0": 1.0,
+    "warp_density_mode": "continuity",
+    "warp_dt_max": Infinity,
+    "warp_timestep_policy": "pysph",
+    "xsph_eps": 0.5
+  },
+  "comparisons": {
+    "t0p0008000": {
+      "deltas": {
+        "axis_major_estimate": -5.596712788769054e-07,
+        "axis_minor_estimate": 5.454902523016614e-07,
+        "kinetic_energy": -0.0033081273668358335,
+        "rho_max": 8.027067783800135e-07,
+        "rho_min": -3.310849231441537e-07,
+        "x_max": 5.45490252523706e-07,
+        "x_min": -3.666763179754895e-07,
+        "y_max": -5.596712782107716e-07,
+        "y_min": 5.596712788769054e-07
+      },
+      "image": "/tmp/headline_nx100/headline-nx100-t0p0008000.png",
+      "time": 0.0008
+    },
+    "t0p0038000": {
+      "deltas": {
+        "axis_major_estimate": -5.510011020781747e-07,
+        "axis_minor_estimate": 1.7770991430632321e-06,
+        "kinetic_energy": -0.0002200547114625806,
+        "rho_max": 1.1139908333568371e-06,
+        "rho_min": -1.2401270134132503e-06,
+        "x_max": 1.7770991441734552e-06,
+        "x_min": -1.002238760983154e-06,
+        "y_max": -6.702103911848667e-07,
+        "y_min": 5.510011020781747e-07
+      },
+      "image": "/tmp/headline_nx100/headline-nx100-t0p0038000.png",
+      "time": 0.0038
+    }
+  },
+  "cpu": {
+    "average_step_time_s": 0.11493080448025716,
+    "backend": "pysph-application",
+    "checkpoints": {
+      "t0p0008000": {
+        "metrics": {
+          "all_finite": true,
+          "axis_major_estimate": 1.0816640490130147,
+          "axis_minor_estimate": 0.9220712094421513,
+          "axis_x_abs": 0.9220712094421513,
+          "axis_y_abs": 1.0816640490130147,
+          "exact_major_axis": 1.0831034701687434,
+          "exact_minor_axis": 0.9232728243814081,
+          "kinetic_energy": 7818.556269923258,
+          "p_max": 11071.301686731818,
+          "p_min": -835.6697397960966,
+          "particles": 31417,
+          "rho_max": 1.0055542309769985,
+          "rho_min": 0.9995725485493702,
+          "time": 0.0008,
+          "x_max": 0.922071209442151,
+          "x_min": -0.9220712094421513,
+          "y_max": 1.081664049013014,
+          "y_min": -1.0816640490130147
+        },
+        "path": "/tmp/headline_nx100/headline-nx100-pysph-app-output/headline-nx100-pysph_00313.hdf5"
+      },
+      "t0p0038000": {
+        "metrics": {
+          "all_finite": true,
+          "axis_major_estimate": 1.4365264918961826,
+          "axis_minor_estimate": 0.6964109650387659,
+          "axis_x_abs": 0.6964109650387659,
+          "axis_y_abs": 1.4365264918961826,
+          "exact_major_axis": 1.4392190525454083,
+          "exact_minor_axis": 0.6948212631228,
+          "kinetic_energy": 7797.707446258537,
+          "p_max": 4204.864301278084,
+          "p_min": -4743.656305926694,
+          "particles": 31417,
+          "rho_max": 1.002131063362072,
+          "rho_min": 0.9975631121324761,
+          "time": 0.0038,
+          "x_max": 0.6964109650387648,
+          "x_min": -0.6964109650387659,
+          "y_max": 1.4365264918961822,
+          "y_min": -1.4365264918961826
+        },
+        "path": "/tmp/headline_nx100/headline-nx100-pysph-app-output/headline-nx100-pysph_01393.hdf5"
+      }
+    },
+    "command": [
+      "/home/kunalp/.pqt_venv_e0b41259/bin/python",
+      "pysph/examples/elliptical_drop_no_scheme.py",
+      "--nx",
+      "100",
+      "--tf",
+      "0.0038",
+      "--timestep",
+      "2.1090201168072683e-06",
+      "--adaptive-timestep",
+      "--cfl",
+      "0.3",
+      "--n-damp",
+      "50",
+      "--fname",
+      "headline-nx100-pysph",
+      "--directory",
+      "/tmp/headline_nx100/headline-nx100-pysph-app-output",
+      "--logfile",
+      "",
+      "--quiet"
+    ],
+    "dt_max": 2.780917055777183e-06,
+    "dt_mean": 2.7404840979225977e-06,
+    "dt_min": 2.2023818173548364e-06,
+    "final_time": 0.0038,
+    "output_dir": "/tmp/headline_nx100/headline-nx100-pysph-app-output",
+    "stdout_tail": "/home/kunalp/work/particles/pysph/pysph/solver/output.py:257: H5pyDeprecationWarning: Creating a dataset without passing data or dtype is deprecated. Pass an explicit dtype. Using dtype='f4' will keep the current default behaviour.\n  prop = ptype_grp.create_dataset(propname, (0,))\nCreate our own solver.\nCreate our own equations.\nElliptical drop :: 31417 particles\n",
+    "steps": 1393,
+    "wall_time_s": 160.09861064099823
+  },
+  "hardware": {
+    "platform": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+    "processor": "",
+    "python": "3.14.4",
+    "warp_device": "cuda:0",
+    "warp_version": "1.14.0"
+  },
+  "performance": {
+    "cpu_average_step_time_s": 0.11493080448025716,
+    "cpu_wall_time_s": 160.09861064099823,
+    "speedup_wall_time": 23.610256518463927,
+    "warp_average_step_time_s": 0.004867833790385879,
+    "warp_wall_time_s": 6.7808924700075295
+  },
+  "warp": {
+    "average_step_time_s": 0.004867833790385879,
+    "backend": "warp",
+    "checkpoints": {
+      "t0p0008000": {
+        "metrics": {
+          "all_finite": true,
+          "axis_major_estimate": 1.0816634893417358,
+          "axis_minor_estimate": 0.9220717549324036,
+          "axis_x_abs": 0.9220717549324036,
+          "axis_y_abs": 1.0816634893417358,
+          "dt_max": 2.7813784981844947e-06,
+          "dt_mean": 2.555910543130991e-06,
+          "dt_min": 2.7459356128852786e-09,
+          "exact_major_axis": 1.0831034701687434,
+          "exact_minor_axis": 0.9232728243814081,
+          "kinetic_energy": 7818.552961795891,
+          "p_max": 11072.9501953125,
+          "p_min": -836.334228515625,
+          "particles": 31417,
+          "rho_max": 1.0055550336837769,
+          "rho_min": 0.999572217464447,
+          "steps": 313,
+          "time": 0.0008,
+          "x_max": 0.9220717549324036,
+          "x_min": -0.9220715761184692,
+          "y_max": 1.0816634893417358,
+          "y_min": -1.0816634893417358
+        },
+        "path": "/tmp/headline_nx100/headline-nx100-warp-t0p0008000.npz"
+      },
+      "t0p0038000": {
+        "metrics": {
+          "all_finite": true,
+          "axis_major_estimate": 1.4365259408950806,
+          "axis_minor_estimate": 0.6964127421379089,
+          "axis_x_abs": 0.6964127421379089,
+          "axis_y_abs": 1.4365259408950806,
+          "dt_max": 2.7813784981844947e-06,
+          "dt_mean": 2.727925340990668e-06,
+          "dt_min": 2.7459356128852786e-09,
+          "exact_major_axis": 1.4392190525454083,
+          "exact_minor_axis": 0.6948212631228,
+          "kinetic_energy": 7797.7072262038255,
+          "p_max": 4207.072265625,
+          "p_min": -4745.986328125,
+          "particles": 31417,
+          "rho_max": 1.0021321773529053,
+          "rho_min": 0.9975618720054626,
+          "steps": 1393,
+          "time": 0.0038,
+          "x_max": 0.6964127421379089,
+          "x_min": -0.6964119672775269,
+          "y_max": 1.436525821685791,
+          "y_min": -1.4365259408950806
+        },
+        "path": "/tmp/headline_nx100/headline-nx100-warp-t0p0038000.npz"
+      }
+    },
+    "dt_max": 2.7813784981844947e-06,
+    "dt_mean": 2.727925340990668e-06,
+    "dt_min": 2.7459356128852786e-09,
+    "final_time": 0.0038,
+    "steps": 1393,
+    "wall_time_s": 6.7808924700075295
+  }
+}

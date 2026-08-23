@@ -1,0 +1,39 @@
+{
+  "all_finite": true,
+  "dt": 3.732778967800475e-07,
+  "equation_launch_s_steady_range": [
+    0.02299178799148649,
+    0.02507138199871406
+  ],
+  "equation_launches_total": 24,
+  "flat_cache_builds_total": 0,
+  "grid_build_s_steady_range": [
+    0.0003788399917539209,
+    0.0006921150052221492
+  ],
+  "grid_builds_per_step": 2.0,
+  "grid_builds_total": 24,
+  "kinetic_energy": 7854.127631112813,
+  "nx": 565,
+  "particles": 1002885,
+  "step_wall_s_all": [
+    0.144287,
+    0.068555,
+    0.062785,
+    0.063623,
+    0.063873,
+    0.063535,
+    0.060361,
+    0.059156,
+    0.060748,
+    0.060081,
+    0.059521,
+    0.059179
+  ],
+  "step_wall_s_steady_range": [
+    0.05915589100914076,
+    0.0638731880026171
+  ],
+  "steps": 12,
+  "warmup_discarded": 2
+}
