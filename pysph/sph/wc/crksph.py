@@ -17,7 +17,7 @@ from math import sqrt, exp
 from compyle.api import declare
 from pysph.sph.equation import Equation, Group, MultiStageEquations
 from pysph.sph.wc.linalg import (
-    augmented_matrix, dot, gj_solve, identity, mat_vec_mult
+    augmented_matrix, dot_product, gj_solve, identity, mat_vec_mult
 )
 from pysph.sph.scheme import Scheme
 from pysph.base.utils import get_particle_array
@@ -35,7 +35,8 @@ class CRKSPHPreStep(Equation):
         super(CRKSPHPreStep, self).__init__(dest, sources)
 
     def _get_helpers_(self):
-        return [augmented_matrix, gj_solve, identity, dot, mat_vec_mult]
+        return [augmented_matrix, gj_solve, identity, dot_product,
+                mat_vec_mult]
 
     def loop_all(self, d_idx, d_x, d_y, d_z, d_h, s_x, s_y, s_z, s_h, s_m,
                  s_rho, SPH_KERNEL, NBRS, N_NBRS, d_ai, d_gradai, d_bi, s_V,
@@ -118,7 +119,7 @@ class CRKSPHPreStep(Equation):
             mat_vec_mult(m2inv, m1, d, temp_vec)
 
             # Eq. 12.
-            ai = 1.0/(m0 - dot(temp_vec, m1, d))
+            ai = 1.0/(m0 - dot_product(temp_vec, m1, d))
             # Eq. 13.
             mat_vec_mult(m2inv, m1, d, bi)
             for gam in range(d):
@@ -548,7 +549,7 @@ class MomentumEquation(Equation):
         super(MomentumEquation, self).__init__(dest, sources)
 
     def _get_helpers_(self):
-        return [dot]
+        return [dot_product]
 
     def initialize(self, d_idx, d_au, d_av, d_aw):
         d_au[d_idx] = self.gx
@@ -593,10 +594,10 @@ class MomentumEquation(Equation):
                 tmprj += s_gradv[d*d*s_idx + d*alp + bet] * XIJ[alp] * XIJ[bet]
         rij = tmpri/tmprj
 
-        tmprij = min(1, 4*rij/((1 + rij)*(1 + rij)))
-        phiij = max(0, tmprij)
+        tmprij = min(1.0, 4*rij/((1 + rij)*(1 + rij)))
+        phiij = max(0.0, tmprij)
 
-        tmpxij = dot(XIJ, XIJ, d)
+        tmpxij = dot_product(XIJ, XIJ, d)
         tmpxij2 = sqrt(tmpxij)
         etai_scalar = tmpxij2/hi
         etaj_scalar = tmpxij2/hj
@@ -617,11 +618,11 @@ class MomentumEquation(Equation):
         uijhat[1] = d_v[d_idx] - s_v[s_idx] - 0.5*phiij * tmpdvxij[1]
         uijhat[2] = d_w[d_idx] - s_w[s_idx] - 0.5*phiij * tmpdvxij[2]
 
-        tmpmui = dot(uijhat, XIJ, d) / (tmpxij/hi + EPS * hi)
-        mui = min(0, tmpmui)
+        tmpmui = dot_product(uijhat, XIJ, d) / (tmpxij/hi + EPS * hi)
+        mui = min(0.0, tmpmui)
 
-        tmpmuj = dot(uijhat, XIJ, d) / (tmpxij/hi + EPS * hj)
-        muj = min(0, tmpmuj)
+        tmpmuj = dot_product(uijhat, XIJ, d) / (tmpxij/hi + EPS * hj)
+        muj = min(0.0, tmpmuj)
 
         Qi = rhoi * (-Cl*ci*mui + Cq*mui*mui)
         Qj = rhoj * (-Cl*cj*muj + Cq*muj*muj)
@@ -677,7 +678,7 @@ class EnergyEquation(Equation):
         super(EnergyEquation, self).__init__(dest, sources)
 
     def _get_helpers_(self):
-        return [dot]
+        return [dot_product]
 
     def initialize(self, d_idx, d_ae):
         d_ae[d_idx] = 0.0
@@ -720,10 +721,10 @@ class EnergyEquation(Equation):
                 tmprj += s_gradv[d*d*s_idx + d*alp + bet] * XIJ[alp] * XIJ[bet]
         rij = tmpri/tmprj
 
-        tmprij = min(1, 4*rij/((1 + rij)*(1 + rij)))
-        phiij = max(0, tmprij)
+        tmprij = min(1.0, 4*rij/((1 + rij)*(1 + rij)))
+        phiij = max(0.0, tmprij)
 
-        tmpxij = dot(XIJ, XIJ, d)
+        tmpxij = dot_product(XIJ, XIJ, d)
         tmpxij2 = sqrt(tmpxij)
         etai_scalar = tmpxij2/hi
         etaj_scalar = tmpxij2/hj
@@ -744,11 +745,11 @@ class EnergyEquation(Equation):
         uijhat[1] = d_v0[d_idx] - s_v0[s_idx] - 0.5*phiij * tmpdvxij[1]
         uijhat[2] = d_w0[d_idx] - s_w0[s_idx] - 0.5*phiij * tmpdvxij[2]
 
-        tmpmui = dot(uijhat, XIJ, d) / (tmpxij/hi + EPS * hi)
-        mui = min(0, tmpmui)
+        tmpmui = dot_product(uijhat, XIJ, d) / (tmpxij/hi + EPS * hi)
+        mui = min(0.0, tmpmui)
 
-        tmpmuj = dot(uijhat, XIJ, d) / (tmpxij/hi + EPS * hj)
-        muj = min(0, tmpmuj)
+        tmpmuj = dot_product(uijhat, XIJ, d) / (tmpxij/hi + EPS * hj)
+        muj = min(0.0, tmpmuj)
 
         Qi = rhoi * (-Cl*ci*mui + Cq*mui*mui)
         Qj = rhoj * (-Cl*cj*muj + Cq*muj*muj)
@@ -766,7 +767,7 @@ class EnergyEquation(Equation):
         delu[1] = s_v0[s_idx] + s_v[s_idx] - d_v0[d_idx] - d_v[d_idx]
         delu[2] = s_w0[s_idx] + s_w[s_idx] - d_w0[d_idx] - d_w[d_idx]
 
-        aeij = dot(delu, auij, d)
+        aeij = dot_product(delu, auij, d)
 
         si = d_p[d_idx]/((d_rho[d_idx])**gamma)
         sj = s_p[s_idx]/((s_rho[s_idx])**gamma)
@@ -807,7 +808,7 @@ class SpeedOfSound(Equation):
         self.gamma = gamma
 
     def initialize(self, d_cs, d_idx, d_p, d_rho):
-        d_cs[d_idx] = (self.gamma * d_p[d_idx] / d_rho[d_idx])**0.5
+        d_cs[d_idx] = sqrt(self.gamma * d_p[d_idx] / d_rho[d_idx])
 
 
 class CRKSPHUpdateGhostProps(Equation):

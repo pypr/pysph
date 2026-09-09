@@ -1,5 +1,5 @@
 from pysph.sph.wc.linalg import (
-    augmented_matrix, gj_solve, mat_mult, mat_vec_mult
+    augmented_matrix, dot, dot_product, gj_solve, mat_mult, mat_vec_mult
 )
 import numpy as np
 import unittest
@@ -14,6 +14,14 @@ def gj_solve_helper(a, b, n):
 
 
 class TestLinalg(unittest.TestCase):
+
+    def test_dot_product(self):
+        a = [1.5, -2.0, 3.0]
+        b = [-4.0, 0.5, 2.0]
+        for n in (1, 2, 3):
+            expected = np.dot(a[:n], b[:n])
+            self.assertAlmostEqual(dot_product(a, b, n), expected)
+            self.assertAlmostEqual(dot(a, b, n), expected)
 
     def _to_array(self, x, shape=None):
         x = np.asarray(x)
