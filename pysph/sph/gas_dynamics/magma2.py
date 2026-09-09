@@ -29,7 +29,7 @@ from pysph.sph.integrator import Integrator
 from pysph.sph.integrator_step import IntegratorStep
 from pysph.sph.scheme import Scheme, add_bool_argument
 from pysph.sph.wc.linalg import (augmented_matrix, gj_solve, identity,
-                                 mat_mult, mat_vec_mult, dot)
+                                 mat_mult, mat_vec_mult, dot_product)
 
 GHOST_TAG = get_ghost_tag()
 
@@ -1119,7 +1119,7 @@ class MomentumAndEnergy(Equation):
         super().__init__(dest, sources)
 
     def _get_helpers_(self):
-        return [dot]
+        return [dot_product]
 
     def initialize(self, d_idx, d_au, d_av, d_aw, d_ae):
         d_au[d_idx] = 0.0
@@ -1155,8 +1155,8 @@ class MomentumAndEnergyStdGrad(MomentumAndEnergy):
             etaj[row] = XIJ[row] / hj
 
         # Limiter
-        etaisq = dot(etai, etai, dim)
-        etajsq = dot(etaj, etaj, dim)
+        etaisq = dot_product(etai, etai, dim)
+        etajsq = dot_product(etaj, etaj, dim)
         etaij = sqrt(min(etaisq, etajsq))
 
         aanum = 0.0
@@ -1217,8 +1217,8 @@ class MomentumAndEnergyStdGrad(MomentumAndEnergy):
 
         # Artificial viscosity
         vsigng = sqrt(abs(d_p[d_idx] - s_p[s_idx]) * RHOIJ1)
-        mui = min(0.0, dot(vij, etai, dim) / (etaisq + epssq))
-        muj = min(0.0, dot(vij, etaj, dim) / (etajsq + epssq))
+        mui = min(0.0, dot_product(vij, etai, dim) / (etaisq + epssq))
+        muj = min(0.0, dot_product(vij, etaj, dim) / (etajsq + epssq))
         qi = d_rho[d_idx] * mui * (-d_alpha[d_idx] * d_cs[d_idx] + beta * mui)
         qj = s_rho[s_idx] * muj * (-s_alpha[s_idx] * s_cs[s_idx] + beta * muj)
         pi = d_p[d_idx] + qi
@@ -1233,7 +1233,7 @@ class MomentumAndEnergyStdGrad(MomentumAndEnergy):
         d_aw[d_idx] -= mjpibyrhoisq * DWI[2] + mjpjbyrhojsq * DWJ[2]
 
         # Accelerations for the thermal energy
-        vijdotdwi = dot(VIJ, DWI, dim)
+        vijdotdwi = dot_product(VIJ, DWI, dim)
         d_ae[d_idx] += mjpibyrhoisq * vijdotdwi
 
         # artificial conduction
@@ -1273,8 +1273,8 @@ class MomentumAndEnergyMI1(MomentumAndEnergy):
             etaj[row] = XIJ[row] / hj
 
         # Limiter
-        etaisq = dot(etai, etai, dim)
-        etajsq = dot(etaj, etaj, dim)
+        etaisq = dot_product(etai, etai, dim)
+        etajsq = dot_product(etaj, etaj, dim)
         etaij = sqrt(min(etaisq, etajsq))
 
         aanum = 0.0
@@ -1340,8 +1340,8 @@ class MomentumAndEnergyMI1(MomentumAndEnergy):
 
         # Artificial viscosity
         vsigng = sqrt(abs(d_p[d_idx] - s_p[s_idx]) * RHOIJ1)
-        mui = min(0.0, dot(vij, etai, dim) / (etaisq + epssq))
-        muj = min(0.0, dot(vij, etaj, dim) / (etajsq + epssq))
+        mui = min(0.0, dot_product(vij, etai, dim) / (etaisq + epssq))
+        muj = min(0.0, dot_product(vij, etaj, dim) / (etajsq + epssq))
         qi = d_rho[d_idx] * mui * (-d_alpha[d_idx] * d_cs[d_idx] + beta * mui)
         qj = s_rho[s_idx] * muj * (-s_alpha[s_idx] * s_cs[s_idx] + beta * muj)
         pi = d_p[d_idx] + qi
@@ -1356,7 +1356,7 @@ class MomentumAndEnergyMI1(MomentumAndEnergy):
         d_aw[d_idx] -= mjpibyrhoisq * gmi[2] + mjpjbyrhojsq * gmj[2]
 
         # Accelerations for the thermal energy
-        vijdotdwi = dot(VIJ, gmi, dim)
+        vijdotdwi = dot_product(VIJ, gmi, dim)
         d_ae[d_idx] += mjpibyrhoisq * vijdotdwi
 
         # artificial conduction
@@ -1395,8 +1395,8 @@ class MomentumAndEnergyMI2(MomentumAndEnergy):
             gmij[row] = 0.0
 
         # Limiter
-        etaisq = dot(etai, etai, dim)
-        etajsq = dot(etaj, etaj, dim)
+        etaisq = dot_product(etai, etai, dim)
+        etajsq = dot_product(etaj, etaj, dim)
         etaij = sqrt(min(etaisq, etajsq))
 
         aanum = 0.0
@@ -1464,8 +1464,8 @@ class MomentumAndEnergyMI2(MomentumAndEnergy):
 
         # Artificial viscosity
         vsigng = sqrt(abs(d_p[d_idx] - s_p[s_idx]) * RHOIJ1)
-        mui = min(0.0, dot(vij, etai, dim) / (etaisq + epssq))
-        muj = min(0.0, dot(vij, etaj, dim) / (etajsq + epssq))
+        mui = min(0.0, dot_product(vij, etai, dim) / (etaisq + epssq))
+        muj = min(0.0, dot_product(vij, etaj, dim) / (etajsq + epssq))
         qi = d_rho[d_idx] * mui * (-d_alpha[d_idx] * d_cs[d_idx] + beta * mui)
         qj = s_rho[s_idx] * muj * (-s_alpha[s_idx] * s_cs[s_idx] + beta * muj)
         pi = d_p[d_idx] + qi
@@ -1480,7 +1480,7 @@ class MomentumAndEnergyMI2(MomentumAndEnergy):
         d_aw[d_idx] -= comn * gmij[2]
 
         # Accelerations for the thermal energy
-        vijdotgmij = dot(VIJ, gmij, dim)
+        vijdotgmij = dot_product(VIJ, gmij, dim)
         d_ae[d_idx] -= self.alphac * s_m[
             s_idx] * vsigng * eij * normgmij * RHOIJ1
         d_ae[d_idx] += s_m[s_idx] * pi * invrhosq * vijdotgmij
@@ -1496,14 +1496,14 @@ class EvaluateTildeMu(Equation):
         super().__init__(dest, sources)
 
     def _get_helpers_(self):
-        return [dot]
+        return [dot_product]
 
     def initialize(self, d_idx, d_tilmu):
         d_tilmu[d_idx] = -INFINITY
 
     def loop(self, d_tilmu, d_idx, d_h, VIJ, XIJ, R2IJ):
         d_tilmu[d_idx] = max(d_tilmu[d_idx],
-                             d_h[d_idx] * dot(VIJ, XIJ, self.dim) / (
+                             d_h[d_idx] * dot_product(VIJ, XIJ, self.dim) / (
                                      R2IJ + 0.01))
 
 

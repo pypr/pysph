@@ -13,12 +13,18 @@ def identity(a=[0.0, 0.0], n=3):
                 a[n*i + j] = 0.0
 
 
-def dot(a=[0.0, 0.0], b=[0.0, 0.0], n=3):
+def dot_product(a=[0.0, 0.0], b=[0.0, 0.0], n=3):
+    """Dot product of arrays, with a name distinct from OpenCL's builtin."""
     i = declare('int')
     result = 0.0
     for i in range(n):
         result += a[i]*b[i]
     return result
+
+
+# Backward-compatible name for Python callers. Transpiled equations should use
+# dot_product to avoid colliding with the OpenCL vector builtin.
+dot = dot_product
 
 
 def mat_mult(a=[1.0, 0.0], b=[1.0, 0.0], n=3, result=[0.0, 0.0]):
@@ -131,10 +137,10 @@ def gj_solve(m=[1., 0.], n=3, nb=1, result=[0.0, 0.0]):
     rr, rrcol, rb, rbr, kup, kupr, kleft, kleftr = declare('int', 8)
     for rrcol in range(0, colrange):
         for rr in range(rrcol + 1, eqns):
-            dnr = float(m[nt*rrcol + rrcol])
+            dnr = m[nt*rrcol + rrcol]
             if abs(dnr) < 1e-12:
                 return 1.0
-            cc = -float(m[nt*rr + rrcol]) / dnr
+            cc = -m[nt*rr + rrcol] / dnr
             for j in range(augCol):
                 m[nt*rr + j] = m[nt*rr + j] + cc * m[nt*rrcol + j]
 
