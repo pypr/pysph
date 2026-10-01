@@ -52,6 +52,9 @@ SPH equations
    :members:
    :undoc-members:
 
+.. automodule:: pysph.sph.solid_mech.hjc
+   :members: HJCStep, get_particle_array_hjc, hjc_parameters
+
 Gas Dynamics
 -------------
 

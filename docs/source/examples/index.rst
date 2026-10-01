@@ -13,8 +13,10 @@ variety of problems.
    taylor_green.rst
    sphere_in_vessel.rst
    flow_past_cylinder.rst
+   hjc.rst
 
 
 * :ref:`taylor_green`: the Taylor-Green Vortex problem in 2D.
 * :ref:`sphere_in_vessel`: A sphere floating in a hydrostatic tank example.
 * :ref:`flow_past_cylinder`: Flow past a circular cylinder in 2D. 
+* :ref:`hjc_impact`: Concrete block impact with HJC plasticity and damage.
