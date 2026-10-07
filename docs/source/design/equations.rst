@@ -280,35 +280,41 @@ methods,
 The following precomputed quantites are available and may be passed into any
 equation:
 
-    - ``HIJ = 0.5*(d_h[d_idx] + s_h[s_idx])``.
+    - ``HIJ = 0.5*(d_h[d_idx] + s_h[s_idx])``
+
+    - ``EPS = 0.01 * HIJ * HIJ``
+
+    - ``RHOIJ = 0.5*(d_rho[d_idx] + s_rho[s_idx])``
+    - ``RHOIJ1 = 1.0/RHOIJ``
 
     - ``XIJ[0] = d_x[d_idx] - s_x[s_idx]``,
       ``XIJ[1] = d_y[d_idx] - s_y[s_idx]``,
       ``XIJ[2] = d_z[d_idx] - s_z[s_idx]``
+
+    - ``VIJ[0] = d_u[d_idx] - s_u[s_idx]``,
+      ``VIJ[1] = d_v[d_idx] - s_v[s_idx]``,
+      ``VIJ[2] = d_w[d_idx] - s_w[s_idx]``
 
     - ``R2IJ = XIJ[0]*XIJ[0] + XIJ[1]*XIJ[1] + XIJ[2]*XIJ[2]``
 
     - ``RIJ = sqrt(R2IJ)``
 
     - ``WIJ = KERNEL(XIJ, RIJ, HIJ)``
-
+    - ``WDP = KERNEL(XIJ, DELTAP*HIJ, HIJ)``
+    - ``WI = KERNEL(XIJ, RIJ, d_h[d_idx])``
     - ``WJ = KERNEL(XIJ, RIJ, s_h[s_idx])``
 
-    - ``RHOIJ = 0.5*(d_rho[d_idx] + s_rho[s_idx])``
-
-    - ``WI = KERNEL(XIJ, RIJ, d_h[d_idx])``
-
-    - ``RHOIJ1 = 1.0/RHOIJ``
+    - ``WDASHI = DWDQ(RIJ, d_h[d_idx])``
+    - ``WDASHJ = DWDQ(RIJ, s_h[s_idx])``
+    - ``WDASHIJ = DWDQ(RIJ, HIJ)``
 
     - ``DWIJ``: ``GRADIENT(XIJ, RIJ, HIJ, DWIJ)``
     - ``DWJ``: ``GRADIENT(XIJ, RIJ, s_h[s_idx], DWJ)``
     - ``DWI``: ``GRADIENT(XIJ, RIJ, d_h[d_idx], DWI)``
 
-    - ``VIJ[0] = d_u[d_idx] - s_u[s_idx]``
-      ``VIJ[1] = d_v[d_idx] - s_v[s_idx]``
-      ``VIJ[2] = d_w[d_idx] - s_w[s_idx]``
-
-    - ``EPS = 0.01 * HIJ * HIJ``
+    - ``GHI``: ``GHI = GRADH(XIJ, RIJ, d_h[d_idx])``
+    - ``GHJ``: ``GHJ = GRADH(XIJ, RIJ, s_h[s_idx])``
+    - ``GHIJ``: ``GHIJ = GRADH(XIJ, RIJ, HIJ)``
 
     - ``SPH_KERNEL``: the kernel being used and one can call the kernel as
       ``SPH_KERNEL.kernel(xij, rij, h)`` the gradient as
