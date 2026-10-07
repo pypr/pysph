@@ -342,6 +342,16 @@ class TestQuinticSpline1D(TestCubicSpline1D):
     def test_simple(self):
         self.check_kernel_at_origin(0.55)
 
+    def test_normalization(self):
+        """" Added in response to issue #421. """
+        kh = self.wrapper.radius_scale
+        # Full domain [-3h, 3h] must integrate to 1.0
+        r = self.check_kernel_moment_1d(-kh, kh, 1.0, 0, xj=0)
+        self.assertAlmostEqual(r, 1.0, 8)
+        # Non-unit h
+        r = self.check_kernel_moment_1d(-kh, kh, 0.5, 0, xj=0)
+        self.assertAlmostEqual(r, 1.0, 8)
+
 
 class TestQuinticSpline2D(TestCubicSpline2D):
     kernel_factory = staticmethod(lambda: QuinticSpline(dim=2))
