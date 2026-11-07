@@ -166,7 +166,7 @@ class InletOutletManager(object):
             name = self.outlet_pairs[pa_arr.name]
 
         ghost_pa = get_particle_array(
-            name=name, m=m, x=x, y=y, h=h, u=u, p=0.0, rho=rho
+            name=name, m=m, x=x, y=y, z=z, h=h, u=u, p=0.0, rho=rho
         )
 
         return ghost_pa
